@@ -65,6 +65,18 @@ namespace RVRepairVan.Patches
             new[] { "rvupg", "the van's upgrades and what they cost", "rvupg" },
             new[] { "rvrepair", "repair the van right now", "rvrepair" },
             new[] { "rvbuy", "buy an upgrade without the money", "rvbuy" },
+            new[] { "rvcam", "park the camera at a fixed view of the RV, 'rvcam off' to return", "rvcam side_n" },
+            new[] { "rvwreck", "wreck the RV again and restart the questline", "rvwreck" },
+            new[] { "rvparts", "list the children of an RV model node with their position", "rvparts rv/Main/Interior" },
+            new[] { "rvtoggle", "switch one RV model node on or off", "rvtoggle rv/Main/Interior/Dash on" },
+            new[] { "rvplace", "build an item on the RV floor", "rvplace plasticpot 0" },
+            new[] { "rvcrew", "every RV employee: position, locker, pay, work issues", "rvcrew" },
+            new[] { "rvassign", "give RV botanists a free RV locker and the RV pots", "rvassign" },
+            new[] { "rvgrid", "extent of every RV build grid in the RV's frame", "rvgrid" },
+            new[] { "rvstock", "fill the first RV storage rack with soil and seeds", "rvstock" },
+            new[] { "rvreach", "for every RV pot and rack: is each access point in bounds and reachable by the crew", "rvreach" },
+            new[] { "rvpay", "put cash in every RV locker, the way a player pays the crew", "rvpay 500" },
+            new[] { "rvpayrepair", "pay Marco for the repair the way his dialogue choice does", "rvpayrepair" },
         };
 
         private static bool Dispatch(string[] parts)
@@ -73,7 +85,9 @@ namespace RVRepairVan.Patches
             string cmd = parts[0].ToLower();
             if (cmd != "rvtest" && cmd != "rvstage" && cmd != "rvdrops" && cmd != "rvclear"
                 && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvreinject" && cmd != "rvprobe"
-                && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy")
+                && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
+                && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach"
+                && cmd != "rvpayrepair")
                 return false;   // not ours - let the game handle it
 
             // Both overloads can fire for a single submission (the string body calls the List body), so run the
@@ -135,6 +149,44 @@ namespace RVRepairVan.Patches
                     case "rvreinject":   // 'rvreinject degraded' exercises the no-container fallback (adds duplicates)
                         RVRepairVan.Quests.Questline.DebugReinject(parts.Length > 1 && parts[1].ToLower() == "degraded");
                         break;
+                    case "rvcam":     // fixed camera views around and inside the RV, for screenshot rounds
+                        RvCam(parts.Length > 1 ? parts[1].ToLower() : "");
+                        break;
+                    case "rvwreck":   // back to a wrecked RV and quest stage Started, to replay the questline
+                        if (RVRepairVan.Managers.RVManager.Destroy())
+                        {
+                            RVRepairVan.Persistence.RepairStateStore.SetRepaired(false);
+                            RVRepairVan.Quests.Questline.DebugSetStage(1);
+                            Core.Log.Msg("[Debug] rvwreck: RV wrecked, stage -> Started.");
+                        }
+                        else Core.Log.Warning("[Debug] rvwreck: destroy call failed (is the RV loaded?).");
+                        break;
+                    case "rvparts":  RvDevTools.Parts(string.Join(" ", parts, 1, parts.Length - 1)); break;
+                    case "rvtoggle":
+                        // Node names carry spaces ("Chair (1)"), so the path is every word after the command and only a
+                        // trailing on/off is read as the switch.
+                        if (parts.Length > 1)
+                        {
+                            string last = parts[parts.Length - 1].ToLower();
+                            bool hasState = parts.Length > 2 && (last == "on" || last == "off");
+                            RvDevTools.Toggle(string.Join(" ", parts, 1, parts.Length - (hasState ? 2 : 1)), hasState ? last : "");
+                        }
+                        else Core.Log.Warning("[Debug] rvtoggle <path under the RV model> [on|off]");
+                        break;
+                    case "rvplace":
+                        if (parts.Length > 1) RvDevTools.Place(parts[1].ToLower(), parts.Length > 2 && int.TryParse(parts[2], out int rot) ? rot : 0);
+                        else Core.Log.Warning("[Debug] rvplace <itemId> [rotation]");
+                        break;
+                    case "rvcrew":   RvDevTools.Crew(); break;
+                    case "rvassign": RvDevTools.Assign(); break;
+                    case "rvgrid":   RvDevTools.GridExtent(); break;
+                    case "rvstock":  RvDevTools.Stock(); break;
+                    case "rvreach":  RvDevTools.Reach(); break;
+                    case "rvpayrepair":
+                        Core.Log.Msg("[Debug] rvpayrepair: HostPayRepair returned "
+                            + RVRepairVan.Quests.Questline.HostPayRepair(true) + ".");
+                        break;
+                    case "rvpay":    RvDevTools.Pay(parts.Length > 1 && float.TryParse(parts[1], out float amount) ? amount : 500f); break;
                     case "rvgiveclient":   // host: tell every CLIENT to spawn packaged test products (jar OG Kush)
                         RVRepairVan.Net.NetworkBus.BroadcastToAll(RVRepairVan.Net.RvOp.DebugGiveItems);
                         Core.Log.Msg("[Debug] rvgiveclient: broadcast DebugGiveItems to clients (run this on the HOST).");
@@ -143,6 +195,46 @@ namespace RVRepairVan.Patches
             }
             catch (Exception e) { Core.Log.Warning("[Debug] console cmd failed: " + e.Message); }
             return true;   // ours - swallow it either way
+        }
+
+        // Camera offsets from the RV root (world axes; the RV is static and lies along X). Eye height inside is the
+        // cabin floor (y 1.08) plus a standing player's eye line.
+        private static readonly (string name, Vector3 eye, Vector3 target)[] CamViews =
+        {
+            ("side_n",  new Vector3(0f, 2.0f, 7.0f),    new Vector3(0f, 1.4f, 0f)),
+            ("side_s",  new Vector3(0f, 2.0f, -7.0f),   new Vector3(0f, 1.4f, 0f)),
+            ("end_e",   new Vector3(8.5f, 2.2f, 0.5f),  new Vector3(0f, 1.4f, 0f)),
+            ("end_w",   new Vector3(-8.5f, 2.2f, 0.5f), new Vector3(0f, 1.4f, 0f)),
+            ("corner",  new Vector3(6.5f, 3.5f, 6.5f),  new Vector3(0f, 1.2f, 0f)),
+            ("top",     new Vector3(0.5f, 14f, 0.5f),   new Vector3(0f, 0f, 0f)),
+            ("in_e",    new Vector3(2.8f, 2.6f, 0.2f),  new Vector3(-3.0f, 1.6f, -0.6f)),
+            ("in_w",    new Vector3(-2.6f, 2.6f, -0.6f), new Vector3(3.0f, 1.6f, 0.4f)),
+            ("in_floor", new Vector3(0.2f, 3.4f, -0.4f), new Vector3(0.2f, 1.08f, -0.5f)),
+        };
+
+        private static void RvCam(string view)
+        {
+            var cam = PlayerSingleton<PlayerCamera>.Instance;
+            if (cam == null) { Core.Log.Warning("[Debug] rvcam: no PlayerCamera."); return; }
+            if (view == "off")
+            {
+                cam.StopTransformOverride(0f, true, true);
+                Core.Log.Msg("[Debug] rvcam: camera back on the player.");
+                return;
+            }
+            Transform root = RVRepairVan.Managers.RVManager.Root;
+            if (root == null) { Core.Log.Warning("[Debug] rvcam: RV root not found."); return; }
+            foreach (var v in CamViews)
+            {
+                if (v.name != view) continue;
+                Vector3 eye = root.position + v.eye, at = root.position + v.target;
+                cam.OverrideTransform(eye, Quaternion.LookRotation(at - eye), 0f, false);
+                Core.Log.Msg("[Debug] rvcam " + view + ": eye=" + eye + " looking at " + at);
+                return;
+            }
+            string names = "";
+            foreach (var v in CamViews) names += " " + v.name;
+            Core.Log.Warning("[Debug] rvcam <view|off>, views:" + names);
         }
 
         internal static void ClearErrandItems()
@@ -211,7 +303,7 @@ namespace RVRepairVan.Patches
     {
         private static bool Prefix(string args)
         {
-            try { return !DebugConsolePatch.TryHandle(args); } catch { return true; }
+            try { return !DebugConsolePatch.TryHandle(args); } catch (Exception e) { Core.Swallowed("DebugConsolePatch.SubmitCommand(string)", e); return true; }
         }
     }
 
@@ -220,7 +312,7 @@ namespace RVRepairVan.Patches
     {
         private static bool Prefix(Il2CppSystem.Collections.Generic.List<string> args)
         {
-            try { return !DebugConsolePatch.TryHandle(args); } catch { return true; }
+            try { return !DebugConsolePatch.TryHandle(args); } catch (Exception e) { Core.Swallowed("DebugConsolePatch.SubmitCommand(List)", e); return true; }
         }
     }
 }
