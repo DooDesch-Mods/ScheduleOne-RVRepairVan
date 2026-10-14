@@ -11,9 +11,9 @@
 ![MelonLoader](https://img.shields.io/badge/MelonLoader-0.7.3+-green)
 ![S1API](https://img.shields.io/badge/S1API-required-orange)
 
-![The wrecked RV and the repaired one](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
+[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_ewKFi6WYO1ixoivBTukWkPBm/badge.svg)](https://mlvscan.com/attestations/att_ewKFi6WYO1ixoivBTukWkPBm)
 
-[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_RhcyMUaP3ywqKoI8_vN9ayEg/badge.svg)](https://mlvscan.com/attestations/att_RhcyMUaP3ywqKoI8_vN9ayEg)
+![The wrecked RV and the repaired one](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
 
 ## Features
 
