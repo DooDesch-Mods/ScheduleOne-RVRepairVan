@@ -94,10 +94,10 @@ namespace RVRepairVan.Base
             string money = MoneyManager.FormatAmount(Price(up));
             switch (up)
             {
-                case RvUpgrade.GutInterior: return L10n.T("Gut the interior. ({0})", money);
-                case RvUpgrade.WorkshopFloor: return L10n.T("Build me a workshop floor. ({0})", money);
-                case RvUpgrade.CrewQuarters: return L10n.T("Make room for a crew. ({0})", money);
-                case RvUpgrade.LoadingDock: return L10n.T("I need a loading dock. ({0})", money);
+                case RvUpgrade.GutInterior: return L10n.T("Clear out the inside ({0})", money);
+                case RvUpgrade.WorkshopFloor: return L10n.T("Put in a work floor ({0})", money);
+                case RvUpgrade.CrewQuarters: return L10n.T("Make room for a crew ({0})", money);
+                case RvUpgrade.LoadingDock: return L10n.T("Build a loading dock ({0})", money);
                 default: return "";
             }
         }
@@ -107,13 +107,13 @@ namespace RVRepairVan.Base
             switch (up)
             {
                 case RvUpgrade.GutInterior:
-                    return L10n.T("Stripped her out. Bed, bench, the lot - it's a box on wheels now. Do something with it.");
+                    return L10n.T("All cleared out. Want to build in there? You'll need a proper floor.");
                 case RvUpgrade.WorkshopFloor:
-                    return L10n.T("Floor's braced and levelled. Bolt whatever you want to it, I don't want to know what.");
+                    return L10n.T("Floor's in. You can set up shop in there now.");
                 case RvUpgrade.CrewQuarters:
-                    return L10n.T("She'll hold a crew now. Put a locker in there or they'll stand around looking at you.");
+                    return L10n.T("Room for {0} now. Hire 'em through the Fixer, and put a locker in there so they get paid.", RVRepairVanPreferences.CrewSize);
                 case RvUpgrade.LoadingDock:
-                    return L10n.T("Dock's in. Tell your supplier to bring it here and stop making you drive.");
+                    return L10n.T("Dock's done. Deliveries can come straight to the RV now.");
                 default: return "";
             }
         }
@@ -149,7 +149,7 @@ namespace RVRepairVan.Base
                     int ticket = ClientPayment.Charge(price, "upgrade " + up);
                     if (ticket == 0)
                     {
-                        Questline.SayMarco(L10n.T("Come back when you've got {0}.", MoneyManager.FormatAmount(price)));
+                        Questline.SayMarco(L10n.T("That's {0}, buddy. Come back when you've got it.", MoneyManager.FormatAmount(price)));
                         return;
                     }
                     NetworkBus.SendToHost(RvOp.BuyUpgrade, (int)up, ticket, price);
@@ -179,7 +179,7 @@ namespace RVRepairVan.Base
                     if (S1API.Money.Money.GetCashBalance() < price)
                     {
                         Core.Log.Msg("[Upgrade] " + up + " rejected - short of " + MoneyManager.FormatAmount(price) + ".");
-                        Questline.SayMarco(L10n.T("Come back when you've got {0}.", MoneyManager.FormatAmount(price)));
+                        Questline.SayMarco(L10n.T("That's {0}, buddy. Come back when you've got it.", MoneyManager.FormatAmount(price)));
                         return false;
                     }
                     // Charge and record ownership in the SAME step. Deferring the mask to the cinematic's midpoint

@@ -185,7 +185,9 @@ namespace RVRepairVan.Dialogue
         {
             try
             {
-                if (npc != null) npc.SendWorldSpaceDialogue(line, 5f);
+                if (npc == null) { Core.Log.Warning("[Say] no NPC to speak: " + line); return; }
+                npc.SendWorldSpaceDialogue(line, 5f);
+                Core.Log.Msg("[Say] " + npc.FirstName + ": " + line);
             }
             catch (Exception e) { Core.Swallowed("MarcoRepairDialogue.WorldSay", e); /* worldspace lines are nice-to-have */ }
         }
@@ -225,7 +227,7 @@ namespace RVRepairVan.Dialogue
                     NetworkBus.SendToHost(RvOp.PayRepair, 0, ticket, (int)price);
                     RVRepairVan.Effects.RepairCinematic.Play(
                         null,
-                        () => WorldSay(marco, L10n.T("There she is - back from the dead. Try not to total her again.")),
+                        () => WorldSay(marco, L10n.T("There she is, good as new. Try not to blow her up again, buddy.")),
                         () => Questline.GruntNpc(marco));
                     return;
                 }
@@ -247,7 +249,7 @@ namespace RVRepairVan.Dialogue
                             Core.Log.Msg("[Marco] RV repaired for " + MoneyManager.FormatAmount(paid) + ".");
                         }
                     },
-                    () => WorldSay(marco, L10n.T("There she is - back from the dead. Try not to total her again.")),
+                    () => WorldSay(marco, L10n.T("There she is, good as new. Try not to blow her up again, buddy.")),
                     () => Questline.GruntNpc(marco));   // mid-repair: Marco hurts himself
             }
             catch (Exception e)

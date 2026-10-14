@@ -60,6 +60,8 @@ namespace RVRepairVan.Patches
             new[] { "rvclear", "clear the staged test state", "rvclear" },
             new[] { "rvgiveclient", "hand the client its half of a co-op errand", "rvgiveclient" },
             new[] { "rvdiag", "what the questline thinks is going on", "rvdiag" },
+            new[] { "rvpick", "fire one dialogue choice by its rvdiag index", "rvpick marco 3" },
+            new[] { "rvhold", "equip a hotbar slot, 'talk' locks equipping the way a conversation does", "rvhold 2 talk" },
             new[] { "rvreinject", "rebuild the quest objects after a reload", "rvreinject" },
             new[] { "rvprobe", "poke one step of the questline", "rvprobe" },
             new[] { "rvupg", "the van's upgrades and what they cost", "rvupg" },
@@ -87,7 +89,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvreinject" && cmd != "rvprobe"
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach"
-                && cmd != "rvpayrepair")
+                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold")
                 return false;   // not ours - let the game handle it
 
             // Both overloads can fire for a single submission (the string body calls the List body), so run the
@@ -117,6 +119,15 @@ namespace RVRepairVan.Patches
                         break;
                     case "rvdiag":    // dump the quest gate + every injected dialogue choice
                         RVRepairVan.Quests.Questline.DebugDiag();
+                        break;
+                    case "rvhold":    // equip hotbar slot n; 'rvhold n talk' then locks equipping like a conversation does
+                        if (parts.Length > 1 && int.TryParse(parts[1], out int holdSlot)) Hold(holdSlot, parts.Length > 2 && parts[2] == "talk");
+                        else Core.Log.Warning("[Debug] rvhold <slot 0-8> [talk]");
+                        break;
+                    case "rvpick":    // fire one dialogue choice by its rvdiag index: rvpick marco 3
+                        if (parts.Length > 2 && int.TryParse(parts[2], out int pick))
+                            RVRepairVan.Quests.Questline.DebugPick(parts[1].ToLowerInvariant(), pick);
+                        else Core.Log.Warning("[Debug] rvpick <donna|ming|marco> <index>  (index from rvdiag)");
                         break;
                     case "rvprobe":   // measure the RV property: idle points, capacity, docks, grids, NavMesh
                         RvProbe.Run();
@@ -253,6 +264,19 @@ namespace RVRepairVan.Patches
                 Core.Log.Msg("[Debug] rvclear: removed " + n + " quest item(s) from all drops.");
             }
             catch (Exception e) { Core.Log.Warning("[Debug] rvclear failed: " + e.Message); }
+        }
+
+        // Equip a hotbar slot without a key press. 'talk' then disables equipping, which is what the dialogue state
+        // does: the hand empties and the slot index moves to PriorEquippedSlotIndex.
+        private static void Hold(int slot, bool talk)
+        {
+            PlayerInventory inv = PlayerSingleton<PlayerInventory>.Instance;
+            if (inv == null) { Core.Log.Warning("[Debug] rvhold: no PlayerInventory."); return; }
+            inv.SetEquippingEnabled(true);
+            inv.Equip(inv.IndexAllSlots(slot));
+            if (talk) inv.SetEquippingEnabled(false);
+            Core.Log.Msg("[Debug] rvhold: equipped=" + inv.EquippedSlotIndex + " prior=" + inv.PriorEquippedSlotIndex
+                + " item=" + (inv.IndexAllSlots(slot)?.ItemInstance?.Name ?? "<empty>") + (talk ? " (talking)" : ""));
         }
 
         internal static void DumpDrops()

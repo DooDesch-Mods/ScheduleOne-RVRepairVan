@@ -98,22 +98,28 @@ namespace RVRepairVan.Base
                 RepairStateStore.SetRepairStartedAt(0);
                 if (NetworkBus.Online && NetworkBus.IsServer) NetworkBus.BroadcastToAll(RvOp.RepairApplied);
                 Quests.RepairQuest.CompleteIfActive();
-                Notify(L10n.T("She's done. Come get her whenever - and try not to total her again."));
+                TextFromMarco(L10n.T("Your RV's all done, buddy. Good as new."));
                 Core.Log.Msg("[Job] Marco finished the RV.");
             }
             catch (Exception e) { Core.Log.Warning("[Job] finish failed: " + e.Message); }
         }
 
-        /// <summary>Marco texts the player that the RV is ready. Falls back to a world line if the phone path fails.</summary>
-        private static void Notify(string text)
+        /// <summary>Marco texts the player. Falls back to a world line if the phone path fails.</summary>
+        internal static void TextFromMarco(string text)
         {
             try
             {
                 var marco = S1API.Entities.NPC.Get("marco_baron");
-                if (marco != null) { marco.SendTextMessage(text); return; }
+                if (marco != null)
+                {
+                    marco.SendTextMessage(text);
+                    Core.Log.Msg("[Marco] texted the player: " + text);
+                    return;
+                }
+                Core.Log.Warning("[Marco] NPC not found - saying the text in the world instead.");
             }
-            catch (Exception e) { Core.Swallowed("RvRepairJob.Notify.text", e); }
-            try { Quests.Questline.SayMarco(text); } catch (Exception e) { Core.Swallowed("RvRepairJob.Notify", e); }
+            catch (Exception e) { Core.Swallowed("RvRepairJob.TextFromMarco.text", e); }
+            try { Quests.Questline.SayMarco(text); } catch (Exception e) { Core.Swallowed("RvRepairJob.TextFromMarco", e); }
         }
 
         // --- instant repair -------------------------------------------------------------------------------

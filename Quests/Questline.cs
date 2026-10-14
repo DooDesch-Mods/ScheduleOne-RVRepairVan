@@ -49,12 +49,12 @@ namespace RVRepairVan.Quests
 
         // Loss-fallback lines (per NPC). Player admits the loss -> NPC demands $LostPackageFee -> pay or defer.
         // English source text doubles as the L10n key - wrap in L10n.T(...) at the point of use.
-        private const string MingAngry  = "You lost it? I don't lose things, and people who lose my things lose teeth. Five hundred buys you both back. Now.";
-        private const string MingPaid   = "Smart. We're square. Now go see Marco at the body shop down by the docks, and tell him Mrs. Ming sent you.";
-        private const string MingShort  = "Then don't come back until your hands are full.";
-        private const string MarcoAngry = "You did what? You walk in here empty-handed and waste my time. Five hundred, or the next thing that goes missing is you.";
-        private const string MarcoPaid  = "Good. Mess like that gets forgotten when the cash shows up. Bring me some of that good stuff now and then, and I'll keep shaving down the bill.";
-        private const string MarcoShort = "Clock's running. Come back with it.";
+        private const string MingAngry  = "You lose my crate? Not very good. Five hundred, then we are okay, yes?";
+        private const string MingPaid   = "Very good. Now go see Marco at the docks, tell him Ming sends you.";
+        private const string MingShort  = "Okay. You bring money, yes?";
+        private const string MarcoAngry = "You lost it? Well, that's gonna cost ya. Five hundred and we're even.";
+        private const string MarcoPaid  = "Pleasure doing business. Now, bring me packaged product in your hand, and every piece comes off your bill.";
+        private const string MarcoShort = "I'll be here.";
 
         // Attempts (2s each during the fast burst) an NPC's dialogue containers get to build before we inject the
         // fallback version instead. ~30s covers a slow scene load without leaving the player waiting on a dead NPC.
@@ -82,8 +82,8 @@ namespace RVRepairVan.Quests
 #endif
         private static DialogueController.DialogueChoice _marcoRepairChoice;
 
-        // Sample picker: one Marco dialogue choice per packaged product the player holds (so they choose WHICH to
-        // hand over). Capped at the hotbar size; _sampleSlots is the live snapshot the choices/handler index into.
+        // Sample choice: the packaged product in the player's hand; _sampleSlots is the live snapshot the choice
+        // and its handler index into.
         // Marco's build-out shop. Order matters only for the display order of the choices - the prerequisites
         // themselves live in RvUpgrades.
         private static readonly Base.RvUpgrade[] UpgradeOrder =
@@ -94,7 +94,7 @@ namespace RVRepairVan.Quests
         private static readonly DialogueController.DialogueChoice[] _upgradeChoices =
             new DialogueController.DialogueChoice[4];
 
-        private const int MAX_SAMPLE_CHOICES = 8;
+        private const int MAX_SAMPLE_CHOICES = 1;   // only the product in the player's hand
         private static readonly DialogueController.DialogueChoice[] _sampleChoices = new DialogueController.DialogueChoice[MAX_SAMPLE_CHOICES];
         private static readonly System.Collections.Generic.List<ItemSlot> _sampleSlots = new System.Collections.Generic.List<ItemSlot>();
 
@@ -124,7 +124,6 @@ namespace RVRepairVan.Quests
             }
         }
 
-        private static bool MarcoGreeted => Stage >= MarcoMet;   // asked Marco "can you fix it"
         private static bool ReferralUsed => Stage >= ReadyToPay;  // you actually told Marco - price is 10k
         private static bool Trusted_ => Stage >= Trusted;         // did Marco's pickup - packaged samples unlocked
         // A wrecked RV needs repairing - availability is driven by IsDestroyed(). On a co-op CLIENT, RV.IsDestroyed
@@ -291,9 +290,24 @@ namespace RVRepairVan.Quests
                 if (c == null) continue;
                 // Runtime AddListener calls are invisible from here (only serialized listeners are countable), so this
                 // dump shows structure only - whether a choice actually does something is enforced in AddChoice.
-                Core.Log.Msg("    [" + i + "] '" + c.ChoiceText + "' enabled=" + c.Enabled
+                bool shown = false;
+                try { shown = c.shouldShowCheck == null || c.shouldShowCheck.Invoke(false); }
+                catch (Exception e) { Core.Log.Warning("[Debug] shouldShowCheck threw for '" + c.ChoiceText + "': " + e.Message); }
+                Core.Log.Msg("    [" + i + "] '" + c.ChoiceText + "' shown=" + shown + " enabled=" + c.Enabled
                     + " conv=" + (c.Conversation != null) + " onChoosen=" + (c.onChoosen != null));
             }
+        }
+
+        /// <summary>Debug: fire the i-th choice of an NPC (as listed by rvdiag) the way a click would - its action
+        /// runs, its reply container does not open. Covers the state flow behind each dialogue line.</summary>
+        internal static void DebugPick(string who, int index)
+        {
+            DialogueController dc = who == "donna" ? _donnaDC : who == "ming" ? _mingDC : who == "marco" ? _marcoDC : null;
+            if (dc == null || dc.Choices == null) { Core.Log.Warning("[Debug] rvpick: no dialogue for '" + who + "'."); return; }
+            if (index < 0 || index >= dc.Choices.Count) { Core.Log.Warning("[Debug] rvpick: no choice " + index + " on " + who + "."); return; }
+            var c = dc.Choices[index];
+            Core.Log.Msg("[Debug] rvpick " + who + " [" + index + "] '" + c.ChoiceText + "'");
+            if (c.onChoosen != null) c.onChoosen.Invoke();
         }
 #endif
 
@@ -397,7 +411,7 @@ namespace RVRepairVan.Quests
         private static bool InjectDonna(DialogueController donna, NPC npc, bool degraded)
         {
             var reply = S1Container(npc, "rv_donna", b => b
-                .AddNode("ENTRY", L10n.T("Do I look like a mechanic, sweetheart? Go ask Mrs. Ming over at the Chinese place. She knows people.")));
+                .AddNode("ENTRY", L10n.T("I run a motel, not a garage. Try Mrs. Ming at the Chinese restaurant, ok? She knows people.")));
             if (reply == null && !degraded) return false;   // retry rather than inject a choice without its reply
 
             AddChoice(donna, L10n.T("My RV got blown up. Know anyone who can fix it?"), 90,
@@ -411,20 +425,20 @@ namespace RVRepairVan.Quests
             // The errand offer is an in-dialogue sub-menu (accept / not now), no cash involved.
             var offer = S1Container(npc, "rv_ming_offer", b => b
                 .AddNode("ENTRY",
-                    L10n.T("Marco at the docks can fix almost anything. But favors move both ways. I have a crate waiting at a dead drop nearby. Bring it back, and I'll put in a word."),
-                    c => c.Add("MING_ACCEPT", L10n.T("I'll grab it."), "MING_ACCEPTED")
-                          .Add("MING_DEFER", L10n.T("Not right now."), "MING_DEFERRED"))
-                .AddNode("MING_ACCEPTED", L10n.T("Good. Pick it up, bring it here, and don't open it."))
-                .AddNode("MING_DEFERRED", L10n.T("Then your RV can stay where it is.")));
+                    L10n.T("Oh yes! Marco, at the docks. Very good mechanic. But first you do small favor for me, yes? Crate in a dead drop. You bring it here, I call Marco."),
+                    c => c.Add("MING_ACCEPT", L10n.T("I'll get it."), "MING_ACCEPTED")
+                          .Add("MING_DEFER", L10n.T("Not now."), "MING_DEFERRED"))
+                .AddNode("MING_ACCEPTED", L10n.T("Very good! And do not open, yes?"))
+                .AddNode("MING_DEFERRED", L10n.T("Okay. You come back when ready.")));
 
             var deliver = S1Container(npc, "rv_ming_deliver", b => b
-                .AddNode("ENTRY", L10n.T("Good. Go see Marco at the body shop down by the docks. Tell him Mrs. Ming sent you.")));
+                .AddNode("ENTRY", L10n.T("Very good! I call Marco now. Go see him at the docks, tell him Ming sends you.")));
 
             // Loss fallback: collected the drop but no longer holding the crate -> admit it, pay the fee or defer.
             var lost = S1Container(npc, "rv_ming_lost", b => b
                 .AddNode("ENTRY", L10n.T(MingAngry),
                     c => c.Add("MING_PAY", L10n.T("Pay ${0}", LostPackageFee), null)
-                          .Add("MING_DEFER_LOSS", L10n.T("I'll get the money."), "MING_LOSS_DEFER"))
+                          .Add("MING_DEFER_LOSS", L10n.T("I'll come back with the money."), "MING_LOSS_DEFER"))
                 .AddNode("MING_LOSS_DEFER", L10n.T(MingShort)));
 
             if (!degraded && (offer == null || deliver == null || lost == null)) return false;
@@ -432,11 +446,11 @@ namespace RVRepairVan.Quests
             OnPick(npc, "MING_ACCEPT", OnAcceptErrand);
             // Without its sub-menu this choice carries neither a Conversation nor an action, so picking it does
             // nothing at all. Accept the errand straight away instead and say Ming's line in the world.
-            AddChoice(ming, L10n.T("Donna said you might know someone who can fix my RV."), 92,
+            AddChoice(ming, L10n.T("Donna says you know someone who can fix my RV."), 92,
                 () => Active && Stage == AskedDonna,
                 offer != null ? null : (Action)(() =>
                 {
-                    WorldSay(_mingT, L10n.T("Marco at the docks can fix almost anything. But favors move both ways. I have a crate waiting at a dead drop nearby. Bring it back, and I'll put in a word."));
+                    WorldSay(_mingT, L10n.T("Oh yes! Marco, at the docks. Very good mechanic. But first you do small favor for me, yes? Crate in a dead drop. You bring it here, I call Marco."));
                     OnAcceptErrand();
                 }),
                 offer);
@@ -460,36 +474,36 @@ namespace RVRepairVan.Quests
             // Build every container first: a choice whose only action is its Conversation is a dead click if the
             // container is missing, so we would rather retry the whole injection than inject half of it.
             var favourC = S1Container(npc, "rv_marco_favour", b => b
-                .AddNode("ENTRY", L10n.T("Maybe. I left a package at a dead drop nearby. Pick it up, bring it back, and don't make it weird.")));
+                .AddNode("ENTRY", L10n.T("Tell ya what. There's a package of mine in a dead drop. Bring it here and we'll talk.")));
             var gotpkgC = S1Container(npc, "rv_marco_gotpkg", b => b
-                .AddNode("ENTRY", L10n.T("Good. You can follow instructions. Bring me some of that good stuff now and then, and I'll keep shaving down the bill.")));
+                .AddNode("ENTRY", L10n.T("Much obliged. Here's the deal: bring me packaged product in your hand, and every piece comes off your bill.")));
             var lostpkgC = S1Container(npc, "rv_marco_lost", b => b
                 .AddNode("ENTRY", L10n.T(MarcoAngry),
                     c => c.Add("MARCO_PAY", L10n.T("Pay ${0}", LostPackageFee), null)
-                          .Add("MARCO_DEFER_LOSS", L10n.T("I'll get the money."), "MARCO_LOSS_DEFER"))
+                          .Add("MARCO_DEFER_LOSS", L10n.T("I'll come back with the money."), "MARCO_LOSS_DEFER"))
                 .AddNode("MARCO_LOSS_DEFER", L10n.T(MarcoShort)));
             var bringInfoC = S1Container(npc, "rv_marco_bring", b => b
-                .AddNode("ENTRY", L10n.T("Bring me packaged product - sealed stuff, not raw. Every piece I take knocks its value off the bill, up to five hundred a pop, right down to my floor.")));
+                .AddNode("ENTRY", BringInfoLine()));
 
             if (!degraded && (favourC == null || gotpkgC == null || lostpkgC == null || bringInfoC == null)) return false;
 
-            // Greet / "fifty grand?" / referral / repair / sample carry a live price, a dynamic outcome, or are
-            // pure flavour -> worldspace replies. The favour + package hand-off are static -> in-dialogue nodes.
-            AddChoice(marco, L10n.T("Can you fix my RV?"), 100,
-                () => Active && Stage == Referred, OnMarcoGreet);
-            AddChoice(marco, L10n.T("Fifty grand?"), 99,
-                () => Active && Stage == MarcoMet, OnMarcoFifty);
-            // Dropping Mrs. Ming's name (only at MarcoMet - you've greeted him and she's referred you) applies
-            // the referral price (50k -> 10k) and advances to "pay".
-            AddChoice(marco, L10n.T("Mrs. Ming sent me."), 98,
-                () => Active && Stage == MarcoMet, OnMarcoReferral);
+            // Mrs. Ming's name is in the first line the player can say, so the quote they hear is already the
+            // referral price. Saves made before this change can sit at MarcoMet; they get the same choice.
+            AddChoice(marco, L10n.T("Mrs. Ming sent me. Can you fix my RV?"), 100,
+                () => Active && (Stage == Referred || Stage == MarcoMet), OnMarcoReferral);
             _marcoRepairChoice = AddChoice(marco, RepairChoiceText(), 97,
-                () => Active && MarcoGreeted && Stage < Paid, OnMarcoRepair);
+                () => Active && ReferralUsed && Stage < Paid, OnMarcoRepair);
 
-            AddChoice(marco, L10n.T("Anything I can do to bring the price down?"), 96,
+            // "Can you go any lower?" is one question with two answers: before the package run Marco names the
+            // package (and starts the run), after it he names what knocks the bill down. Only one is ever visible.
+            AddChoice(marco, L10n.T("Can you go any lower?"), 96,
                 () => Active && Stage == ReadyToPay && !_pickupActive, OnMarcoFavour, favourC);
+            AddChoice(marco, L10n.T("Can you go any lower?"), 96,
+                () => Active && Trusted_ && Stage < Paid && HeldPackagedSlot() == null && CurrentPrice() > RVRepairVanPreferences.RepairPrice,
+                bringInfoC != null ? null : (Action)(() => WorldSay(_marcoT, BringInfoLine())),
+                bringInfoC);
 
-            AddChoice(marco, L10n.T("Got your package."), 96,
+            AddChoice(marco, L10n.T("Here's your package."), 96,
                 () => Active && _pickupActive && _hasPackage && PlayerHasItem(PackageId), OnGotPackage, gotpkgC);
 
             // Loss fallback: collected the drop but no longer holding the package -> admit it, pay the fee or defer.
@@ -501,9 +515,9 @@ namespace RVRepairVan.Quests
                 lostpkgC != null ? null : (Action)(() => { WorldSay(_marcoT, L10n.T(MarcoAngry)); OnMarcoPayLoss(); }),
                 lostpkgC);
 
-            // One sample entry per packaged product the player holds, so they pick WHICH to hand over. Each entry is
-            // shown live (SampleChoiceVisible) only while trust is earned (Stage >= Trusted) and the price is still
-            // above the floor; its label is set to that product's name + per-unit value right before it's drawn.
+            // The product the player held when the conversation opened, as one choice. Shown live
+            // (SampleChoiceVisible) only while trust is earned and the price is above the floor; its label is set to
+            // that product's name + per-unit value right before it is drawn.
             for (int s = 0; s < MAX_SAMPLE_CHOICES; s++)
             {
                 int idx = s;
@@ -511,9 +525,6 @@ namespace RVRepairVan.Quests
                     () => SampleChoiceVisible(idx), () => OnGiveSample(idx));
             }
 
-            // Persistent reminder once trust is earned: tells players (who may have skipped the dialogue) HOW to
-            // keep lowering the price. Shows whenever they're NOT currently holding product to hand over (when they
-            // are, the "Give Marco a packaged sample" action is visible instead), until paid or the floor is hit.
             // Marco's build-out shop: offered once the RV is standing again, in both quest modes. Each entry keeps
             // a live price label like the repair choice, so a settings change updates it without a restart.
             for (int u = 0; u < UpgradeOrder.Length; u++)
@@ -522,11 +533,6 @@ namespace RVRepairVan.Quests
                 _upgradeChoices[u] = AddChoice(marco, Base.RvUpgrades.ChoiceText(up), 93 - u,
                     () => Base.RvUpgrades.Available(up), () => Base.RvUpgrades.Buy(up));
             }
-
-            AddChoice(marco, L10n.T("What can I bring to lower the price?"), 94,
-                () => Active && Trusted_ && Stage < Paid && !HoldingPackaged() && CurrentPrice() > RVRepairVanPreferences.RepairPrice,
-                bringInfoC != null ? null : (Action)(() => WorldSay(_marcoT, L10n.T("Bring me packaged product - sealed stuff, not raw. Every piece I take knocks its value off the bill, up to five hundred a pop, right down to my floor."))),
-                bringInfoC);
             Core.LogDebug("[Questline] Marco dialogue injected" + (degraded ? " (degraded)." : "."));
             return true;
         }
@@ -794,31 +800,32 @@ namespace RVRepairVan.Quests
             return true;
         }
 
-        private static void OnMarcoGreet()
-        {
-            if (RouteIntent(RvOp.MarcoGreet)) return;
-            if (Stage != Referred) return;
-            // Always the full quote on first contact.
-            Stage = MarcoMet;
-            WorldSay(_marcoT, L10n.T("Yeah, I can fix it. Fifty grand."));
-            SyncEntry();
-        }
-
-        private static void OnMarcoFifty()
-        {
-            // Pure flavour - no state change.
-            WorldSay(_marcoT, L10n.T("You brought me a burnt-out shell. That's not a repair, that's a resurrection."));
-        }
+        // Kept for a co-op client on an older build that still sends the greet intent: it now means the same as
+        // naming Mrs. Ming, since there is no separate greeting step any more.
+        private static void OnMarcoGreet() => OnMarcoReferral();
 
         private static void OnMarcoReferral()
         {
             if (RouteIntent(RvOp.MarcoReferral)) return;
-            if (Stage != MarcoMet) return;
-            Stage = ReadyToPay;          // ReferralUsed -> price drops 50k -> 10k
+            if (Stage != Referred && Stage != MarcoMet)
+            {
+                Core.LogDebug("[Questline] referral ignored - stage " + Stage + ".");
+                return;
+            }
+            Stage = ReadyToPay;          // ReferralUsed -> the referral price applies
             RefreshRepairChoice();
-            WorldSay(_marcoT, L10n.T("Mrs. Ming sent you? Yeah, alright. Should've opened with that. Ten grand."));
+            WorldSay(_marcoT, L10n.T("Ming sent ya? Well, any friend of hers. That RV's a burnt-out shell, buddy. Normally that's {0}. For you, {1}.",
+                MoneyManager.FormatAmount(RVRepairVanPreferences.BasePriceNoReferral), MoneyManager.FormatAmount(CurrentPrice())));
             SyncEntry();
         }
+
+        private static string ShortLine(int price) =>
+            L10n.T("That's {0}, buddy. Come back when you've got it.", MoneyManager.FormatAmount(price));
+
+        // The answer to "Can you go any lower?" once Marco trusts you.
+        private static string BringInfoLine() =>
+            L10n.T("Packaged product, buddy. Have it in your hand when you talk to me - every piece knocks up to {0} off the bill.",
+                MoneyManager.FormatAmount(RVRepairVanPreferences.MaxSampleDiscount));
 
         private static void OnMarcoRepair()
         {
@@ -828,10 +835,10 @@ namespace RVRepairVan.Quests
                 int price = CurrentPrice();
                 if (S1API.Money.Money.GetCashBalance() < price)
                 {
-                    WorldSay(_marcoT, L10n.T("You're short. Come back when you've got the cash."));
+                    WorldSay(_marcoT, ShortLine(price));
                     return;
                 }
-                WorldSay(_marcoT, L10n.T("Alright. Hold still, this won't take long."));
+                WorldSay(_marcoT, L10n.T("Alright, let me grab my tools."));
 
                 // Co-op CLIENT: the repair (RV state + persistence) runs on the HOST, since RV.IsDestroyed is
                 // host-authoritative. The money is this player's own cash, so it is taken here and the host refunds
@@ -839,11 +846,11 @@ namespace RVRepairVan.Quests
                 if (NetworkBus.Online && !NetworkBus.IsServer)
                 {
                     int ticket = ClientPayment.Charge(price, "repair");
-                    if (ticket == 0) { WorldSay(_marcoT, L10n.T("You're short. Come back when you've got the cash.")); return; }
+                    if (ticket == 0) { WorldSay(_marcoT, ShortLine(price)); return; }
                     NetworkBus.SendToHost(RvOp.PayRepair, 0, ticket, price);
                     RVRepairVan.Effects.RepairCinematic.Play(
                         null,   // no local field write - the host drives the visual via RepairApplied
-                        () => WorldSay(_marcoT, L10n.T("There she is - back from the dead. Go take a look, and try not to total her again.")),
+                        () => WorldSay(_marcoT, L10n.T("There she is, good as new. Try not to blow her up again, buddy.")),
                         () => GruntNpc(FindNpc(MarcoId)));
                     return;
                 }
@@ -869,7 +876,7 @@ namespace RVRepairVan.Quests
 #endif
                         }
                     },
-                    () => WorldSay(_marcoT, L10n.T("There she is - back from the dead. Go take a look, and try not to total her again.")),
+                    () => WorldSay(_marcoT, L10n.T("There she is, good as new. Try not to blow her up again, buddy.")),
                     () => GruntNpc(FindNpc(MarcoId)));   // mid-repair: Marco hurts himself
             }
             catch (Exception e) { Core.Log.Error("[Questline] repair failed: " + e); }
@@ -953,11 +960,11 @@ namespace RVRepairVan.Quests
             try
             {
                 RefreshSampleSlots();
-                ItemSlot slot = (i >= 0 && i < _sampleSlots.Count) ? _sampleSlots[i] : FindPackagedProductSlot();
+                ItemSlot slot = (i >= 0 && i < _sampleSlots.Count) ? _sampleSlots[i] : HeldPackagedSlot();
                 ProductItemInstance product = slot?.ItemInstance?.TryCast<ProductItemInstance>();
                 if (product == null || product.AppliedPackaging == null)
                 {
-                    WorldSay(_marcoT, L10n.T("That ain't packaged. Hand me something sealed."));
+                    WorldSay(_marcoT, L10n.T("That ain't packaged, buddy. Bring it sealed."));
                     return;
                 }
                 int discount = SampleUnitDiscount(product);
@@ -980,7 +987,7 @@ namespace RVRepairVan.Quests
                 // send the discount it computed and let the host apply + replicate the new price.
                 if (RouteIntent(RvOp.GiveSample, discount))
                 {
-                    WorldSay(_marcoT, L10n.T("Appreciate it. Knocked {0} off the bill.", MoneyManager.FormatAmount(discount)));
+                    WorldSay(_marcoT, L10n.T("Thanks, buddy. That's {0} off.", MoneyManager.FormatAmount(discount)));
                     return;
                 }
                 HostGiveSample(discount);   // host or offline
@@ -1014,19 +1021,13 @@ namespace RVRepairVan.Quests
             }
         }
 
-        // Snapshot every inventory slot currently holding a packaged product (capped at the choice count). Rebuilt
-        // each time the choices are evaluated/picked so the list always reflects what the player holds right now.
+        // Snapshot the slot the player held when the conversation opened, if it is packaged product. Rebuilt each
+        // time the choice is evaluated/picked so it always reflects what the player holds right now.
         private static void RefreshSampleSlots()
         {
             _sampleSlots.Clear();
-            var slots = PlayerSingleton<PlayerInventory>.Instance?.GetAllInventorySlots();
-            if (slots == null) return;
-            for (int i = 0; i < slots.Count && _sampleSlots.Count < MAX_SAMPLE_CHOICES; i++)
-            {
-                ItemSlot slot = slots[i];
-                ProductItemInstance p = slot?.ItemInstance?.TryCast<ProductItemInstance>();
-                if (p != null && p.AppliedPackaging != null) _sampleSlots.Add(slot);
-            }
+            ItemSlot held = HeldPackagedSlot();
+            if (held != null) _sampleSlots.Add(held);
         }
 
         // Live visibility + label for the i-th sample choice. Shown only with trust earned and room above the floor;
@@ -1057,7 +1058,7 @@ namespace RVRepairVan.Quests
             Samples = Samples + 1;
             DiscountTotal = DiscountTotal + discount;   // setter broadcasts the new price (StageSync) to all clients
             RefreshRepairChoice();
-            WorldSay(_marcoT, L10n.T("Appreciate it. Knocked {0} off the bill.", MoneyManager.FormatAmount(discount)));
+            WorldSay(_marcoT, L10n.T("Thanks, buddy. That's {0} off.", MoneyManager.FormatAmount(discount)));
         }
 
         // Reserve a real (preferably empty) dead drop for a pickup step. Normally the FARTHEST drop from the
@@ -1110,9 +1111,9 @@ namespace RVRepairVan.Quests
                 DumpItemsOnce();   // DEBUG only: list every item id/name (clone-base reference)
                 // Carry-only bases (a sack / a bag), NOT furniture - inherits a real icon + in-hand model.
                 // Tried in order; first that clones wins. grainbag/trashbag are StorableItemDefinition subclasses.
-                RegisterItem(CrateId, L10n.T("Ming's Crate"), L10n.T("A sealed crate for Mrs. Ming. She said not to open it."),
+                RegisterItem(CrateId, L10n.T("Mrs. Ming's Crate"), L10n.T("A sealed crate for Mrs. Ming. Don't open it."),
                     new[] { "grainbag", "trashbag", "flashlight" });
-                RegisterItem(PackageId, L10n.T("Marco's Package"), L10n.T("A package Marco left at a drop. Don't make it weird."),
+                RegisterItem(PackageId, L10n.T("Marco's Package"), L10n.T("Marco's package. Bring it to him at the docks."),
                     new[] { "trashbag", "grainbag", "flashlight" });
                 _itemsRegistered = true;
                 Core.LogDebug("[Questline] quest items registered (host+client).");
@@ -1397,22 +1398,22 @@ namespace RVRepairVan.Quests
 
             if (_pickupActive)
             {
-                title = _hasPackage ? L10n.T("Bring Marco's package back") : L10n.T("Pick up Marco's package from the dead drop");
+                title = _hasPackage ? L10n.T("Bring the package to Marco") : L10n.T("Pick up Marco's package from the dead drop");
                 if (_hasPackage) { npcId = MarcoId; poi = MarcoPos(); } else poi = _dropPoint;
             }
             else
             {
                 switch (Stage)
                 {
-                    case Started:    title = L10n.T("Ask the motel manager about the RV"); npcId = DonnaId; poi = DonnaPos(); break;
+                    case Started:    title = L10n.T("Ask Donna at the motel about your RV"); npcId = DonnaId; poi = DonnaPos(); break;
                     case AskedDonna: title = L10n.T("Talk to Mrs. Ming at the Chinese restaurant"); npcId = MingId; poi = MingPos(); break;
-                    case MingErrand: title = L10n.T("Pick up Ming's crate from the dead drop"); poi = _cratePoint; break;
-                    case MingCrate:  title = L10n.T("Bring Ming's crate back to Mrs. Ming"); npcId = MingId; poi = MingPos(); break;
-                    case Referred:   title = L10n.T("Talk to Marco at the body shop"); npcId = MarcoId; poi = MarcoPos(); break;
-                    case MarcoMet:   title = L10n.T("Tell Marco Mrs. Ming sent you"); npcId = MarcoId; poi = MarcoPos(); break;
+                    case MingErrand: title = L10n.T("Pick up Mrs. Ming's crate from the dead drop"); poi = _cratePoint; break;
+                    case MingCrate:  title = L10n.T("Bring the crate to Mrs. Ming"); npcId = MingId; poi = MingPos(); break;
+                    case Referred:
+                    case MarcoMet:   title = L10n.T("Tell Marco at the docks that Mrs. Ming sent you"); npcId = MarcoId; poi = MarcoPos(); break;
                     case ReadyToPay:
                     case Trusted:    title = L10n.T("Pay Marco for the repair"); npcId = MarcoId; poi = MarcoPos(); break;
-                    case Paid:       title = L10n.T("Check on the RV"); poi = RvPos(); break;
+                    case Paid:       title = L10n.T("Go see your RV"); poi = RvPos(); break;
                     default:         title = L10n.T("Find a way to repair your RV"); poi = RvPos(); break;
                 }
             }
@@ -1461,28 +1462,23 @@ namespace RVRepairVan.Quests
             return choice;
         }
 
-        /// <summary>True if the player has a PACKAGED product anywhere in the hotbar (peek only, no consume).</summary>
-        private static bool HoldingPackaged() => FindPackagedProductSlot() != null;
-
-        /// <summary>The inventory slot holding a PACKAGED product, or null. Scans GetAllInventorySlots (hotbar +
-        /// cash) - the exact source the vanilla HandoverScreen sample flow reads - instead of the equipped item:
-        /// opening an NPC conversation holsters/unequips the player, so EquippedItem and equippedSlot both go null
-        /// mid-dialogue even though the sealed product is still in the inventory.</summary>
-        private static ItemSlot FindPackagedProductSlot()
+        /// <summary>The hotbar slot the player is holding, if it carries PACKAGED product, else null. A conversation
+        /// unequips the hand (the dialogue state disables equipping), and PlayerInventory.SetEquippingEnabled(false)
+        /// keeps that slot in PriorEquippedSlotIndex to re-equip it afterwards - so that index is "the hand" while
+        /// Marco is talking. EquippedSlotIndex covers a call made outside a conversation.</summary>
+        private static ItemSlot HeldPackagedSlot()
         {
             try
             {
-                var slots = PlayerSingleton<PlayerInventory>.Instance?.GetAllInventorySlots();
-                if (slots == null) return null;
-                for (int i = 0; i < slots.Count; i++)
-                {
-                    ItemSlot slot = slots[i];
-                    ProductItemInstance p = slot?.ItemInstance?.TryCast<ProductItemInstance>();
-                    if (p != null && p.AppliedPackaging != null) return slot;
-                }
+                PlayerInventory inv = PlayerSingleton<PlayerInventory>.Instance;
+                if (inv == null) return null;
+                int idx = inv.EquippedSlotIndex >= 0 ? inv.EquippedSlotIndex : inv.PriorEquippedSlotIndex;
+                if (idx < 0) return null;
+                ItemSlot slot = inv.IndexAllSlots(idx);
+                ProductItemInstance p = slot?.ItemInstance?.TryCast<ProductItemInstance>();
+                return p != null && p.AppliedPackaging != null ? slot : null;
             }
-            catch (Exception e) { Core.Swallowed("Questline.FindPackagedProductSlot", e); }
-            return null;
+            catch (Exception e) { Core.Swallowed("Questline.HeldPackagedSlot", e); return null; }
         }
 
         /// <summary>Say a line as Marco in the world. Used by the upgrade shop, which lives outside this class but
@@ -1510,9 +1506,11 @@ namespace RVRepairVan.Quests
         {
             try
             {
-                if (npc == null) return;
+                if (npc == null) { Core.Log.Warning("[Say] no NPC to speak: " + line); return; }
                 NPC n = npc.GetComponentInParent<NPC>();
-                if (n != null) n.SendWorldSpaceDialogue(line, 5f);
+                if (n == null) { Core.Log.Warning("[Say] '" + npc.name + "' has no NPC component: " + line); return; }
+                n.SendWorldSpaceDialogue(line, 5f);
+                Core.Log.Msg("[Say] " + n.FirstName + ": " + line);
             }
             catch (Exception e) { Core.Swallowed("Questline.WorldSay", e); /* worldspace lines are nice-to-have */ }
         }

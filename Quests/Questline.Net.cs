@@ -277,7 +277,10 @@ namespace RVRepairVan.Quests
             if (!RepairStateStore.GetRepaired() || Base.RvRepairJob.JobRunning) return;
             Stage = Done;
             RepairQuest.CompleteIfActive();
-            WorldSay(_marcoT, L10n.T("There she is. Standing again. Interior's your problem. Try not to piss off whoever torched it the first time."));
+            // Marco stays at his shop, so a speech bubble here would never be seen next to the RV - he texts instead.
+            Base.RvRepairJob.TextFromMarco(RVRepairVanPreferences.UpgradesEnabled
+                ? L10n.T("Hope she runs fine. If you want more out of her, come see me - I do build-outs too.")
+                : L10n.T("Hope she runs fine, buddy."));
             Core.Log.Msg("[Questline] quest complete (RV checked).");
         }
 
@@ -331,7 +334,7 @@ namespace RVRepairVan.Quests
                 if (RVRepairVanPreferences.RepairTakesADay && Base.RvRepairJob.Begin())
                 {
                     if (RVRepairVanPreferences.QuestlineEnabled) { Stage = Paid; SyncEntry(); }
-                    WorldSay(_marcoT, L10n.T("Leave her with me. Come back tomorrow and I'll text you when she's done."));
+                    WorldSay(_marcoT, L10n.T("Alright, I'll send the boys over to your RV. Give me a day - I'll text ya when she's done."));
                     Core.Log.Msg("[Net] host booked Marco's repair job for " + MoneyManager.FormatAmount(paid) + ".");
                     return true;
                 }
@@ -351,7 +354,7 @@ namespace RVRepairVan.Quests
                 if (withCinematic)
                     RVRepairVan.Effects.RepairCinematic.Play(
                         () => commit(),
-                        () => WorldSay(_marcoT, L10n.T("There she is - back from the dead. Go take a look, and try not to total her again.")),
+                        () => WorldSay(_marcoT, L10n.T("There she is, good as new. Try not to blow her up again, buddy.")),
                         () => GruntNpc(FindNpc(MarcoId)));
                 else
                     commit();   // a client acted; do it now and let our broadcast swap their RV during their cinematic
