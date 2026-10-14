@@ -17,10 +17,12 @@ namespace RVRepairVan.Base
     /// </summary>
     internal static class RvInterior
     {
-        // Under RV/rv/Main/Interior.
+        // Under RV/rv/Main/Interior. "Dash", "Chair" and "Chair (1)" are the driver's cab (dashboard at z -5.25, both
+        // seats at z -4.22 beside the steering column) and stay: with them hidden the front of the RV is a hole the
+        // player can see straight through to the outside.
         private static readonly string[] InteriorChildren =
         {
-            "Bed", "Bench", "Cabinets", "Chair", "Chair (1)", "Dash",
+            "Bed", "Bench", "Cabinets",
         };
 
         // Under RV/rv/Main directly - and this is the half that was missed at first. The furniture is NOT all
