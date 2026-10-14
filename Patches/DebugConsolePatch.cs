@@ -164,8 +164,13 @@ namespace RVRepairVan.Patches
                     case "rvdrive":   // 'rvdrive' = use the wheel, 'home' snaps back, 'info' dumps, 'look', 'exit', 'gas'
                         if (parts.Length > 1 && parts[1].ToLower() == "home") Base.RvMobile.DebugHome();
                         else if (parts.Length > 1 && parts[1].ToLower() == "info") Base.RvDrive.Info();
+                        else if (parts.Length > 1 && parts[1].ToLower() == "lights") Base.RvDrive.Lights();
+                        else if (parts.Length > 1 && parts[1].ToLower() == "tp") Base.RvDrive.Tp(parts.Length > 2 ? parts[2..] : Array.Empty<string>());
+                        else if (parts.Length > 1 && parts[1].ToLower() == "hull") Base.RvDrive.HullToggle(parts.Length > 2 ? parts[2].ToLower() : "");
+                        else if (parts.Length > 1 && parts[1].ToLower() == "stat") Base.RvDrive.Stat(parts.Length > 2 ? parts[2] : "-");
                         else if (parts.Length > 1 && parts[1].ToLower() == "probe") Base.RvDrive.Probe();
-                        else if (parts.Length > 1 && parts[1].ToLower() == "look") Base.RvDrive.Look(parts.Length > 2 && parts[2].ToLower() == "off");
+                        else if (parts.Length > 1 && parts[1].ToLower() == "look") Base.RvDrive.Look(parts.Length > 2 && parts[2].ToLower() == "off", parts.Length > 2 && parts[2].ToLower() == "rear");
+                        else if (parts.Length > 2 && parts[1].ToLower() == "lamps") Base.RvLights.Force(parts[2].ToLower());
                         else if (parts.Length > 1 && parts[1].ToLower() == "exit") Base.RvDrive.Exit();
                         else if (parts.Length > 2 && parts[1].ToLower() == "gas") Base.RvDrive.Gas(parts[2].ToLower(), parts.Length > 3 ? parts[3] : "0");
                         else Base.RvMobile.DebugDrive();

@@ -24,7 +24,7 @@ namespace RVRepairVan.Base
         }
 
         /// <summary>rvdrive look [off]: a fixed camera above and beside the parked chassis, for screenshots.</summary>
-        internal static void Look(bool off)
+        internal static void Look(bool off, bool rear = false)
         {
             var pc = Il2CppScheduleOne.DevUtilities.PlayerSingleton<Il2CppScheduleOne.PlayerScripts.PlayerCamera>.Instance;
             if (pc == null) { Core.Log.Warning("[Drive] look: no PlayerCamera."); return; }
@@ -32,7 +32,8 @@ namespace RVRepairVan.Base
             if (_chassis == null) { Core.Log.Warning("[Drive] look: no chassis out."); return; }
             if (_chassis.LocalPlayerIsInVehicle) { Core.Log.Warning("[Drive] look: leave the driver seat first, the vehicle camera wins."); return; }
             Vector3 at = _chassis.transform.position + Vector3.up * 1.5f;
-            Vector3 eye = at + _chassis.transform.right * 12f + Vector3.up * 9f;
+            Vector3 eye = rear ? at - _chassis.transform.forward * 13f + Vector3.up * 1.5f
+                : at + _chassis.transform.right * 12f + Vector3.up * 9f;
             pc.OverrideTransform(eye, Quaternion.LookRotation(at - eye), 0f, false);
             Core.Log.Msg("[Drive] look: eye=" + eye + " at " + at);
         }
@@ -55,6 +56,100 @@ namespace RVRepairVan.Base
             _chassis.steerOverride = st;
             if (_chassis.Rb != null) _chassis.Rb.WakeUp();
             Core.Log.Msg("[Drive] override throttle=" + th + " steer=" + st + " speed=" + _chassis.Speed_Kmh.ToString("0.0") + " km/h");
+        }
+
+        /// <summary>rvdrive stat: one line of driving telemetry - position, speed, roll and pitch, wheels on the ground.</summary>
+        internal static void Stat(string tag)
+        {
+            if (_chassis == null) { Core.Log.Warning("[Drive] stat: no chassis out."); return; }
+            Transform t = _chassis.transform;
+            float roll = Vector3.SignedAngle(Vector3.ProjectOnPlane(Vector3.up, t.forward), t.up, t.forward);
+            float pitch = Vector3.SignedAngle(Vector3.ProjectOnPlane(Vector3.up, t.right), t.up, t.right);
+            int grounded = 0, wheels = 0;
+            foreach (WheelCollider w in _chassis.GetComponentsInChildren<WheelCollider>(false)) { wheels++; if (w.isGrounded) grounded++; }
+            Core.Log.Msg("[Drive] stat " + tag + " pos=" + t.position.ToString("F1") + " speed=" + _chassis.Speed_Kmh.ToString("0.0")
+                + " km/h roll=" + roll.ToString("0.0") + " pitch=" + pitch.ToString("0.0") + " wheels=" + grounded + "/" + wheels
+                + " throttle=" + _chassis.currentThrottle.ToString("0.00")
+                + (_chassis.Rb != null ? " com=" + _chassis.Rb.centerOfMass.ToString("F2") + " inertia=" + _chassis.Rb.inertiaTensor.ToString("F0") : ""));
+        }
+
+        /// <summary>rvdrive tp [x z heading]: set the parked chassis down 10 m ahead of the player, or at x/z facing a compass heading (0 = +z).</summary>
+        internal static void Tp(string[] args)
+        {
+            if (_chassis == null) { Core.Log.Warning("[Drive] tp: no chassis out - 'rvdrive' first, then 'rvdrive exit'."); return; }
+            if (_chassis.LocalPlayerIsInVehicle) { Core.Log.Warning("[Drive] tp: leave the driver seat first."); return; }
+            var player = Il2CppScheduleOne.PlayerScripts.Player.Local;
+            if (player == null) { Core.Log.Warning("[Drive] tp: no local player."); return; }
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var num = System.Globalization.NumberStyles.Float;
+            Vector3 fwd, at;
+            if (args.Length >= 3 && float.TryParse(args[0], num, inv, out float x) && float.TryParse(args[1], num, inv, out float z)
+                && float.TryParse(args[2], num, inv, out float heading))
+            {
+                fwd = Quaternion.Euler(0f, heading, 0f) * Vector3.forward;
+                at = new Vector3(x, 0f, z);
+            }
+            else
+            {
+                fwd = Vector3.ProjectOnPlane(player.transform.forward, Vector3.up).normalized;
+                at = player.transform.position + fwd * 10f;
+            }
+            float ground = float.NegativeInfinity;
+            string groundName = "-";
+            foreach (RaycastHit h in Physics.RaycastAll(at + Vector3.up * 60f, Vector3.down, 120f, ~0, QueryTriggerInteraction.Ignore))
+            {
+                if (h.collider.transform.IsChildOf(_chassis.transform)) continue;
+                string layer = LayerMask.LayerToName(h.collider.gameObject.layer);
+                if (layer == "Player" || layer == "TransparentFX") continue;
+                if (h.point.y > ground) { ground = h.point.y; groundName = Path(h.collider.transform) + " layer=" + layer; }
+            }
+            if (float.IsNegativeInfinity(ground)) { Core.Log.Warning("[Drive] tp: no ground under " + at + "."); return; }
+            Core.Log.Msg("[Drive] tp: ground " + groundName);
+            at.y = ground + 1f;
+            Rigidbody rb = _chassis.Rb;
+            Quaternion rot = Quaternion.LookRotation(fwd, Vector3.up);
+            _chassis.transform.SetPositionAndRotation(at, rot);
+            if (rb != null) { rb.position = at; rb.rotation = rot; rb.velocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+            Physics.SyncTransforms();
+            Core.Log.Msg("[Drive] tp: chassis set down at " + at.ToString("F1") + " facing " + fwd.ToString("F2") + ".");
+        }
+
+        /// <summary>rvdrive lights: toggle the headlights like the vehicle's light key does.</summary>
+        internal static void Lights()
+        {
+            if (_chassis == null) { Core.Log.Warning("[Drive] lights: no chassis out."); return; }
+            VehicleLights vl = _chassis.GetComponent<VehicleLights>();
+            if (vl == null) { Core.Log.Warning("[Drive] lights: the chassis has no VehicleLights."); return; }
+            vl.HeadlightsOn = !vl.HeadlightsOn;
+            Core.Log.Msg("[Drive] headlights " + (vl.HeadlightsOn ? "on" : "off") + ".");
+        }
+
+        /// <summary>rvdrive hull on|off: switch the driving hull box, and list what it touches.</summary>
+        internal static void HullToggle(string arg)
+        {
+            BoxCollider hull = RvMobile.Hull;
+            if (hull == null) { Core.Log.Warning("[Drive] hull: none built."); return; }
+            if (arg == "on" || arg == "off") hull.enabled = arg == "on";
+            Transform t = hull.transform;
+            Vector3 half = Vector3.Scale(hull.size * 0.5f, t.lossyScale) + Vector3.one * 0.3f;   // contacts sit on the surface, not inside
+            int n = 0;
+            foreach (Collider c in Physics.OverlapBox(t.TransformPoint(hull.center), half, t.rotation, ~0, QueryTriggerInteraction.Ignore))
+            {
+                if (_chassis != null && c.transform.IsChildOf(_chassis.transform)) continue;
+                Core.Log.Msg("[Drive]   hull touches " + Path(c.transform) + " layer=" + LayerMask.LayerToName(c.gameObject.layer));
+                n++;
+            }
+            int own = 0;
+            if (_chassis != null)
+                foreach (Collider c in _chassis.GetComponentsInChildren<Collider>(false))
+                    if (c.enabled && !c.isTrigger && c.TryCast<WheelCollider>() == null)
+                    {
+                        own++;
+                        Core.Log.Msg("[Drive]   chassis collider " + Path(c.transform) + " " + c.GetIl2CppType().Name + " layer="
+                            + LayerMask.LayerToName(c.gameObject.layer) + " bounds " + c.bounds.min.ToString("F2") + ".." + c.bounds.max.ToString("F2"));
+                    }
+            Core.Log.Msg("[Drive] hull enabled=" + hull.enabled + " layer=" + LayerMask.LayerToName(hull.gameObject.layer) + ", " + n
+                + " foreign collider(s) inside, " + own + " solid chassis collider(s).");
         }
 
         // Where the camera really is, which wheels touch the ground, and what sits in the chassis' way.
@@ -94,7 +189,7 @@ namespace RVRepairVan.Base
                 }
 
                 Vector3 fwd = _chassis.transform.forward;
-                foreach (float h in new[] { 0.5f, 1.5f, 3f })
+                foreach (float h in new[] { 0.5f, 1.5f, 3f, 4.3f })
                 {
                     Vector3 from = _chassis.transform.position + Vector3.up * h - fwd * 1f;
                     RaycastHit[] hits = Physics.RaycastAll(from, fwd, 12f, ~0, QueryTriggerInteraction.Ignore);

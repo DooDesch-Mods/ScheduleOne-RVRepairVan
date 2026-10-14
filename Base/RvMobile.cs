@@ -48,6 +48,7 @@ namespace RVRepairVan.Base
         /// <summary>True while the RV is on its chassis, wherever that is - including parked right at home.</summary>
         internal static bool Away => _chassis != null;
         internal static LandVehicle Chassis => _chassis;
+        internal static BoxCollider Hull => _hull;
 
         // --- upgrade hook ---------------------------------------------------------------------------------
 
@@ -90,6 +91,7 @@ namespace RVRepairVan.Base
             _static.Clear();
             if (_draw != null) { MelonCoroutines.Stop(_draw); _draw = null; }
             _hull = null;
+            RvLights.Reset();
             RvAway.Reset();
         }
 
@@ -264,6 +266,7 @@ namespace RVRepairVan.Base
             int hidden = 0;
             foreach (Renderer r in chassis.GetComponentsInChildren<Renderer>(true)) { r.forceRenderingOff = true; hidden++; }
             HideChassisExtras(chassis);
+            RvLights.MuteChassis(chassis);
             CollectChassisColliders(chassis);
 
             // Captured at home, before anything moves: the static-batch redraw measures the drive offset from here.
@@ -295,6 +298,7 @@ namespace RVRepairVan.Base
             RaiseCamera(chassis);
             BuildHull(chassis, homeBounds);
             int baked = TakeStaticParts(_model);
+            RvLights.Bind(_model);
 
             _driving = true;   // force the first SetDriving to run in full
             SetDriving(chassis.CurrentPlayerOccupancy > 0);
@@ -340,6 +344,7 @@ namespace RVRepairVan.Base
                 p.T.localRotation = p.LocalRot;
             }
             Carried.Clear();
+            RvLights.Unbind();
             ReleaseStaticParts();
             if (_hull != null) { UnityEngine.Object.Destroy(_hull.gameObject); _hull = null; }
             _chassisColliders.Clear();
@@ -484,6 +489,14 @@ namespace RVRepairVan.Base
             }
             if (_localWasIn && !localIn) MelonCoroutines.Start(PlaceInCabin());
             _localWasIn = localIn;
+            RvLights.Update();
+            // Against a wall the body still falls asleep with a zero threshold, and the driven wheels spin up unloaded
+            // under it. Kept awake, they stay in contact with the road and cannot grip all at once later.
+            if (_driving && _chassis.LocalPlayerIsDriver)
+            {
+                Rigidbody rb = _chassis.Rb;
+                if (rb != null && rb.IsSleeping()) rb.WakeUp();
+            }
 
             if (NetworkBus.Online && !NetworkBus.IsServer) return;
 
@@ -518,7 +531,9 @@ namespace RVRepairVan.Base
         private static readonly List<Collider> _muted = new List<Collider>();
         private static readonly List<Collider> _chassisColliders = new List<Collider>();
         private static BoxCollider _hull;
-        private const float HullHalfWidth = 1.5f;
+        private const float HullHalfWidth = 1.5f, HullClearance = 1.0f, HullTop = 3.4f;
+
+        private static float _sleepThreshold = -1f;   // the chassis' own, read before driving overrides it
 
         private static void SetDriving(bool driving)
         {
@@ -531,13 +546,26 @@ namespace RVRepairVan.Base
                 int muted = 0;
                 foreach (CarriedPart p in Carried) if (p.T != null) muted += MuteColliders(p.T);
                 SetChassisColliders(true);
-                if (rb != null) { rb.constraints = RigidbodyConstraints.None; rb.WakeUp(); }
+                // A body that was frozen falls asleep, and wheel torque does not wake it: the wheels spin up with no
+                // load, then grip all at once when something nudges the body, and the RV flips. So it never sleeps
+                // while someone drives.
+                if (rb != null)
+                {
+                    if (_sleepThreshold < 0f) _sleepThreshold = rb.sleepThreshold;
+                    rb.sleepThreshold = 0f;
+                    rb.constraints = RigidbodyConstraints.None;
+                    rb.WakeUp();
+                }
                 Core.Log.Msg("[Mobile] driving: " + muted + " RV collider(s) off, chassis body on.");
             }
             else
             {
                 if (rb != null && !rb.isKinematic) { rb.velocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
-                if (rb != null) rb.constraints = RigidbodyConstraints.FreezeAll;
+                if (rb != null)
+                {
+                    rb.constraints = RigidbodyConstraints.FreezeAll;
+                    if (_sleepThreshold >= 0f) rb.sleepThreshold = _sleepThreshold;
+                }
                 SetChassisColliders(false);
                 int back = RestoreColliders();
                 Core.Log.Msg("[Mobile] parked: " + back + " RV collider(s) on, chassis body off and frozen.");
@@ -567,14 +595,19 @@ namespace RVRepairVan.Base
         }
 
         // The veeper's body and its bounding box sit inside the RV; parked, they are the invisible wall in the cabin.
+        // Only the colliders the vehicle itself has switched on: the wheel meshes carry disabled colliders that reach
+        // the road, and with them on the body rests on four blocks instead of its suspension.
         private static void CollectChassisColliders(LandVehicle chassis)
         {
             _chassisColliders.Clear();
+            int skipped = 0;
             foreach (Collider c in chassis.GetComponentsInChildren<Collider>(true))
             {
                 if (c.isTrigger || c.TryCast<WheelCollider>() != null) continue;
+                if (!c.enabled || !c.gameObject.activeInHierarchy) { skipped++; continue; }
                 _chassisColliders.Add(c);
             }
+            Core.Log.Msg("[Mobile] chassis colliders: " + _chassisColliders.Count + " solid, " + skipped + " switched off by the vehicle and left off.");
         }
 
         private static void SetChassisColliders(bool on)
@@ -599,7 +632,13 @@ namespace RVRepairVan.Base
                     min = Vector3.Min(min, local);
                     max = Vector3.Max(max, local);
                 }
-                min.y += 0.7f;
+                // Keep the box well off the road. The RV is four times as long as the chassis, so a bottom close to the
+                // ground scrapes at the slightest pitch or body roll: it brakes the RV and, in a turn, levers it over.
+                float ground = WheelGroundY(chassis);
+                min.y = Mathf.Max(min.y + 0.7f, ground + HullClearance);
+                // The roof with its AC unit stands 4.4 m tall, and the town's traffic light arms hang at about 4 m; a full
+                // height box stops dead under every crossing. The box ends below them, so the roof clips the arm instead.
+                max.y = Mathf.Min(max.y, ground + HullTop);
                 // The side steps and the awning reach past the body; the box keeps to the body's 3 m.
                 float cx = (min.x + max.x) * 0.5f;
                 min.x = Mathf.Max(min.x, cx - HullHalfWidth);
@@ -611,9 +650,29 @@ namespace RVRepairVan.Base
                 _hull.center = (min + max) * 0.5f;
                 _hull.size = max - min;
                 _hull.enabled = false;
-                Core.Log.Msg("[Mobile] hull " + _hull.size + " at " + _hull.center + ".");
+                // Sound zones carry solid colliders on TransparentFX at about 3.5 m, out of reach of a normal car but
+                // not of the RV's roof. They would stop it dead in the open.
+                int fx = LayerMask.NameToLayer("TransparentFX");
+                if (fx >= 0) _hull.excludeLayers = 1 << fx;
+                else Core.Log.Warning("[Mobile] no TransparentFX layer - the RV may snag on sound zones.");
+                Core.Log.Msg("[Mobile] hull " + _hull.size + " at " + _hull.center + ", " + (min.y - ground).ToString("0.00")
+                    + " to " + (max.y - ground).ToString("0.00") + " m above the road.");
             }
             catch (Exception e) { Core.Log.Warning("[Mobile] hull failed - the RV body can clip while driving: " + e.Message); }
+        }
+
+        // Chassis-local height of the road under the wheels at rest.
+        private static float WheelGroundY(LandVehicle chassis)
+        {
+            float ground = float.MaxValue;
+            foreach (WheelCollider w in chassis.GetComponentsInChildren<WheelCollider>(true))
+            {
+                float y = chassis.transform.InverseTransformPoint(w.transform.TransformPoint(w.center)).y
+                    - w.suspensionDistance * w.suspensionSpring.targetPosition - w.radius;
+                ground = Mathf.Min(ground, y);
+            }
+            if (ground == float.MaxValue) { Core.Log.Warning("[Mobile] chassis has no wheels - hull height taken from the RV body only."); return 0f; }
+            return ground;
         }
 
         private static void HideChassisExtras(LandVehicle chassis)
@@ -689,7 +748,7 @@ namespace RVRepairVan.Base
 
         // The vehicle camera orbits the stock van's cameraOrigin and pulls in wherever a ray from there hits a wall,
         // which inside the RV body is right away. Lift the origin above the roof and back the camera off.
-        private const float CameraLift = 3.5f, CameraLateral = 11f, CameraVertical = 4f;
+        private const float CameraLift = 3.5f, CameraLateral = 11f, CameraAboveOrigin = 3f;
 
         private static void RaiseCamera(LandVehicle chassis)
         {
@@ -701,7 +760,12 @@ namespace RVRepairVan.Base
                 // The camera sits at -forward of the VehicleCamera's own transform, which can face the other way than
                 // the chassis. Flip the offset so the camera always trails the cab.
                 cam.lateralOffset = Vector3.Dot(cam.transform.forward, chassis.transform.forward) >= 0f ? CameraLateral : -CameraLateral;
-                cam.verticalOffset = CameraVertical;
+                // The camera must sit above the point it looks at. Looking up, its pitch reads as 350 degrees, and the
+                // right-click orbit clamps that to 89 - straight above the roof.
+                float originAbove = cam.cameraOrigin != null ? cam.cameraOrigin.position.y - cam.transform.position.y : 0f;
+                cam.verticalOffset = Mathf.Max(0f, originAbove) + CameraAboveOrigin;
+                Core.Log.Msg("[Mobile] camera " + Mathf.Abs(cam.lateralOffset) + " m behind, " + CameraAboveOrigin
+                    + " m above its look point (origin " + originAbove.ToString("0.00") + " m over the camera mount).");
             }
             catch (Exception e) { Core.Log.Warning("[Mobile] camera adjust failed: " + e.Message); }
         }
@@ -780,6 +844,19 @@ namespace RVRepairVan.Base
                 yield return null;
             }
             _draw = null;
+        }
+
+        /// <summary>A redrawn static part picks up the materials its renderer has now (a lamp switched on or off).</summary>
+        internal static void RefreshStatic(Renderer r)
+        {
+            if (r == null) return;
+            foreach (StaticPart p in _static)
+            {
+                if (p.Renderer == null || p.Renderer.Pointer != r.Pointer) continue;
+                var mats = r.sharedMaterials;
+                for (int i = 0; i < p.Materials.Length && i < mats.Length; i++) p.Materials[i] = mats[i];
+                return;
+            }
         }
 
         private static void ReleaseStaticParts()
