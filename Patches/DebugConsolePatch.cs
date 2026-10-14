@@ -164,6 +164,14 @@ namespace RVRepairVan.Patches
                         RvCam(parts.Length > 1 ? parts[1].ToLower() : "");
                         break;
                     case "rvwreck":   // back to a wrecked RV and quest stage Started, to replay the questline
+                        // 'rvwreck game' wrecks it the way the tutorial quest does while a save loads, and keeps the
+                        // paid repair, so the restore watcher has to bring it back.
+                        if (parts.Length > 1 && parts[1].ToLower() == "game")
+                        {
+                            if (RVRepairVan.Managers.RVManager.Destroy()) Core.Log.Msg("[Debug] rvwreck game: RV wrecked, the paid repair is kept.");
+                            else Core.Log.Warning("[Debug] rvwreck game: destroy call failed (is the RV loaded?).");
+                            break;
+                        }
                         if (RVRepairVan.Managers.RVManager.Destroy())
                         {
                             RVRepairVan.Persistence.RepairStateStore.SetRepaired(false);

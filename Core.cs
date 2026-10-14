@@ -65,6 +65,7 @@ namespace RVRepairVan
             // load, so wiping on "Main" would discard the values it had just read.
             if (sceneName == "Menu")
             {
+                _sceneGeneration++;   // ends the restore watcher of the save that was just left
                 RepairSave.BeginLoad();
                 return;
             }
@@ -100,7 +101,8 @@ namespace RVRepairVan
             RVRepairVan.Base.RvUpgrades.Reset();   // drop last scene's cached transforms; the mask lives in the save
             RVRepairVan.Net.ClientPayment.Reset();  // a ticket from the last session can never be answered now
 
-            MelonCoroutines.Start(RestoreRepairCoroutine());
+            _sceneGeneration++;
+            MelonCoroutines.Start(RestoreRepairCoroutine(_sceneGeneration));
             MelonCoroutines.Start(RVRepairVan.Base.RvRepairJob.InstantRepairCoroutine());
         }
 
@@ -165,17 +167,39 @@ namespace RVRepairVan
             }
         }
 
+        // Counts loads of the Main scene; a watcher from an earlier load sees the number change and stops.
+        private static int _sceneGeneration;
+
+        private const float GameLoadTimeout = 300f, RestoreWatchInterval = 3f;
+
         /// <summary>
-        /// After a save loads, re-apply a previously paid-for repair (no charge) if the
-        /// RV spawned back in its destroyed state.
+        /// After a save loads, re-apply a previously paid-for repair (no charge) if the RV spawned back in its
+        /// destroyed state.
+        ///
+        /// Vanilla wrecks the RV again while it loads the save: restoring the finished tutorial quest calls
+        /// RV.SetDestroyed. That happens inside the load screen, on a slow PC well after the scene is up, so a
+        /// single check at a fixed delay can run before it and miss it - the RV then stays wrecked and Marco offers
+        /// the repair again. The check waits until the game reports the load as finished and then keeps watching
+        /// for the rest of the session.
         /// </summary>
-        private static IEnumerator RestoreRepairCoroutine()
+        private static IEnumerator RestoreRepairCoroutine(int generation)
         {
-            // Wait until our save-bound state has actually loaded (repaired flag is authoritative only then),
-            // up to ~10s, then let the base-game RV settle a moment before reading/repairing.
+            // Wait until our save-bound state has actually loaded (repaired flag is authoritative only then).
             float waited = 0f;
             while (!RepairSave.Loaded && waited < 10f) { yield return new WaitForSeconds(0.5f); waited += 0.5f; }
-            yield return new WaitForSeconds(2f);
+            if (!RepairSave.Loaded) Log.Warning("[Restore] save state not loaded after 10 s - the repair check runs on defaults.");
+            Log.Msg("[Restore] RV destroyed at scene start: " + SafeIsDestroyed() + ".");
+
+            waited = 0f;
+            while (!GameLoaded() && waited < GameLoadTimeout)
+            {
+                if (generation != _sceneGeneration) { Log.Msg("[Restore] a newer load took over - this check stops."); yield break; }
+                yield return new WaitForSeconds(0.5f);
+                waited += 0.5f;
+            }
+            if (generation != _sceneGeneration) { Log.Msg("[Restore] a newer load took over - this check stops."); yield break; }
+            if (waited >= GameLoadTimeout) Log.Warning("[Restore] the game did not report a finished load after " + GameLoadTimeout + " s - checking the RV anyway.");
+            else Log.Msg("[Restore] game load finished after " + waited.ToString("0.0") + " s.");
 
             // On a co-op CLIENT the local save is not authoritative for the RV - the host owns RV.IsDestroyed and
             // replays it via OnSpawnServer / our RepairApplied snapshot. Restoring from our own (possibly stale)
@@ -188,23 +212,7 @@ namespace RVRepairVan
 
             RVManager.LogState();   // diagnostic: see the real RV state on load
 
-            bool restore = false;
-            try
-            {
-                restore = RVManager.TryLocate()
-                          && RepairStateStore.GetRepaired()
-                          && RVManager.IsDestroyed();
-            }
-            catch (Exception e)
-            {
-                Log.Warning("[Restore] check failed: " + e.Message);
-            }
-
-            if (restore)
-            {
-                Log.Msg("[Restore] RV was previously repaired - restoring without charge.");
-                RVManager.Repair();
-            }
+            if (NeedsRestore()) Restore("RV was previously repaired - restoring without charge.");
 
             // Marco's build-outs are runtime effects on scene objects, not saved world state - only the paid-for
             // mask is persisted, so re-apply it now that the intact RV exists. Retry a few times: the interior
@@ -216,6 +224,59 @@ namespace RVRepairVan
                 catch (Exception e) { Log.Warning("[Restore] upgrade apply failed: " + e.Message); }
                 yield return new WaitForSeconds(2f);
             }
+
+            // A paid-for RV that gets wrecked later in the session (a load step that finishes after the game
+            // reports the load as done) is restored here too.
+            while (generation == _sceneGeneration)
+            {
+                yield return new WaitForSeconds(RestoreWatchInterval);
+                if (generation != _sceneGeneration) break;
+                if (!NeedsRestore()) continue;
+                Restore("a paid-for RV was wrecked again after the load - restoring without charge.");
+                // Clients that already joined saw the wreck, so they get the swap too.
+                if (RVRepairVan.Net.NetworkBus.Online && RVRepairVan.Net.NetworkBus.IsServer)
+                    RVRepairVan.Net.NetworkBus.BroadcastToAll(RVRepairVan.Net.RvOp.RepairApplied);
+                try { RVRepairVan.Base.RvUpgrades.ApplyOwned(); }
+                catch (Exception e) { Log.Warning("[Restore] upgrade apply after the late restore failed: " + e.Message); }
+            }
+        }
+
+        private static bool GameLoaded()
+        {
+            try
+            {
+                var lm = Il2CppScheduleOne.DevUtilities.PersistentSingleton<Il2CppScheduleOne.Persistence.LoadManager>.Instance;
+                return lm != null && lm.IsGameLoaded;
+            }
+            catch (Exception e) { Swallowed("Core.GameLoaded", e); return false; }
+        }
+
+        private static string SafeIsDestroyed()
+        {
+            try { return RVManager.TryLocate() ? RVManager.IsDestroyed().ToString() : "no RV found"; }
+            catch (Exception e) { return "unknown (" + e.Message + ")"; }
+        }
+
+        private static bool NeedsRestore()
+        {
+            try
+            {
+                return RepairStateStore.GetRepaired()
+                       && !RVRepairVan.Base.RvRepairJob.JobRunning
+                       && RVManager.TryLocate()
+                       && RVManager.IsDestroyed();
+            }
+            catch (Exception e)
+            {
+                Log.Warning("[Restore] check failed: " + e.Message);
+                return false;
+            }
+        }
+
+        private static void Restore(string why)
+        {
+            Log.Msg("[Restore] " + why);
+            RVManager.Repair();
         }
     }
 }
