@@ -94,7 +94,7 @@ namespace RVRepairVan.Effects
                     var am = AudioManager.Instance;
                     if (am != null && am.MainGameMixer != null) src.outputAudioMixerGroup = am.MainGameMixer;
                 }
-                catch { }
+                catch (Exception e) { Core.Swallowed("RepairCinematic.PlaySound", e); }
                 src.Play();
                 UnityEngine.Object.Destroy(go, clip.length + 0.3f);
             }
@@ -103,7 +103,7 @@ namespace RVRepairVan.Effects
 
         private static UnityEngine.Vector3 PlayerPos()
         {
-            try { var pm = PlayerSingleton<PlayerMovement>.Instance; if (pm != null) return pm.transform.position; } catch { }
+            try { var pm = PlayerSingleton<PlayerMovement>.Instance; if (pm != null) return pm.transform.position; } catch (Exception e) { Core.Swallowed("RepairCinematic.PlayerPos", e); }
             return UnityEngine.Vector3.zero;
         }
 

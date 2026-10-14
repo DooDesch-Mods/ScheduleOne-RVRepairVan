@@ -38,8 +38,9 @@ namespace RVRepairVan.Managers
                 position = _root.position;
                 return true;
             }
-            catch
+            catch (Exception e)
             {
+                Core.Swallowed("RVManager.TryGetPosition", e);
                 return false;
             }
         }
@@ -69,8 +70,8 @@ namespace RVRepairVan.Managers
                     if (rv == null) continue;
                     Transform t = ((Component)rv).transform;
                     bool dest = false, exp = false;
-                    try { dest = rv.IsDestroyed; } catch { }
-                    try { exp = rv._exploded; } catch { }
+                    try { dest = rv.IsDestroyed; } catch (Exception e) { Core.Swallowed("RVManager.LogState.IsDestroyed", e); }
+                    try { exp = rv._exploded; } catch (Exception e) { Core.Swallowed("RVManager.LogState._exploded", e); }
                     string children = "";
                     for (int c = 0; c < t.childCount; c++)
                     {
@@ -168,8 +169,9 @@ namespace RVRepairVan.Managers
 
                 return _rv.IsDestroyed;
             }
-            catch
+            catch (Exception e)
             {
+                Core.Swallowed("RVManager.IsDestroyed", e);
                 return false;
             }
         }
@@ -193,7 +195,7 @@ namespace RVRepairVan.Managers
             try { _rv.IsDestroyed = false; }
             catch (Exception e) { Core.Log.Warning("[RVManager] set IsDestroyed failed: " + e.Message); }
             try { _rv._exploded = false; }
-            catch { /* field may not exist on every build */ }
+            catch (Exception e) { Core.Swallowed("RVManager.Repair._exploded", e); /* field may not exist on every build */ }
 
             return RepairVisualOnly();
         }
@@ -241,7 +243,7 @@ namespace RVRepairVan.Managers
                     _rv.FXContainer.gameObject.SetActive(true);
                 }
             }
-            catch { /* FXContainer optional */ }
+            catch (Exception e) { Core.Swallowed("RVManager.RepairVisualOnly.FXContainer", e); /* FXContainer optional */ }
 
             Core.Log.Msg("[RVManager] RV repaired (visual).");
             return true;
@@ -263,7 +265,7 @@ namespace RVRepairVan.Managers
             try { _rv.IsDestroyed = true; }
             catch (Exception e) { Core.Log.Warning("[RVManager] set IsDestroyed(true) failed: " + e.Message); }
             try { _rv._exploded = true; }
-            catch { /* field may not exist on every build */ }
+            catch (Exception e) { Core.Swallowed("RVManager.Destroy._exploded", e); /* field may not exist on every build */ }
 
             try
             {

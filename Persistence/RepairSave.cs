@@ -82,6 +82,7 @@ namespace RVRepairVan.Persistence
         {
             Instance = this;
             Loaded = true;
+            _stage = Quests.Questline.StageForLoad(_repaired, _stage);
             Core.Log.Msg($"[State] loaded: repaired={_repaired} stage={_stage} samples={_samples} discount={_discount} upgrades={_upgrades}");
         }
 

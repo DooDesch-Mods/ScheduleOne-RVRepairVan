@@ -78,6 +78,9 @@ namespace RVRepairVan.Base
                 {
                     ExpandGrid(prop, extra);
                     RetireSecondGrid(prop);
+                    tiles = 0;
+                    for (int i = 0; grids != null && i < grids.Count; i++)
+                        if (grids[i] != null && grids[i].gameObject.activeSelf && grids[i].Tiles != null) tiles += grids[i].Tiles.Count;
                 }
 
                 // Latch only once the work is actually done, so a failed pass is retried rather than swallowed.
@@ -131,7 +134,7 @@ namespace RVRepairVan.Base
                     Vector3 ext = box != null ? box.bounds.size : Vector3.one * 12f;
                     reach = Mathf.Clamp(Mathf.CeilToInt(Mathf.Max(ext.x, ext.z) / size) + 2, 4, 48);
                 }
-                catch { }
+                catch (Exception e) { Core.Swallowed("RvBuildGrid.ExpandGrid", e); }
 
                 Bounds? cabin = CabinFloorBounds();
                 int added = 0, skippedOutside = 0;
@@ -236,12 +239,12 @@ namespace RVRepairVan.Base
                 b.Expand(new Vector3(pad, 10f, pad));
                 return b;
             }
-            catch { return null; }
+            catch (Exception e) { Core.Swallowed("RvBuildGrid.CabinFloorBounds", e); return null; }
         }
 
         private static bool SafeInBounds(Property prop, Vector3 world)
         {
-            try { return prop.DoBoundsContainPoint(world); } catch { return true; }
+            try { return prop.DoBoundsContainPoint(world); } catch (Exception e) { Core.Swallowed("RvBuildGrid.SafeInBounds", e); return true; }
         }
 
         private static bool CloneTile(Grid grid, Tile template, int cx, int cz, float size, float offset)
@@ -260,11 +263,11 @@ namespace RVRepairVan.Base
                 // RegisterTile already appends to BOTH Tiles and CoordinateTilePairs, so adding to those by hand
                 // registers every tile twice - the measured symptom was a grid reporting 66 tiles after 24 were
                 // added to 18. The one book it does NOT write is _coordinateToTile, which is what GetTile reads.
-                try { grid.RegisterTile(tile); } catch { }
-                try { if (grid._coordinateToTile != null) grid._coordinateToTile[new Coordinate(cx, cz)] = tile; } catch { }
+                try { grid.RegisterTile(tile); } catch (Exception e) { Core.Swallowed("RvBuildGrid.CloneTile.RegisterTile", e); }
+                try { if (grid._coordinateToTile != null) grid._coordinateToTile[new Coordinate(cx, cz)] = tile; } catch (Exception e) { Core.Swallowed("RvBuildGrid.CloneTile.coordinateToTile", e); }
                 return true;
             }
-            catch { return false; }
+            catch (Exception e) { Core.Swallowed("RvBuildGrid.CloneTile", e); return false; }
         }
 
         private static Property PropertyOf()

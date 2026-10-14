@@ -119,8 +119,8 @@ namespace RVRepairVan.Patches
                             if (tl == null) continue;
                             Vector3 p = tl.transform.position;
                             min = Vector3.Min(min, p); max = Vector3.Max(max, p);
-                            try { if (!prop.DoBoundsContainPoint(p)) outside++; } catch { }
-                            try { if (tl.BuildableOccupants != null && tl.BuildableOccupants.Count > 0) occupied++; } catch { }
+                            try { if (!prop.DoBoundsContainPoint(p)) outside++; } catch (Exception e) { Core.Swallowed("RvProbe.DumpGrids.DoBoundsContainPoint", e); }
+                            try { if (tl.BuildableOccupants != null && tl.BuildableOccupants.Count > 0) occupied++; } catch (Exception e) { Core.Swallowed("RvProbe.DumpGrids.BuildableOccupants", e); }
                         }
                         Core.Log.Msg("[Probe]   grid[" + i + "] tile extent x " + min.x.ToString("F1") + ".." + max.x.ToString("F1")
                             + "  z " + min.z.ToString("F1") + ".." + max.z.ToString("F1") + "  y " + min.y.ToString("F2")
@@ -205,7 +205,7 @@ namespace RVRepairVan.Patches
             if (depth > 4) return;   // deep enough to find clutter, shallow enough to stay readable
             string pad = new string(' ', depth * 2);
             bool rend = false;
-            try { rend = t.GetComponent<Renderer>() != null; } catch { }
+            try { rend = t.GetComponent<Renderer>() != null; } catch (Exception e) { Core.Swallowed("RvProbe.Walk", e); }
             Core.Log.Msg("[Probe]   " + pad + (t.gameObject.activeSelf ? "[on ] " : "[off] ")
                 + (rend ? "r " : "  ") + t.name + "  (" + t.childCount + ")");
             for (int i = 0; i < t.childCount; i++) Walk(t.GetChild(i), depth + 1);

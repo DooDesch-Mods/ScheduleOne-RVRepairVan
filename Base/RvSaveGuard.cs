@@ -32,7 +32,7 @@ namespace RVRepairVan.Base
                 if (__result) return;
                 if (RepairStateStore.GetRepaired()) __result = true;
             }
-            catch (Exception e) { Core.LogDebug("[SaveGuard] " + e.Message); }
+            catch (Exception e) { Core.Swallowed("RvSaveGuard", e); }
         }
     }
 }

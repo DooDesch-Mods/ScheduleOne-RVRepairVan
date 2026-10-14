@@ -28,6 +28,18 @@ namespace RVRepairVan.Quests
         private const int None = 0, Started = 1, AskedDonna = 2, MingErrand = 3, MingCrate = 4,
                           Referred = 5, MarcoMet = 6, ReadyToPay = 7, Trusted = 8, Paid = 9, Done = 10;
 
+        /// <summary>
+        /// The stage a freshly loaded save should run at. A repaired RV with the story stored mid-way (Simple mode
+        /// repairs without moving the stage, a debug repair skips it) would otherwise re-open "Back on the road" with
+        /// its marker on an intact RV, because the RV still reads as a wreck until the repair visual is swapped in.
+        /// </summary>
+        internal static int StageForLoad(bool repaired, int stage)
+        {
+            if (!repaired || stage < Started || stage >= Paid) return stage;
+            Core.Log.Msg("[Questline] save has a repaired RV at stage " + stage + " - loading it as finished.");
+            return Done;
+        }
+
         // NPC ids in the game's registry (same ids S1API uses). Reliable lookup; see FindNpc().
         private const string DonnaId = "donna_martin", MingId = "ming", MarcoId = "marco_baron";
 
@@ -147,7 +159,7 @@ namespace RVRepairVan.Quests
                 if (wh != null && wh.State == Il2CppScheduleOne.Quests.EQuestState.Completed)
                     return true;
             }
-            catch { }
+            catch (Exception e) { Core.Swallowed("Questline.ExplosionBeatPassed", e); }
             return false;
         }
 
@@ -534,7 +546,7 @@ namespace RVRepairVan.Quests
                         return n;
                 }
             }
-            catch { }
+            catch (Exception e) { Core.Swallowed("Questline.FindNpc", e); }
             return null;
         }
 
@@ -560,20 +572,20 @@ namespace RVRepairVan.Quests
                 {
                     NPC n = reg[i];
                     if (n == null) continue;
-                    try { float d = Dist(p, n.transform.position); if (d < bd) { bd = d; best = n; } } catch { }
+                    try { float d = Dist(p, n.transform.position); if (d < bd) { bd = d; best = n; } } catch (Exception e) { Core.Swallowed("Questline.DebugGruntNearest.distance", e); }
                 }
                 GruntNpc(best);
             }
-            catch { }
+            catch (Exception e) { Core.Swallowed("Questline.DebugGruntNearest", e); }
         }
 #endif
 
         // --- S1API native dialogue (works since S1API 3.0.5 fixed the NPC-loader crash) -------------------
 
-        // Builds a real DialogueContainer on the NPC via S1API and hands it back (found again in the handler)
+        // Builds a real Conversation on the NPC via S1API and hands it back (found again in the handler)
         // so it can be attached to an injected choice's Conversation - the NPC's reply (and any sub-choices)
         // then plays IN the dialogue UI, the conversation stays open. Null -> graceful fallback to a plain choice.
-        private static DialogueContainer S1Container(NPC npc, string name, Action<S1API.Entities.Dialogue.DialogueContainerBuilder> build)
+        private static Conversation S1Container(NPC npc, string name, Action<S1API.Entities.Dialogue.DialogueContainerBuilder> build)
         {
             try
             {
@@ -619,7 +631,7 @@ namespace RVRepairVan.Quests
                 {
                     NPC n = reg[i];
                     if (n == null) continue;
-                    try { ids += n.ID + " "; } catch { ids += "(err) "; }
+                    try { ids += n.ID + " "; } catch (Exception e) { Core.Swallowed("Questline.DumpNpcDiagnostics.ID", e); ids += "(err) "; }
                 }
                 Core.Log.Msg("[NPC-DIAG] registry(" + reg.Count + "): " + ids);
                 DiagTarget(DonnaId); DiagTarget(MingId); DiagTarget(MarcoId);
@@ -659,8 +671,8 @@ namespace RVRepairVan.Quests
             NPC n = FindNpc(id);
             if (n == null) { Core.Log.Msg("[NPC-DIAG] " + id + ": NOT in registry"); return; }
             string go = "?"; bool active = false; bool ctrl = false;
-            try { var c = (Component)n; go = c.gameObject.name; active = c.gameObject.activeInHierarchy; } catch { }
-            try { ctrl = ControllerOf(n, out _) != null; } catch { }
+            try { var c = (Component)n; go = c.gameObject.name; active = c.gameObject.activeInHierarchy; } catch (Exception e) { Core.Swallowed("Questline.DiagTarget.gameObject", e); }
+            try { ctrl = ControllerOf(n, out _) != null; } catch (Exception e) { Core.Swallowed("Questline.DiagTarget.controller", e); }
             Core.Log.Msg("[NPC-DIAG] " + id + ": IN registry, go='" + go + "' active=" + active + " controllerFound=" + ctrl);
         }
 
@@ -696,7 +708,7 @@ namespace RVRepairVan.Quests
                 if (dc == null) dc = ((Component)npc).GetComponentInChildren<DialogueController>(true);
                 return dc;
             }
-            catch { return null; }
+            catch (Exception e) { Core.Swallowed("Questline.ControllerOf", e); return null; }
         }
 
         // --- handlers -------------------------------------------------------
@@ -748,13 +760,38 @@ namespace RVRepairVan.Quests
         // Ming - you admitted losing her crate. Pay the fee to move on, or come back later.
         private static void OnMingPayLoss()
         {
-            if (RouteIntent(RvOp.MingPayLoss)) return;   // host charges the shared pool + advances
-            if (Stage != MingCrate) return;
-            if (S1API.Money.Money.GetCashBalance() < LostPackageFee) { WorldSay(_mingT, L10n.T(MingShort)); return; }
-            S1API.Money.Money.ChangeCashBalance(-LostPackageFee, true, true);
+            if (NetworkBus.Online && !NetworkBus.IsServer)
+            {
+                // Co-op client: the fee comes out of this player's cash, the host advances the stage.
+                int ticket = ClientPayment.Charge(LostPackageFee, "Ming's fee");
+                if (ticket == 0) { WorldSay(_mingT, L10n.T(MingShort)); return; }
+                NetworkBus.SendToHost(RvOp.MingPayLoss, 0, ticket, LostPackageFee);
+                return;
+            }
+            HostMingPayLoss(-1);
+        }
+
+        /// <summary>
+        /// Host or offline. <paramref name="clientPaid"/> &lt; 0: the acting player is this one, so charge this
+        /// player's cash. Otherwise a client already paid that much and only the stage moves. False = nothing happened.
+        /// </summary>
+        private static bool HostMingPayLoss(int clientPaid)
+        {
+            if (Stage != MingCrate) { Core.LogDebug("[Questline] Ming fee ignored - stage " + Stage + "."); return false; }
+            if (clientPaid < 0)
+            {
+                if (S1API.Money.Money.GetCashBalance() < LostPackageFee) { WorldSay(_mingT, L10n.T(MingShort)); return false; }
+                S1API.Money.Money.ChangeCashBalance(-LostPackageFee, true, true);
+            }
+            else if (clientPaid != LostPackageFee)
+            {
+                Core.Log.Warning("[Questline] Ming fee refused - client paid " + clientPaid + ", fee is " + LostPackageFee + ".");
+                return false;
+            }
             Stage = Referred;
             WorldSay(_mingT, L10n.T(MingPaid));
             SyncEntry();
+            return true;
         }
 
         private static void OnMarcoGreet()
@@ -796,12 +833,14 @@ namespace RVRepairVan.Quests
                 }
                 WorldSay(_marcoT, L10n.T("Alright. Hold still, this won't take long."));
 
-                // Co-op CLIENT: the repair (RV state + the money charge + persistence) must run on the HOST, since
-                // RV.IsDestroyed and the money balance are host-authoritative. Send the intent, play the cinematic
-                // locally for feedback, and let the host's RepairApplied broadcast swap the RV during the black.
+                // Co-op CLIENT: the repair (RV state + persistence) runs on the HOST, since RV.IsDestroyed is
+                // host-authoritative. The money is this player's own cash, so it is taken here and the host refunds
+                // it if it refuses. Play the cinematic locally; the host's RepairApplied swaps the RV during the black.
                 if (NetworkBus.Online && !NetworkBus.IsServer)
                 {
-                    NetworkBus.SendToHost(RvOp.PayRepair);
+                    int ticket = ClientPayment.Charge(price, "repair");
+                    if (ticket == 0) { WorldSay(_marcoT, L10n.T("You're short. Come back when you've got the cash.")); return; }
+                    NetworkBus.SendToHost(RvOp.PayRepair, 0, ticket, price);
                     RVRepairVan.Effects.RepairCinematic.Play(
                         null,   // no local field write - the host drives the visual via RepairApplied
                         () => WorldSay(_marcoT, L10n.T("There she is - back from the dead. Go take a look, and try not to total her again.")),
@@ -872,16 +911,38 @@ namespace RVRepairVan.Quests
         // Marco - you admitted losing his package. Pay the fee to move on, or come back later.
         private static void OnMarcoPayLoss()
         {
-            if (RouteIntent(RvOp.MarcoPayLoss)) return;   // host charges the shared pool + advances
-            if (!(_pickupActive && _hasPackage)) return;
-            if (S1API.Money.Money.GetCashBalance() < LostPackageFee) { WorldSay(_marcoT, L10n.T(MarcoShort)); return; }
-            S1API.Money.Money.ChangeCashBalance(-LostPackageFee, true, true);
+            if (NetworkBus.Online && !NetworkBus.IsServer)
+            {
+                // Co-op client: the fee comes out of this player's cash, the host advances the stage.
+                int ticket = ClientPayment.Charge(LostPackageFee, "Marco's fee");
+                if (ticket == 0) { WorldSay(_marcoT, L10n.T(MarcoShort)); return; }
+                NetworkBus.SendToHost(RvOp.MarcoPayLoss, 0, ticket, LostPackageFee);
+                return;
+            }
+            HostMarcoPayLoss(-1);
+        }
+
+        /// <summary>Host or offline; same contract as <see cref="HostMingPayLoss"/>.</summary>
+        private static bool HostMarcoPayLoss(int clientPaid)
+        {
+            if (!(_pickupActive && _hasPackage)) { Core.LogDebug("[Questline] Marco fee ignored - no lost package."); return false; }
+            if (clientPaid < 0)
+            {
+                if (S1API.Money.Money.GetCashBalance() < LostPackageFee) { WorldSay(_marcoT, L10n.T(MarcoShort)); return false; }
+                S1API.Money.Money.ChangeCashBalance(-LostPackageFee, true, true);
+            }
+            else if (clientPaid != LostPackageFee)
+            {
+                Core.Log.Warning("[Questline] Marco fee refused - client paid " + clientPaid + ", fee is " + LostPackageFee + ".");
+                return false;
+            }
             _pickupActive = false;
             _hasPackage = false;
             _drop = null;
             Stage = Trusted;
             WorldSay(_marcoT, L10n.T(MarcoPaid));
             SyncEntry();
+            return true;
         }
 
         // Give Marco one packaged product. i indexes the snapshot the choice list was built from (RefreshSampleSlots),
@@ -901,7 +962,7 @@ namespace RVRepairVan.Quests
                 }
                 int discount = SampleUnitDiscount(product);
 
-                // Marco actually consumes it: NPCBehaviour.ConsumeProduct (the ServerRpc the vanilla sample flow uses)
+                // Marco actually consumes it: NPCBehaviour.ConsumeProduct_Server (the ServerRpc the vanilla sample flow uses)
                 // both sets the product AND enables the consume behaviour, so he plays the smoke/snort/eat animation,
                 // sound and particles and the product's effects apply to him - and it replicates in co-op. Earlier we
                 // only called SendProduct (sets the product, never starts the behaviour), so nothing happened visibly.
@@ -909,7 +970,7 @@ namespace RVRepairVan.Quests
                 // unit from the player ourselves below (deterministic; protects a stack > 1).
                 NPC marco = FindNpc(MarcoId);
                 int before = slot != null ? slot.Quantity : -1;
-                if (marco != null && marco.Behaviour != null) marco.Behaviour.ConsumeProduct(product, false);
+                if (marco != null && marco.Behaviour != null) marco.Behaviour.ConsumeProduct_Server(product, false);
                 RemoveOneFromSlot(slot);   // exactly one from the slot we found (clears it if it was the last)
                 int after = slot != null ? slot.Quantity : -1;
                 Core.LogDebug("[Questline] sample given: hotbar qty " + before + " -> " + after + " (expected -1).");
@@ -985,7 +1046,7 @@ namespace RVRepairVan.Quests
         private static string SampleChoiceText(ProductItemInstance p)
         {
             string name = L10n.T("product");
-            try { ItemDefinition def = p.Definition; if (def != null) name = def.Name; } catch { }
+            try { ItemDefinition def = p.Definition; if (def != null) name = def.Name; } catch (Exception e) { Core.Swallowed("Questline.SampleChoiceText", e); }
             return L10n.T("Give Marco: {0} (-{1})", name, MoneyManager.FormatAmount(SampleUnitDiscount(p)));
         }
 
@@ -1092,7 +1153,7 @@ namespace RVRepairVan.Quests
                     Core.LogDebug("[Questline] quest item '" + id + "' cloned from base '" + baseId + "'.");
                     break;
                 }
-                catch (Exception e) { Core.LogDebug("[Questline] CloneFrom('" + baseId + "') failed: " + e.Message); }
+                catch (Exception e) { Core.Log?.Warning("[Questline] CloneFrom('" + baseId + "') failed: " + e.Message); }
             }
 
             if (def == null)
@@ -1102,7 +1163,7 @@ namespace RVRepairVan.Quests
                 Core.Log.Warning("[Questline] quest item '" + id + "' registered WITHOUT a model/icon (no clone base usable).");
             }
 
-            try { S1API.Items.ItemManager.PreserveRuntimeItem(def); } catch { }
+            try { S1API.Items.ItemManager.PreserveRuntimeItem(def); } catch (Exception e) { Core.Swallowed("Questline.RegisterItem", e); }
         }
 
         // One-time dump of every registered item (DEBUG builds only) - so we can read real ids/names from the
@@ -1123,7 +1184,7 @@ namespace RVRepairVan.Quests
                         var d = all[i];
                         if (d == null) continue;
                         try { Core.Log.Msg("[ITEMDUMP] id='" + d.ID + "' name='" + d.Name + "' cat=" + d.Category + " icon=" + (d.Icon != null)); }
-                        catch { }
+                        catch (Exception e) { Core.Swallowed("Questline.DumpItemsOnce", e); }
                     }
             }
             catch (Exception e) { Core.Log.Warning("[ITEMDUMP] failed: " + e.Message); }
@@ -1161,7 +1222,7 @@ namespace RVRepairVan.Quests
                         return true;
                 }
             }
-            catch { }
+            catch (Exception e) { Core.Swallowed("Questline.PlayerHasItem", e); }
             return false;
         }
 
@@ -1264,6 +1325,23 @@ namespace RVRepairVan.Quests
                     HostCheckedRv();
                 }
 
+                // A repaired RV is the end of the story. A stage still mid-way (a debug repair) or a journal entry still
+                // open at Done (a save from a build that left it open) shows "Back on the road" with its marker on an
+                // intact RV, so close both.
+                if (RepairStateStore.GetRepaired() && !Base.RvRepairJob.JobRunning)
+                {
+                    if (Stage >= Started && Stage < Paid)
+                    {
+                        Core.Log.Msg("[Questline] RV is already repaired at stage " + Stage + " - finishing the story.");
+                        Stage = Done;
+                    }
+                    if (Stage == Done && RepairQuest.HasOpenEntry())
+                    {
+                        Core.Log.Msg("[Questline] story is finished but the journal entry is still open - closing it.");
+                        RepairQuest.CompleteIfActive();
+                    }
+                }
+
                 if (!Active) continue;
                 try
                 {
@@ -1299,7 +1377,7 @@ namespace RVRepairVan.Quests
                         if (got) { _hasPackage = true; SyncEntry(); }
                     }
                 }
-                catch { /* never break the loop */ }
+                catch (Exception e) { Core.Swallowed("Questline.ProximityCoroutine", e); /* never break the loop */ }
             }
         }
 
@@ -1355,7 +1433,7 @@ namespace RVRepairVan.Quests
         // Adds a stage-conditional top-level choice (shouldShowCheck = the only way to gate visibility per
         // quest stage). If a Conversation container is given, picking it plays that conversation IN the dialogue
         // (NPC reply + any sub-choices, UI stays open). onChosen is the optional state action.
-        private static DialogueController.DialogueChoice AddChoice(DialogueController dc, string text, int prio, Func<bool> show, Action onChosen, DialogueContainer conv = null)
+        private static DialogueController.DialogueChoice AddChoice(DialogueController dc, string text, int prio, Func<bool> show, Action onChosen, Conversation conv = null)
         {
             // A choice with neither a reply container nor an action does nothing when picked - the player clicks and
             // the conversation just sits there. That is what a missing S1API container used to produce, so refuse it
@@ -1375,7 +1453,7 @@ namespace RVRepairVan.Quests
                 Conversation = conv,
                 Priority = prio
             };
-            Func<bool, bool> pred = (_) => { try { return show(); } catch { return false; } };
+            Func<bool, bool> pred = (_) => { try { return show(); } catch (Exception e) { Core.Swallowed("Questline.AddChoice.shouldShowCheck", e); return false; } };
             choice.shouldShowCheck = DelegateSupport.ConvertDelegate<DialogueController.DialogueChoice.ShouldShowCheck>(pred);
             choice.onChoosen = new UnityEvent();
             if (onChosen != null) choice.onChoosen.AddListener((Action)onChosen);
@@ -1403,7 +1481,7 @@ namespace RVRepairVan.Quests
                     if (p != null && p.AppliedPackaging != null) return slot;
                 }
             }
-            catch { }
+            catch (Exception e) { Core.Swallowed("Questline.FindPackagedProductSlot", e); }
             return null;
         }
 
@@ -1414,14 +1492,14 @@ namespace RVRepairVan.Quests
         private static void RefreshRepairChoice()
         {
             try { if (_marcoRepairChoice != null) _marcoRepairChoice.ChoiceText = RepairChoiceText(); }
-            catch { }
+            catch (Exception e) { Core.Swallowed("Questline.RefreshRepairChoice.repair", e); }
             // The build-out prices are settings too - keep their labels in step with the repair price.
             try
             {
                 for (int i = 0; i < _upgradeChoices.Length && i < UpgradeOrder.Length; i++)
                     if (_upgradeChoices[i] != null) _upgradeChoices[i].ChoiceText = Base.RvUpgrades.ChoiceText(UpgradeOrder[i]);
             }
-            catch { }
+            catch (Exception e) { Core.Swallowed("Questline.RefreshRepairChoice.upgrades", e); }
         }
 
         internal static void RefreshPrice() => RefreshRepairChoice();
@@ -1436,12 +1514,12 @@ namespace RVRepairVan.Quests
                 NPC n = npc.GetComponentInParent<NPC>();
                 if (n != null) n.SendWorldSpaceDialogue(line, 5f);
             }
-            catch { /* worldspace lines are nice-to-have */ }
+            catch (Exception e) { Core.Swallowed("Questline.WorldSay", e); /* worldspace lines are nice-to-have */ }
         }
 
         private static Vector3 PlayerPos()
         {
-            try { var pl = Player.Local; if (pl != null) return pl.transform.position; } catch { }
+            try { var pl = Player.Local; if (pl != null) return pl.transform.position; } catch (Exception e) { Core.Swallowed("Questline.PlayerPos", e); }
             return Vector3.zero;
         }
 

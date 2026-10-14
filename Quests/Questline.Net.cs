@@ -14,8 +14,9 @@ namespace RVRepairVan.Quests
     ///
     /// Model: the HOST owns the canonical state (Stage / DiscountTotal / RV repair). A client never mutates
     /// shared state directly - it sends an INTENT (RvOp, client -> host via NetworkBus.SendToHost) and the host
-    /// validates it against its own Stage, applies the effect (advance Stage, charge the shared money pool, repair
-    /// the RV), then broadcasts the resulting STATE (StageSync / RepairApplied, host -> all via BroadcastToAll).
+    /// validates it against its own Stage, applies the effect (advance Stage, repair the RV), then broadcasts the
+    /// resulting STATE (StageSync / RepairApplied, host -> all via BroadcastToAll). Money is per player: a client
+    /// pays from its own cash before sending a paid intent, and the host answers with PaymentSettled (ClientPayment).
     /// Clients render that state (objective text/POI, price, RV visual) but are otherwise dumb terminals.
     ///
     /// Offline (NetworkBus.Online == false) NONE of this runs - every handler takes its original local branch,
@@ -82,17 +83,17 @@ namespace RVRepairVan.Quests
                     case RvOp.AskDonna: OnAskDonna(); break;
                     case RvOp.AcceptErrand: OnAcceptErrand(); break;
                     case RvOp.DeliverCrate: HostDeliverCrate(); break;
-                    case RvOp.MingPayLoss: OnMingPayLoss(); break;
+                    case RvOp.MingPayLoss: Settle(m, HostMingPayLoss(PaidAmount(m))); break;
                     case RvOp.MarcoGreet: OnMarcoGreet(); break;
                     case RvOp.MarcoReferral: OnMarcoReferral(); break;
                     case RvOp.MarcoFavour: OnMarcoFavour(); break;
                     case RvOp.GotPackage: HostGotPackage(); break;
-                    case RvOp.MarcoPayLoss: OnMarcoPayLoss(); break;
+                    case RvOp.MarcoPayLoss: Settle(m, HostMarcoPayLoss(PaidAmount(m))); break;
                     case RvOp.GiveSample: HostGiveSample(m.A); break;   // A = discount the client computed
-                    case RvOp.PayRepair: HostPayRepair(false); break;  // no cinematic on the host for a client's repair
+                    case RvOp.PayRepair: Settle(m, HostPayRepair(false, PaidAmount(m))); break;  // no cinematic on the host for a client's repair
                     case RvOp.CheckedRv: HostCheckedRv(); break;       // a client reached the post-repair RV
                     case RvOp.ErrandItemPicked: HostErrandItemPicked(); break;  // a client picked up the crate/package
-                    case RvOp.BuyUpgrade: Base.RvUpgrades.HostBuy((Base.RvUpgrade)m.A, false); break;   // client is already playing its own cinematic
+                    case RvOp.BuyUpgrade: Settle(m, Base.RvUpgrades.HostBuy((Base.RvUpgrade)m.A, false, PaidAmount(m))); break;   // client is already playing its own cinematic
                     case RvOp.RequestSnapshot: HostSendSnapshot(); break;
 #if DEBUG
                     case RvOp.Ping: Core.Log.Msg("[Net] host <- Ping " + m.A); break;
@@ -100,6 +101,18 @@ namespace RVRepairVan.Quests
                 }
             }
             catch (Exception e) { Core.Log.Warning("[Net] server intent " + m.Op + " failed: " + e.Message); }
+        }
+
+        // A paid intent carries B = the client's ticket and C = what it paid. Without a ticket nothing was paid, and
+        // the host's own cash must not cover it - so it counts as paying 0, which every price check refuses.
+        private static int PaidAmount(RvMsg m) => m.B != 0 ? Math.Max(0, m.C) : 0;
+
+        /// <summary>Host: tell the paying client whether to keep its payment or take it back.</summary>
+        private static void Settle(RvMsg m, bool applied)
+        {
+            if (m.B == 0) { Core.Log.Warning("[Net] paid intent " + m.Op + " arrived without a ticket - nothing to settle."); return; }
+            NetworkBus.BroadcastToAll(RvOp.PaymentSettled, m.B, applied ? 0 : 1);
+            Core.Log.Msg("[Net] " + m.Op + " ticket " + m.B + (applied ? " kept" : " refunded") + ".");
         }
 
         // ---- CLIENT: host state arrived ----
@@ -113,6 +126,7 @@ namespace RVRepairVan.Quests
                     case RvOp.TransientSync: ApplyTransient(m.A, m.B, m.C); break;
                     case RvOp.UpgradeSync: Base.RvUpgrades.ApplySync(m.A); break;
                     case RvOp.RepairApplied: ApplyRepair(); break;
+                    case RvOp.PaymentSettled: if (!NetworkBus.IsServer) ClientPayment.Settle(m.A, m.B != 0); break;
 #if DEBUG
                     case RvOp.Ping: Core.Log.Msg("[Net] client <- Ping " + m.A); break;
                     case RvOp.DebugGiveItems: RVRepairVan.Patches.DebugConsolePatch.GiveTestProducts("jar", "ogkush"); break;
@@ -238,7 +252,7 @@ namespace RVRepairVan.Quests
                 }
                 return bestSq <= 9f ? best : null;   // accept only a real match (within ~3 m)
             }
-            catch { return null; }
+            catch (Exception e) { Core.Swallowed("Questline.Net.ResolveDropByPos", e); return null; }
         }
 
         /// <summary>
@@ -278,25 +292,36 @@ namespace RVRepairVan.Quests
         }
 
         /// <summary>
-        /// Host-authoritative repair (used by BOTH quest modes). Validate funds against the shared pool, charge it,
-        /// repair the RV (state + visual + persistence), and broadcast RepairApplied to all clients. In Questline
-        /// mode it also advances to Paid (which auto-broadcasts StageSync); in Simple mode it just completes.
+        /// Host-authoritative repair (used by BOTH quest modes): repair the RV (state + visual + persistence) and
+        /// broadcast RepairApplied to all clients. In Questline mode it also advances to Paid (which auto-broadcasts
+        /// StageSync); in Simple mode it just completes.
         /// <paramref name="withCinematic"/> = the host player is the one acting (play the local fade); false when
         /// it's a client's PayRepair intent (commit immediately, no black on the host's screen).
+        /// <paramref name="clientPaid"/> &lt; 0 = the host player pays from its own cash; otherwise a client already
+        /// paid that much, which must match the current price. Returns false when nothing was done.
         /// </summary>
-        internal static void HostPayRepair(bool withCinematic)
+        internal static bool HostPayRepair(bool withCinematic, int clientPaid = -1)
         {
             try
             {
-                if (!RVManager.IsDestroyed()) { Core.LogDebug("[Net] host PayRepair ignored - RV not destroyed."); return; }
+                if (!RVManager.IsDestroyed()) { Core.LogDebug("[Net] host PayRepair ignored - RV not destroyed."); return false; }
                 int price = RVRepairVanPreferences.QuestlineEnabled ? CurrentPrice() : RVRepairVanPreferences.RepairPrice;
-                if (S1API.Money.Money.GetCashBalance() < price)
+                if (clientPaid < 0)
                 {
-                    Core.Log.Msg("[Net] host PayRepair rejected - shared pool short (" + MoneyManager.FormatAmount(price) + ").");
-                    return;
+                    if (S1API.Money.Money.GetCashBalance() < price)
+                    {
+                        Core.Log.Msg("[Net] host PayRepair rejected - host short of " + MoneyManager.FormatAmount(price) + ".");
+                        return false;
+                    }
+                    // Charge synchronously, before the cinematic, so an interrupted fade cannot bill twice.
+                    S1API.Money.Money.ChangeCashBalance(-price, true, true);
                 }
-                // Charge the shared pool synchronously (host = authoritative for money), then repair.
-                S1API.Money.Money.ChangeCashBalance(-price, true, true);
+                else if (clientPaid != price)
+                {
+                    Core.Log.Warning("[Net] host PayRepair refused - client paid " + MoneyManager.FormatAmount(clientPaid)
+                        + ", price is " + MoneyManager.FormatAmount(price) + ".");
+                    return false;
+                }
                 int paid = price;
 
                 // "Repair takes a day": Marco takes the job now and hands the RV back 24 in-game hours later.
@@ -308,7 +333,7 @@ namespace RVRepairVan.Quests
                     if (RVRepairVanPreferences.QuestlineEnabled) { Stage = Paid; SyncEntry(); }
                     WorldSay(_marcoT, L10n.T("Leave her with me. Come back tomorrow and I'll text you when she's done."));
                     Core.Log.Msg("[Net] host booked Marco's repair job for " + MoneyManager.FormatAmount(paid) + ".");
-                    return;
+                    return true;
                 }
 
                 Action commit = () =>
@@ -330,8 +355,9 @@ namespace RVRepairVan.Quests
                         () => GruntNpc(FindNpc(MarcoId)));
                 else
                     commit();   // a client acted; do it now and let our broadcast swap their RV during their cinematic
+                return true;
             }
-            catch (Exception e) { Core.Log.Error("[Net] host repair failed: " + e); }
+            catch (Exception e) { Core.Log.Error("[Net] host repair failed: " + e); return false; }
         }
     }
 }

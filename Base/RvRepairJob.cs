@@ -37,7 +37,7 @@ namespace RVRepairVan.Base
                 if (tm == null) return -1;
                 return tm.GetTotalMinSum();
             }
-            catch { return -1; }
+            catch (Exception e) { Core.Swallowed("RvRepairJob.NowMinutes", e); return -1; }
         }
 
         /// <summary>True while Marco has the RV and it is not finished yet.</summary>
@@ -112,8 +112,8 @@ namespace RVRepairVan.Base
                 var marco = S1API.Entities.NPC.Get("marco_baron");
                 if (marco != null) { marco.SendTextMessage(text); return; }
             }
-            catch (Exception e) { Core.LogDebug("[Job] text message failed: " + e.Message); }
-            try { Quests.Questline.SayMarco(text); } catch { }
+            catch (Exception e) { Core.Swallowed("RvRepairJob.Notify.text", e); }
+            try { Quests.Questline.SayMarco(text); } catch (Exception e) { Core.Swallowed("RvRepairJob.Notify", e); }
         }
 
         // --- instant repair -------------------------------------------------------------------------------
@@ -131,7 +131,7 @@ namespace RVRepairVan.Base
                 if (NetworkBus.Online && !NetworkBus.IsServer) continue;
                 bool wrecked;
                 try { wrecked = RVManager.TryLocate() && RVManager.IsDestroyed(); }
-                catch { continue; }
+                catch (Exception e) { Core.Swallowed("RvRepairJob.InstantRepairCoroutine", e); continue; }
                 if (!wrecked) continue;
 
                 Core.Log.Msg("[Instant] RV is wrecked and InstantRepair is on - repairing free of charge.");
