@@ -4,6 +4,14 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.0.1] - 2026-10-14
+
+### Changed
+- Donna, Mrs. Ming and Marco got new lines. Every reply tells you where to go next, and Marco talks like he does in the game.
+- Marco takes Mrs. Ming's name on your first visit. The extra "Fifty grand?" step is gone.
+- "Can you go any lower?" is one choice now. Marco sends you for his package first, then takes packaged product from your hand.
+- Marco texts you once the RV is repaired and mentions his build-outs.
+
 ## [3.0.0] - 2026-10-14
 
 ### Added
