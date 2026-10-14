@@ -94,6 +94,7 @@ namespace RVRepairVan.Base
             _hull = null;
             _contents = null;
             RvWheels.Reset();
+            RvSteps.Reset();
             RvLights.Reset();
             RvAway.Reset();
         }
@@ -307,6 +308,7 @@ namespace RVRepairVan.Base
             _modelHomeInverse = _model.worldToLocalMatrix;
             Bounds homeBounds = BodyBounds(_model);
             RvWheels.Capture(_model, chassis, _homePos, _homeRot);
+            RvSteps.Capture(_model, _homeRot);
 
             Carried.Clear();
             Carry(_model);
@@ -390,6 +392,7 @@ namespace RVRepairVan.Base
             Carried.Clear();
             if (_contents != null) { UnityEngine.Object.Destroy(_contents); _contents = null; }
             RvWheels.Release();
+            RvSteps.Release();
             RvLights.Unbind();
             ReleaseStaticParts();
             if (_hull != null) { UnityEngine.Object.Destroy(_hull.gameObject); _hull = null; }
@@ -585,6 +588,7 @@ namespace RVRepairVan.Base
         {
             if (_chassis == null || driving == _driving) return;
             _driving = driving;
+            RvSteps.SetIn(driving);
             Rigidbody rb = _chassis.Rb;
             if (driving)
             {
@@ -713,8 +717,9 @@ namespace RVRepairVan.Base
             float ground = float.MaxValue;
             foreach (WheelCollider w in chassis.GetComponentsInChildren<WheelCollider>(true))
             {
+                float s = RvWheels.Scale(w, chassis.transform);
                 float y = chassis.transform.InverseTransformPoint(w.transform.TransformPoint(w.center)).y
-                    - w.suspensionDistance * w.suspensionSpring.targetPosition - w.radius;
+                    - (w.suspensionDistance * w.suspensionSpring.targetPosition + w.radius) * s;
                 ground = Mathf.Min(ground, y);
             }
             if (ground == float.MaxValue) { Core.Log.Warning("[Mobile] chassis has no wheels - hull height taken from the RV body only."); return 0f; }
@@ -875,7 +880,7 @@ namespace RVRepairVan.Base
                 Matrix4x4 delta = _model.localToWorldMatrix * _modelHomeInverse;
                 foreach (StaticPart p in _static)
                 {
-                    Matrix4x4 m = delta * RvWheels.Spin(p.Renderer) * p.HomeBase;
+                    Matrix4x4 m = delta * RvSteps.Offset(p.Renderer) * RvWheels.Spin(p.Renderer) * p.HomeBase;
                     for (int i = 0; i < p.Materials.Length; i++)
                     {
                         int sub = p.FirstSubMesh + i;

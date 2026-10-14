@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using MelonLoader;
 using Il2CppScheduleOne.Vehicles;
+using RVRepairVan.Managers;
 
 namespace RVRepairVan.Base
 {
@@ -132,20 +133,29 @@ namespace RVRepairVan.Base
                 Vector3 target = sum / n;
 
                 // Contact height before the move: the chassis was levelled so the RV tyres stand on it.
-                float rest = w.suspensionDistance * w.suspensionSpring.targetPosition;
-                float ground = ct.InverseTransformPoint(w.transform.TransformPoint(w.center)).y - rest - w.radius;
+                // Radius and suspension travel are in the wheel transform's own scale, which is not 1 on this chassis.
+                float s = Scale(w, ct);
+                float rest = w.suspensionDistance * w.suspensionSpring.targetPosition * s;
+                float ground = ct.InverseTransformPoint(w.transform.TransformPoint(w.center)).y - rest - w.radius * s;
                 Vector3 centreAtRest = new Vector3(target.x, ground + radius, target.z);
                 // The collider's own centre offset is kept, so its transform goes where that offset lands on the tyre.
                 Vector3 offset = ct.InverseTransformVector(w.transform.TransformVector(w.center));
                 w.transform.position = ct.TransformPoint(centreAtRest - offset + Vector3.up * rest);
-                w.radius = radius;
+                w.radius = radius / s;
                 var axle = new Axle { W = w, Rest = centreAtRest, Radius = radius };
                 _axles.Add(axle);
                 foreach (Tyre t in mine) t.Axle = axle;
                 moved++;
-                Core.LogDebug("[Wheels]   " + w.name + " -> " + centreAtRest.ToString("F2") + " r " + radius.ToString("0.00") + " (" + n + " tyre(s)).");
+                Core.LogDebug("[Wheels]   " + w.name + " -> " + centreAtRest.ToString("F2") + " r " + radius.ToString("0.00") + " (scale " + s.ToString("0.00") + ", " + n + " tyre(s)).");
             }
             return moved;
+        }
+
+        /// <summary>How much one unit of the wheel's own radius and suspension travel measures in chassis space.</summary>
+        internal static float Scale(WheelCollider w, Transform chassis)
+        {
+            float s = chassis.InverseTransformVector(w.transform.TransformVector(Vector3.up)).magnitude;
+            return s > 0.001f ? s : 1f;
         }
 
         /// <summary>The extra motion of a redrawn static tyre, in home world space; identity for anything else.</summary>
@@ -186,6 +196,40 @@ namespace RVRepairVan.Base
             _axles.Clear();
             _chassis = null;
         }
+
+#if DEBUG
+        /// <summary>
+        /// rvdrive stat: per chassis wheel, how far its suspension is compressed and how far the tyre drawn on it
+        /// stands above (or sinks below) the ground under it.
+        /// </summary>
+        internal static void Report()
+        {
+            if (_chassis == null || _axles.Count == 0) { Core.Log.Warning("[Wheels] report: no wheels bound."); return; }
+            Transform ct = _chassis.transform;
+            Transform model = RVManager.Model;
+            foreach (Axle a in _axles)
+            {
+                WheelCollider w = a.W;
+                if (w == null) { Core.Log.Warning("[Wheels] report: a wheel is gone."); continue; }
+                w.GetWorldPose(out Vector3 wp, out Quaternion _);
+                Vector3 top = w.transform.TransformPoint(w.center);
+                float drop = Vector3.Dot(top - wp, ct.up);   // 0 = fully compressed, suspensionDistance = fully extended
+                float ground = float.NaN;
+                foreach (RaycastHit h in Physics.RaycastAll(wp + ct.up * 1.5f, -ct.up, 4f, ~0, QueryTriggerInteraction.Ignore))
+                {
+                    Transform t = h.collider.transform;
+                    if (t.IsChildOf(ct) || (model != null && t.IsChildOf(model))) continue;
+                    float d = Vector3.Dot(h.point - wp, ct.up);
+                    if (float.IsNaN(ground) || d > ground) ground = d;
+                }
+                Core.Log.Msg("[Wheels]   " + w.name + " grounded=" + w.isGrounded + " sprung=" + w.sprungMass.ToString("0")
+                    + " compression=" + (1f - drop / Mathf.Max(0.001f, w.suspensionDistance * Scale(w, ct))).ToString("0.00")
+                    + " (drop " + drop.ToString("0.00") + " of " + (w.suspensionDistance * Scale(w, ct)).ToString("0.00") + ", scale " + Scale(w, ct).ToString("0.00") + ", target " + w.suspensionSpring.targetPosition.ToString("0.00")
+                    + ", spring " + w.suspensionSpring.spring.ToString("0") + ") tyre bottom "
+                    + (float.IsNaN(ground) ? "no ground" : (-a.Radius - ground).ToString("0.00") + " m above the ground"));
+            }
+        }
+#endif
 
         private static IEnumerator Loop()
         {
