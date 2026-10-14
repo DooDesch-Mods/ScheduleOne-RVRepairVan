@@ -33,7 +33,7 @@
 ## Requirements
 
 - **Schedule I** `0.4.6f11` (IL2CPP) with **MelonLoader 0.7.3+**.
-- **S1API 3.1.8+** (pulled in as a dependency).
+- **S1API 3.2.1+** (pulled in as a dependency).
 
 ## Settings
 

@@ -1,6 +1,7 @@
 using System;
 using DooDesch.Localization;
 using S1API.Quests;
+using S1API.Quests.Constants;
 
 namespace RVRepairVan.Quests
 {
@@ -22,8 +23,9 @@ namespace RVRepairVan.Quests
             {
                 return QuestManager.GetQuestByName(Title) != null;
             }
-            catch
+            catch (Exception e)
             {
+                Core.Swallowed("RepairQuest.IsActive", e);
                 return false;
             }
         }
@@ -40,8 +42,27 @@ namespace RVRepairVan.Quests
                 Quest quest = QuestManager.GetQuestByName(Title);
                 return quest?.QuestEntries != null && quest.QuestEntries.Count > 0;
             }
-            catch
+            catch (Exception e)
             {
+                Core.Swallowed("RepairQuest.HasEntry", e);
+                return false;
+            }
+        }
+
+        /// <summary>True while the quest has an entry that is neither completed nor failed.</summary>
+        internal static bool HasOpenEntry()
+        {
+            try
+            {
+                Quest quest = QuestManager.GetQuestByName(Title);
+                if (quest?.QuestEntries == null) return false;
+                foreach (QuestEntry entry in quest.QuestEntries)
+                    if (entry.State == QuestState.Active || entry.State == QuestState.Inactive) return true;
+                return false;
+            }
+            catch (Exception e)
+            {
+                Core.Swallowed("RepairQuest.HasOpenEntry", e);
                 return false;
             }
         }
@@ -122,19 +143,29 @@ namespace RVRepairVan.Quests
                 Quest quest = QuestManager.GetQuestByName(Title);
                 if (quest == null)
                 {
+                    Core.LogDebug("[Quest] '" + Title + "' not in the journal - nothing to complete.");
                     return;
                 }
 
+                // The entry is added in OnCreated, a frame or two after CreateQuest. Completing in that window
+                // completes nothing and leaves the quest open, so say so instead of reporting success.
+                int completed = 0;
                 if (quest.QuestEntries != null)
                 {
                     foreach (QuestEntry entry in quest.QuestEntries)
                     {
-                        try { entry.Complete(); }
-                        catch { /* keep completing the rest */ }
+                        if (entry.State == QuestState.Completed) continue;
+                        try { entry.Complete(); completed++; }
+                        catch (Exception e) { Core.Swallowed("RepairQuest.CompleteIfActive", e); /* keep completing the rest */ }
                     }
                 }
+                if (completed == 0 && (quest.QuestEntries == null || quest.QuestEntries.Count == 0))
+                {
+                    Core.Log.Warning("[Quest] '" + Title + "' has no entry yet - left open.");
+                    return;
+                }
 
-                Core.Log.Msg("[Quest] '" + Title + "' completed.");
+                Core.Log.Msg("[Quest] '" + Title + "' completed (" + completed + " entry/entries closed).");
             }
             catch (Exception e)
             {

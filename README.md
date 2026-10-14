@@ -56,7 +56,7 @@
 |-----------|------------------|
 | Schedule I | `0.4.6f11` (IL2CPP, current Steam public build) |
 | MelonLoader | `0.7.3+` |
-| S1API | [ifBars/S1API_Forked](https://thunderstore.io/c/schedule-i/p/ifBars/S1API_Forked/) **3.1.8+** (dialogue, items, dead drops, money, save system) |
+| S1API | [ifBars/S1API_Forked](https://thunderstore.io/c/schedule-i/p/ifBars/S1API_Forked/) **3.2.1+** (dialogue, items, dead drops, money, save system) |
 
 ## Installation
 
