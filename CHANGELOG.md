@@ -4,33 +4,29 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
-## [3.0.0] - 2026-08-04
+## [3.0.0] - 2026-10-14
 
 ### Added
-- Marco sells build-outs once the RV is standing again. Each one costs money and
-  gets its own short cinematic, and they build on each other.
-  - **Gut the interior** ($2,500) tears out the bed, bench, cabinets, chairs and the
-    partition wall. What is left is floor.
-  - **Build me a workshop floor** ($7,500) adds 24 tiles on top of the RV's own 32,
-    so equipment fits inside.
-  - **Make room for a crew** ($15,000) puts the RV back in the Fixer's list. Three
-    employees can work there - place a locker inside or they will just stand around.
-  - **I need a loading dock** ($25,000) and your supplier delivers to the RV.
-- Every price is a setting, along with `CrewSize` and `BuildGridExtraTiles`. Change
-  them and Marco's offer updates without a restart. `UpgradesEnabled` turns the whole
-  shop off.
-- `InstantRepair` puts the RV back together for free the moment it is wrecked, for
-  anyone who wants the van and not the story.
-- `RepairTakesADay` hands the RV to Marco for 24 in-game hours instead of fixing it on
-  the spot. He texts you when it is ready.
+- Marco sells four build-outs once the RV stands again, each with its own cinematic. They build on each other.
+  - **Gut the interior** ($2,500) clears out the bed, bench and cabinets.
+  - **Build me a workshop floor** ($7,500) adds 24 tiles to the RV's 32.
+  - **Make room for a crew** ($15,000): three employees can work in the RV. Place a locker inside.
+  - **I need a loading dock** ($25,000): your supplier delivers to the RV.
+- Every price is a setting, as are `CrewSize` and `BuildGridExtraTiles`. Marco's offer updates without a restart.
+  `UpgradesEnabled` turns the shop off.
+- `InstantRepair` fixes the RV for free the moment it is wrecked.
+- `RepairTakesADay` leaves the RV with Marco for 24 in-game hours. He texts you when it is ready.
 
 ### Changed
-- Needs S1API **3.1.8** or newer. On an older one the mod loads but does nothing, so
-  update it along with the mod.
+- Works on game version 0.4.7 and needs S1API **3.2.1** or newer. With an older S1API the mod loads but does nothing.
+- In co-op, whoever pays for the repair, a lost package or a build-out pays from their own cash. Without enough
+  cash the deal is turned down.
 
 ### Fixed
-- Loading a save from the main menu could read your progress back as empty and start
-  the questline over. Your state was being cleared right after it was loaded.
+- Donna, Mrs. Ming and Marco offered no option on game 0.4.7, so the questline could not start.
+- Crew hired for the RV stood outside and never worked. They walk in through the door now and work inside.
+- After loading, a repaired RV could show "Back on the Road" again with a marker on the RV.
+- Loading a save from the main menu could clear your progress and restart the questline.
 
 ## [2.6.2] - 2026-08-04
 
