@@ -21,121 +21,105 @@ namespace RVRepairVan.Localization
 
                 // Objectives
                 ["Find a way to repair your RV"] = "Finde einen Weg, dein Wohnmobil zu reparieren",
-                ["Ask the motel manager about the RV"] = "Frag die Motel-Managerin nach dem Wohnmobil",
+                ["Ask Donna at the motel about your RV"] = "Frag Donna im Motel nach deinem Wohnmobil",
                 ["Talk to Mrs. Ming at the Chinese restaurant"] = "Sprich mit Mrs. Ming im Chinarestaurant",
-                ["Pick up Ming's crate from the dead drop"] = "Hol Mings Kiste am Toten Briefkasten ab",
-                ["Bring Ming's crate back to Mrs. Ming"] = "Bring Mings Kiste zurück zu Mrs. Ming",
-                ["Talk to Marco at the body shop"] = "Sprich mit Marco in der Werkstatt",
-                ["Tell Marco Mrs. Ming sent you"] = "Sag Marco, dass Mrs. Ming dich schickt",
+                ["Pick up Mrs. Ming's crate from the dead drop"] = "Hol Mrs. Mings Kiste am Toten Briefkasten ab",
+                ["Bring the crate to Mrs. Ming"] = "Bring die Kiste zu Mrs. Ming",
+                ["Tell Marco at the docks that Mrs. Ming sent you"] = "Sag Marco am Hafen, dass Mrs. Ming dich schickt",
                 ["Pick up Marco's package from the dead drop"] = "Hol Marcos Paket am Toten Briefkasten ab",
-                ["Bring Marco's package back"] = "Bring Marcos Paket zurück",
+                ["Bring the package to Marco"] = "Bring das Paket zu Marco",
                 ["Pay Marco for the repair"] = "Bezahl Marco für die Reparatur",
-                ["Check on the RV"] = "Sieh nach dem Wohnmobil",
+                ["Go see your RV"] = "Sieh dir dein Wohnmobil an",
 
                 // Donna
                 ["My RV got blown up. Know anyone who can fix it?"] =
-                    "Mein Wohnmobil wurde in die Luft gejagt. Kennst du jemanden, der es reparieren kann?",
-                ["Do I look like a mechanic, sweetheart? Go ask Mrs. Ming over at the Chinese place. She knows people."] =
-                    "Seh ich aus wie ein Mechaniker, Schätzchen? Frag Mrs. Ming drüben beim Chinesen. Die kennt Leute.",
+                    "Mein Wohnmobil ist in die Luft geflogen. Kennst du jemanden, der es reparieren kann?",
+                ["I run a motel, not a garage. Try Mrs. Ming at the Chinese restaurant, ok? She knows people."] =
+                    "Ich führe ein Motel, keine Werkstatt. Frag Mrs. Ming im Chinarestaurant, ok? Die kennt Leute.",
 
                 // Ming
-                ["Donna said you might know someone who can fix my RV."] =
-                    "Donna meinte, du kennst vielleicht jemanden, der mein Wohnmobil reparieren kann.",
-                ["Marco at the docks can fix almost anything. But favors move both ways. I have a crate waiting at a dead drop nearby. Bring it back, and I'll put in a word."] =
-                    "Marco am Hafen kann fast alles reparieren. Aber Gefallen beruhen auf Gegenseitigkeit. In einem Toten Briefkasten in der Nähe wartet eine Kiste auf mich. Bring sie her, und ich lege ein gutes Wort ein.",
-                ["I'll grab it."] = "Ich hole sie.",
-                ["Not right now."] = "Jetzt gerade nicht.",
-                ["Good. Pick it up, bring it here, and don't open it."] =
-                    "Gut. Hol sie ab, bring sie her, und mach sie nicht auf.",
-                ["Then your RV can stay where it is."] = "Dann bleibt dein Wohnmobil eben, wo es ist.",
+                ["Donna says you know someone who can fix my RV."] =
+                    "Donna meint, du kennst jemanden, der mein Wohnmobil reparieren kann.",
+                ["Oh yes! Marco, at the docks. Very good mechanic. But first you do small favor for me, yes? Crate in a dead drop. You bring it here, I call Marco."] =
+                    "Oh ja! Marco, am Hafen. Sehr guter Mechaniker. Aber erst machst du kleinen Gefallen für mich, ja? Kiste in Totem Briefkasten. Du bringst sie her, ich rufe Marco an.",
+                ["I'll get it."] = "Ich hole sie.",
+                ["Not now."] = "Jetzt nicht.",
+                ["Very good! And do not open, yes?"] = "Sehr gut! Und nicht aufmachen, ja?",
+                ["Okay. You come back when ready."] = "Okay. Du kommst wieder, wenn du bereit bist.",
                 ["Here's your crate."] = "Hier ist deine Kiste.",
-                ["Good. Go see Marco at the body shop down by the docks. Tell him Mrs. Ming sent you."] =
-                    "Gut. Geh zu Marco in der Werkstatt unten am Hafen. Sag ihm, Mrs. Ming schickt dich.",
+                ["Very good! I call Marco now. Go see him at the docks, tell him Ming sends you."] =
+                    "Sehr gut! Ich rufe Marco an. Geh zu ihm an den Hafen, sag ihm, Ming schickt dich.",
                 ["I lost your crate."] = "Ich habe deine Kiste verloren.",
-                ["You lost it? I don't lose things, and people who lose my things lose teeth. Five hundred buys you both back. Now."] =
-                    "Du hast sie verloren? Ich verliere nichts, und wer meine Sachen verliert, verliert Zähne. Fünfhundert bringen dich wieder ins Reine. Sofort.",
-                ["Smart. We're square. Now go see Marco at the body shop down by the docks, and tell him Mrs. Ming sent you."] =
-                    "Klug. Wir sind quitt. Jetzt geh zu Marco in der Werkstatt unten am Hafen und sag ihm, Mrs. Ming schickt dich.",
-                ["Then don't come back until your hands are full."] =
-                    "Dann komm erst wieder, wenn deine Hände voll sind.",
+                ["You lose my crate? Not very good. Five hundred, then we are okay, yes?"] =
+                    "Du verlierst meine Kiste? Nicht sehr gut. Fünfhundert, dann sind wir okay, ja?",
+                ["Very good. Now go see Marco at the docks, tell him Ming sends you."] =
+                    "Sehr gut. Jetzt geh zu Marco am Hafen, sag ihm, Ming schickt dich.",
+                ["Okay. You bring money, yes?"] = "Okay. Du bringst Geld, ja?",
 
                 // Marco
-                ["Can you fix my RV?"] = "Kannst du mein Wohnmobil reparieren?",
-                ["Yeah, I can fix it. Fifty grand."] = "Klar kann ich das reparieren. Fünfzig Riesen.",
-                ["Fifty grand?"] = "Fünfzig Riesen?",
-                ["You brought me a burnt-out shell. That's not a repair, that's a resurrection."] =
-                    "Du bringst mir ein ausgebranntes Wrack. Das ist keine Reparatur, das ist eine Wiederauferstehung.",
-                ["Mrs. Ming sent me."] = "Mrs. Ming schickt mich.",
-                ["Mrs. Ming sent you? Yeah, alright. Should've opened with that. Ten grand."] =
-                    "Mrs. Ming schickt dich? Na gut. Damit hättest du anfangen sollen. Zehn Riesen.",
+                ["Mrs. Ming sent me. Can you fix my RV?"] = "Mrs. Ming schickt mich. Kannst du mein Wohnmobil reparieren?",
+                ["Ming sent ya? Well, any friend of hers. That RV's a burnt-out shell, buddy. Normally that's {0}. For you, {1}."] =
+                    "Ming schickt dich? Na, ihre Freunde sind auch meine Freunde. Das Ding ist ein ausgebranntes Wrack, Kumpel. Normal kostet das {0}. Für dich {1}.",
                 ["Repair my RV ({0})"] = "Mein Wohnmobil reparieren ({0})",
-                ["Anything I can do to bring the price down?"] = "Kann ich irgendwas tun, um den Preis zu drücken?",
-                ["Maybe. I left a package at a dead drop nearby. Pick it up, bring it back, and don't make it weird."] =
-                    "Vielleicht. Ich habe ein Paket an einem Toten Briefkasten in der Nähe hinterlegt. Hol es ab, bring es her, und mach es nicht komisch.",
-                ["Got your package."] = "Hab dein Paket.",
-                ["Good. You can follow instructions. Bring me some of that good stuff now and then, and I'll keep shaving down the bill."] =
-                    "Gut. Du kannst Anweisungen folgen. Bring mir ab und zu was von dem guten Zeug, dann drücke ich die Rechnung weiter.",
+                ["Can you go any lower?"] = "Geht's noch billiger?",
+                ["Tell ya what. There's a package of mine in a dead drop. Bring it here and we'll talk."] =
+                    "Ich sag dir was. In einem Toten Briefkasten liegt ein Paket von mir. Bring's her, dann reden wir.",
+                ["Here's your package."] = "Hier ist dein Paket.",
+                ["Much obliged. Here's the deal: bring me packaged product in your hand, and every piece comes off your bill."] =
+                    "Sehr nett. Der Deal: Bring mir verpackte Ware in der Hand, und jedes Stück geht von deiner Rechnung ab.",
+                ["Packaged product, buddy. Have it in your hand when you talk to me - every piece knocks up to {0} off the bill."] =
+                    "Verpackte Ware, Kumpel. Halt sie in der Hand, wenn du mit mir redest - jedes Stück drückt die Rechnung um bis zu {0}.",
                 ["I lost your package."] = "Ich habe dein Paket verloren.",
-                ["You did what? You walk in here empty-handed and waste my time. Five hundred, or the next thing that goes missing is you."] =
-                    "Du hast WAS? Du kommst mit leeren Händen rein und verschwendest meine Zeit. Fünfhundert, oder das Nächste, das verschwindet, bist du.",
-                ["Good. Mess like that gets forgotten when the cash shows up. Bring me some of that good stuff now and then, and I'll keep shaving down the bill."] =
-                    "Gut. Solche Ausrutscher sind vergessen, sobald das Geld da ist. Bring mir ab und zu was von dem guten Zeug, dann drücke ich die Rechnung weiter.",
-                ["Clock's running. Come back with it."] = "Die Uhr läuft. Komm mit dem Ding zurück.",
+                ["You lost it? Well, that's gonna cost ya. Five hundred and we're even."] =
+                    "Verloren? Tja, das kostet dich was. Fünfhundert, dann sind wir quitt.",
+                ["Pleasure doing business. Now, bring me packaged product in your hand, and every piece comes off your bill."] =
+                    "Angenehme Geschäfte. Und jetzt: Bring mir verpackte Ware in der Hand, und jedes Stück geht von deiner Rechnung ab.",
+                ["I'll be here."] = "Ich bin hier.",
                 ["Your RV looks fine to me."] = "Dein Wohnmobil sieht für mich in Ordnung aus.",
-                ["You're short. Come back when you've got the cash."] =
-                    "Zu wenig. Komm wieder, wenn du das Geld hast.",
-                ["Alright. Hold still, this won't take long."] = "Na gut. Bleib stehen, dauert nicht lange.",
-                ["There she is - back from the dead. Go take a look, and try not to total her again."] =
-                    "Da ist sie - zurück von den Toten. Sieh sie dir an, und versuch, sie nicht gleich wieder zu schrotten.",
-                ["There she is - back from the dead. Try not to total her again."] =
-                    "Da ist sie - zurück von den Toten. Versuch, sie nicht gleich wieder zu schrotten.",
-                ["There she is. Standing again. Interior's your problem. Try not to piss off whoever torched it the first time."] =
-                    "Da ist sie. Steht wieder. Der Innenraum ist dein Problem. Und verärgere besser nicht nochmal den, der sie abgefackelt hat.",
+                ["That's {0}, buddy. Come back when you've got it."] = "Das macht {0}, Kumpel. Komm wieder, wenn du's hast.",
+                ["Alright, let me grab my tools."] = "Alles klar, ich hol mein Werkzeug.",
+                ["There she is, good as new. Try not to blow her up again, buddy."] =
+                    "Da steht sie, wie neu. Jag sie nicht gleich wieder in die Luft, Kumpel.",
+                ["Hope she runs fine. If you want more out of her, come see me - I do build-outs too."] =
+                    "Hoffe, sie läuft. Wenn du mehr aus ihr rausholen willst, komm vorbei - ich mach auch Ausbauten.",
+                ["Hope she runs fine, buddy."] = "Hoffe, sie läuft, Kumpel.",
 
                 // Samples
                 ["Give Marco a packaged sample"] = "Marco eine verpackte Probe geben",
                 ["Give Marco: {0} (-{1})"] = "Marco geben: {0} (-{1})",
                 ["product"] = "Ware",
-                ["That ain't packaged. Hand me something sealed."] =
-                    "Das ist nicht verpackt. Gib mir was Versiegeltes.",
-                ["Appreciate it. Knocked {0} off the bill."] =
-                    "Danke dir. {0} gehen von der Rechnung runter.",
-                ["What can I bring to lower the price?"] = "Was kann ich bringen, um den Preis zu senken?",
-                ["Bring me packaged product - sealed stuff, not raw. Every piece I take knocks its value off the bill, up to five hundred a pop, right down to my floor."] =
-                    "Bring mir verpackte Ware - versiegeltes Zeug, nichts Loses. Jedes Stück, das ich nehme, geht mit seinem Wert von der Rechnung ab, bis fünfhundert pro Stück, runter bis zu meiner Schmerzgrenze.",
+                ["That ain't packaged, buddy. Bring it sealed."] = "Das ist nicht verpackt, Kumpel. Bring's versiegelt.",
+                ["Thanks, buddy. That's {0} off."] = "Danke, Kumpel. Das sind {0} weniger.",
 
                 // Loss-fee sub-choices
                 ["Pay ${0}"] = "{0} $ zahlen",
-                ["I'll get the money."] = "Ich besorge das Geld.",
+                ["I lost your crate. (Pay ${0})"] = "Ich habe deine Kiste verloren. ({0} $ zahlen)",
+                ["I lost your package. (Pay ${0})"] = "Ich habe dein Paket verloren. ({0} $ zahlen)",
+                ["I'll come back with the money."] = "Ich komme mit dem Geld wieder.",
 
                 // Marco's RV build-outs (each one paid for, each one with its own cinematic)
-                ["Gut the interior. ({0})"] = "Reiß den Innenraum raus. ({0})",
-                ["Build me a workshop floor. ({0})"] = "Bau mir einen Werkstattboden. ({0})",
-                ["Make room for a crew. ({0})"] = "Mach Platz für eine Crew. ({0})",
-                ["I need a loading dock. ({0})"] = "Ich brauche eine Laderampe. ({0})",
-                ["Stripped her out. Bed, bench, the lot - it's a box on wheels now. Do something with it."] =
-                    "Alles raus. Bett, Bank, der ganze Kram - jetzt ist es eine Kiste auf Rädern. Mach was draus.",
-                ["Floor's braced and levelled. Bolt whatever you want to it, I don't want to know what."] =
-                    "Boden ist verstärkt und gerade. Schraub drauf, was du willst, ich will es gar nicht wissen.",
-                ["She'll hold a crew now. Put a locker in there or they'll stand around looking at you."] =
-                    "Da passt jetzt eine Crew rein. Stell einen Spind rein, sonst stehen sie nur rum und gucken dich an.",
-                ["Dock's in. Tell your supplier to bring it here and stop making you drive."] =
-                    "Rampe steht. Sag deinem Lieferanten, er soll herkommen, statt dich fahren zu lassen.",
-                ["Come back when you've got {0}."] = "Komm wieder, wenn du {0} hast.",
+                ["Clear out the inside ({0})"] = "Den Innenraum ausräumen ({0})",
+                ["Put in a work floor ({0})"] = "Einen Arbeitsboden einbauen ({0})",
+                ["Make room for a crew ({0})"] = "Platz für eine Crew schaffen ({0})",
+                ["Build a loading dock ({0})"] = "Eine Laderampe bauen ({0})",
+                ["All cleared out. Want to build in there? You'll need a proper floor."] =
+                    "Alles raus. Willst du da drin was bauen? Dann brauchst du einen richtigen Boden.",
+                ["Floor's in. You can set up shop in there now."] = "Boden ist drin. Jetzt kannst du da drin aufbauen.",
+                ["Room for {0} now. Hire 'em through the Fixer, and put a locker in there so they get paid."] =
+                    "Jetzt ist Platz für {0}. Stell sie über den Fixer ein und stell einen Spind rein, damit sie bezahlt werden.",
+                ["Dock's done. Deliveries can come straight to the RV now."] =
+                    "Rampe steht. Lieferungen kommen jetzt direkt zum Wohnmobil.",
 
                 // Repair-takes-a-day option
-                ["Leave her with me. Come back tomorrow and I'll text you when she's done."] =
-                    "Lass sie hier. Komm morgen wieder, ich schreib dir, wenn sie fertig ist.",
-                ["She's done. Come get her whenever - and try not to total her again."] =
-                    "Sie ist fertig. Hol sie ab, wann du willst - und fahr sie nicht gleich wieder zu Schrott.",
+                ["Alright, I'll send the boys over to your RV. Give me a day - I'll text ya when she's done."] =
+                    "Alles klar, ich schick die Jungs zu deinem Wohnmobil. Gib mir einen Tag - ich schreib dir, wenn sie fertig ist.",
+                ["Your RV's all done, buddy. Good as new."] = "Dein Wohnmobil ist fertig, Kumpel. Wie neu.",
 
                 // Quest items
-                ["Ming's Crate"] = "Mings Kiste",
-                ["A sealed crate for Mrs. Ming. She said not to open it."] =
-                    "Eine versiegelte Kiste für Mrs. Ming. Sie hat gesagt: nicht öffnen.",
+                ["Mrs. Ming's Crate"] = "Mrs. Mings Kiste",
+                ["A sealed crate for Mrs. Ming. Don't open it."] = "Eine versiegelte Kiste für Mrs. Ming. Nicht öffnen.",
                 ["Marco's Package"] = "Marcos Paket",
-                ["A package Marco left at a drop. Don't make it weird."] =
-                    "Ein Paket, das Marco an einem Briefkasten hinterlegt hat. Mach es nicht komisch.",
+                ["Marco's package. Bring it to him at the docks."] = "Marcos Paket. Bring es zu ihm an den Hafen.",
             });
         }
     }

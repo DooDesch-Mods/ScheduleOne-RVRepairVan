@@ -66,7 +66,7 @@ namespace RVRepairVan.Quests
             {
                 // Initial objective = the first real step (NOT the same text as the quest title, or the
                 // journal shows it twice). The questline immediately re-syncs this to the current stage.
-                QuestEntry entry = AddEntry(L10n.T("Ask the motel manager about the RV"));
+                QuestEntry entry = AddEntry(L10n.T("Ask Donna at the motel about your RV"));
 
                 // The game's QuestEntry.Start() registers a compass element from PoILocation. S1API leaves
                 // PoILocation null, and on this build (0.4.5f2) CompassManager then dereferences null every

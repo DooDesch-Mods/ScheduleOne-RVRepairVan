@@ -2,9 +2,9 @@
 
 > 🛟 **Need help or found a bug?** Get support at [support.doodesch.de/rvrepairvan](https://support.doodesch.de/rvrepairvan).
 
-> Your RV got blown up in the intro? Now you can actually fix it. A proper tracked side
-> quest sends you from the motel manager to Mrs. Ming to Marco the mechanic, with real
-> errands, referral haggling, and a little repair cinematic at the end. Built on
+> Your RV got blown up in the intro? Now you can fix it. A tracked side quest sends you
+> from Donna at the motel to Mrs. Ming to Marco the mechanic, with dead-drop errands, a
+> haggled price and a repair cinematic. After that, Marco turns the RV into a workshop. Built on
 > [S1API](https://github.com/ifBars/S1API).
 
 ![Version](https://img.shields.io/badge/version-3.0.0-blue)
@@ -14,47 +14,44 @@
 ![Status](https://img.shields.io/badge/status-working-brightgreen)
 [![Polyfill](https://polyfill.doomods.com/badge/rvrepairvan.svg)](https://polyfill.doomods.com/mod/rvrepairvan)
 
+![The wrecked RV and the repaired one](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
+
 [![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_RhcyMUaP3ywqKoI8_vN9ayEg/badge.svg)](https://mlvscan.com/attestations/att_RhcyMUaP3ywqKoI8_vN9ayEg)
 
 ## Features
 
-- **"Back on the Road" questline** (default). After the RV is wrecked during the intro,
-  the quest starts on its own and points you to the motel manager (Donna), who sends you
-  to **Mrs. Ming**, who has you fetch a crate from a **dead drop** before she refers you
-  to **Marco** the mechanic at the docks.
-- **Native dialogue** via S1API: real in-conversation choices and replies, not floating
-  one-line bubbles, and it shows up in the journal and the on-screen HUD tracker.
-- **Referral pricing.** Marco quotes **$50,000** up front; tell him *"Mrs. Ming sent me"*
-  and it drops to **$10,000**. Optionally earn his trust (a second dead-drop pickup) to
-  hand over **packaged product samples** that shave the bill down further, to the floor.
-- **Real carried items.** The crate and package are actual items you pick up and carry
-  (with a proper icon and in-hand model). Lose one and the NPC charges a **$500** recovery
-  fee to continue.
-- **Repair cinematic.** When you pay, the screen fades to black, you hear Marco work on
-  it (and grumble), then it fades back and he tells you she is ready. Plays in both modes.
-- **Marco's build-outs.** Once the RV is standing again, he sells four upgrades that turn
-  it into somewhere you can actually work. Each one costs money and runs its own short
-  cinematic: **gut the interior** ($2,500) for floor space, a **workshop floor** ($7,500)
-  that adds 24 build tiles to the RV's own 32, **crew quarters** ($15,000) so three
-  employees can be stationed there, and a **loading dock** ($25,000) your supplier can
-  deliver to. The first three build on each other; the dock stands alone.
-- **Save-bound persistence.** Progress and the repaired RV are stored inside the game
-  save, so they stay in sync with the world: finishing without saving (or after a crash)
-  correctly reverts instead of leaving you stuck.
-- **Simple mode** (`QuestMode = Simple`): skip the story and just talk to Marco, pay the
-  flat repair price, and get the cinematic.
-- **Configurable** prices and discounts, read live - change them in settings and Marco's
-  offer updates without a restart.
-- **English and German - and your language.** The questline picks German automatically
-  on a German system (the game has no language setting of its own), English everywhere
-  else, and you can add or fix translations yourself with a simple JSON file - no
-  modding needed. See Configuration.
+- **"Back on the Road" questline** (default). After the RV is wrecked in the intro, the
+  quest starts on its own. Donna at the motel sends you to **Mrs. Ming**. She wants a crate
+  from a **dead drop** first, then she calls **Marco** at the docks.
+- **Native dialogue** via S1API: choices inside the normal conversation, plus journal
+  entries and the on-screen quest tracker.
+- **Haggling.** Marco normally charges **$50,000**. Tell him Mrs. Ming sent you and it is
+  **$10,000**. Ask *"Can you go any lower?"* and he sends you for a package of his. After
+  that, every packaged product you hold out to him takes up to $500 off, down to a floor.
+- **Carried quest items.** The crate and the package are items with an icon and an in-hand
+  model. Lose one and the owner wants **$500** before the quest goes on.
+- **Repair cinematic.** You pay, the screen goes black, Marco works on the RV, and it fades
+  back in repaired. Plays in both modes.
+- **Marco's build-outs.** Once the RV stands again, he sells four upgrades, each with its
+  own short cinematic:
+  - **Clear out the inside** ($2,500): bed, bench and cabinets go, dash and seats stay.
+  - **Put in a work floor** ($7,500): 24 build tiles on top of the RV's own 32.
+  - **Make room for a crew** ($15,000): three employees work inside. Put a locker in.
+  - **Build a loading dock** ($25,000): your supplier delivers to the RV.
+
+  The first three build on each other. The dock stands alone.
+- **Save-bound progress.** Quest progress and the repaired RV live in the game save. Quit
+  without saving and they go back with the world.
+- **Simple mode** (`QuestMode = Simple`): skip the story, talk to Marco, pay the flat price.
+- **Live settings.** Change a price and Marco's offer updates without a restart.
+- **English and German, and your language.** German on a German system, English
+  everywhere else. Add or fix a translation with a JSON file, see Configuration.
 
 ## Requirements
 
 | Component | Version / Source |
 |-----------|------------------|
-| Schedule I | `0.4.6f11` (IL2CPP, current Steam public build) |
+| Schedule I | `0.4.7f12` (IL2CPP, current Steam public build) |
 | MelonLoader | `0.7.3+` |
 | S1API | [ifBars/S1API_Forked](https://thunderstore.io/c/schedule-i/p/ifBars/S1API_Forked/) **3.2.1+** (dialogue, items, dead drops, money, save system) |
 
@@ -86,7 +83,7 @@ Settings live in
 | `MinSampleDiscount` | `100` | Smallest price cut a single packaged sample can give. |
 | `MaxSampleDiscount` | `500` | Largest price cut a single packaged sample can give. |
 | `UpgradesEnabled` | `true` | Marco's build-outs. Off = the RV stays a plain shell. |
-| `PriceGutInterior` | `2500` | Clears the bed, bench, cabinets, chairs and the partition wall. |
+| `PriceGutInterior` | `2500` | Clears the bed, bench and cabinets. Dash and seats stay. |
 | `PriceWorkshopFloor` | `7500` | Extends the build grid. Needs the interior gutted first. |
 | `PriceCrewQuarters` | `15000` | Lets employees be stationed at the RV. Needs the workshop floor. |
 | `PriceLoadingDock` | `25000` | Adds a delivery dock. |
@@ -122,13 +119,20 @@ in development builds and are not shipped in the release.
 
 1. Play through the intro until the RV is wrecked and the early quests have begun.
 2. The **"Back on the Road"** quest appears and points you to the **motel manager**.
-3. Follow it: Donna -> **Mrs. Ming** (accept her errand, grab the crate from the dead drop,
-   bring it back) -> **Marco** at the body shop.
-4. Ask Marco to fix the RV, drop Ming's name to cut the price, optionally do his pickup and
-   hand over packaged samples for further discounts.
-5. **Pay** - enjoy the repair cinematic - then go **check on the RV**.
+3. Follow it: Donna -> **Mrs. Ming** (fetch her crate from the dead drop) -> **Marco** at
+   the docks. Tell him Mrs. Ming sent you.
+4. Optional: ask him to go lower, fetch his package, then hold out packaged product to
+   him for more off the bill.
+5. **Pay**, watch the repair, then go **see your RV**. Marco texts you about his build-outs.
 
 Prefer no story? Set `QuestMode = Simple` and just pay Marco directly.
+
+## Screenshots
+
+| Before | After |
+|---|---|
+| ![Wrecked RV](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/wreck.jpg) | ![Repaired RV](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/repaired.jpg) |
+| ![Crew at work in the RV](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/crew.jpg) | ![Gutted interior with the dash kept](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/interior.jpg) |
 
 ## Compatibility
 
