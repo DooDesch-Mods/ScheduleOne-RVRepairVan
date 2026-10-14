@@ -80,14 +80,23 @@ namespace RVRepairVan.Effects
                 UnityEngine.AudioClip clip = EnsureClip();
                 if (clip == null) return;
 
-                // Own 2D AudioSource routed through the game's MainGameMixer, so the clip RESPECTS the player's
-                // in-game volume settings (PlayClipAtPoint does NOT - it plays raw/full and ignores the sliders)
-                // and sits at a sane level under Marco's voice. 2D (spatialBlend 0) keeps it consistent + audible.
+                // Own 2D AudioSource routed through the game's MainGameMixer, at a level under Marco's voice. The
+                // game's Master and Sound Effects sliders are not mixer levels: each of its own sources multiplies
+                // them into its volume, so this one does the same. 2D (spatialBlend 0) keeps it consistent + audible.
                 var go = new UnityEngine.GameObject("RVRepairSound");
                 go.transform.position = PlayerPos();
                 var src = go.AddComponent<UnityEngine.AudioSource>();
                 src.clip = clip;
-                src.volume = SoundVolume;
+                float settings = 1f;
+                try
+                {
+                    var am = AudioManager.Instance;
+                    if (am != null) settings = am.GetVolume(Il2CppScheduleOne.Core.Audio.EAudioType.FX, true);
+                    else Core.Log.Warning("[Cinematic] no AudioManager - the repair sound plays at its own level.");
+                }
+                catch (Exception e) { Core.Log.Warning("[Cinematic] reading the volume settings failed: " + e.Message); }
+                src.volume = SoundVolume * settings;
+                Core.LogDebug("[Cinematic] repair sound at " + src.volume.ToString("0.000") + " (settings " + settings.ToString("0.00") + ").");
                 src.spatialBlend = 0f;
                 try
                 {

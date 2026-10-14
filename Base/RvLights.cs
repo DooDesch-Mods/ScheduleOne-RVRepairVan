@@ -4,6 +4,7 @@ using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Il2CppScheduleOne.DevUtilities;
 using Il2CppScheduleOne.Misc;
 using Il2CppScheduleOne.Vehicles;
+using RVRepairVan.Managers;
 
 namespace RVRepairVan.Base
 {
@@ -188,6 +189,43 @@ namespace RVRepairVan.Base
             return sb.ToString();
         }
 
+        /// <summary>
+        /// A lamp in the RV was switched (the wall switch for the ceiling bars). Away from home its lit surface is
+        /// drawn by <see cref="RvMobile"/> from a copy of the materials, so the copy has to follow the switch.
+        /// </summary>
+        internal static void OnSwitched(ToggleableLight tl)
+        {
+            if (!RvMobile.Away || tl == null) return;
+            Transform model = RVManager.Model;
+            if (model == null || !tl.transform.IsChildOf(model)) return;
+            var meshes = tl.lightSurfacesMeshes;
+            int refreshed = 0;
+            if (meshes != null)
+                for (int i = 0; i < meshes.Length; i++)
+                    if (meshes[i] != null) { RvMobile.RefreshStatic(meshes[i]); refreshed++; }
+            Core.LogDebug("[Lights] '" + tl.name + "' switched " + (tl.isOn ? "on" : "off") + " while away, " + refreshed + " surface(s) redrawn.");
+        }
+
+#if DEBUG
+        /// <summary>rvdrive lamps inside on|off: the RV's other lamps (the ceiling bars), as the wall switch sets them.</summary>
+        internal static void SwitchInside(bool on)
+        {
+            Transform model = RVManager.Model;
+            if (model == null) { Core.Log.Warning("[Lights] inside: RV model not found."); return; }
+            int n = 0;
+            foreach (ToggleableLight tl in model.GetComponentsInChildren<ToggleableLight>(true))
+            {
+                string name = tl.name;
+                if (name.IndexOf("Brake", StringComparison.OrdinalIgnoreCase) >= 0 || name.IndexOf("Reverse", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                tl.isOn = on;
+                n++;
+                foreach (Light l in tl.GetComponentsInChildren<Light>(true))
+                    Core.Log.Msg("[Lights]   " + name + "/" + l.name + ": light " + (l.enabled ? "on" : "off") + ", active " + l.gameObject.activeInHierarchy + ".");
+            }
+            Core.Log.Msg("[Lights] inside: " + n + " lamp(s) switched " + (on ? "on" : "off") + ".");
+        }
+#endif
+
         private static void Switch(List<ToggleableLight> lamps, bool on)
         {
             foreach (ToggleableLight tl in lamps)
@@ -199,6 +237,17 @@ namespace RVRepairVan.Base
                     for (int i = 0; i < meshes.Length; i++)
                         if (meshes[i] != null) RvMobile.RefreshStatic(meshes[i]);
             }
+        }
+    }
+
+    /// <summary>SetLights is where every switch of a <see cref="ToggleableLight"/> lands (virtual, so not inlined).</summary>
+    [HarmonyLib.HarmonyPatch(typeof(ToggleableLight), nameof(ToggleableLight.SetLights))]
+    internal static class Rv_ToggleableLightSetLights_Patch
+    {
+        private static void Postfix(ToggleableLight __instance)
+        {
+            try { RvLights.OnSwitched(__instance); }
+            catch (Exception e) { Core.Swallowed("Rv_ToggleableLightSetLights_Patch", e); }
         }
     }
 }

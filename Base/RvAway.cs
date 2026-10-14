@@ -54,7 +54,9 @@ namespace RVRepairVan.Base
         }
 
         // Property.UpdateCulling measures the camera against the property ROOT, which stays home. Driven more than
-        // 50 m away, every station on board would disappear while the player stands next to it.
+        // 50 m away, every station on board would disappear while the player stands next to it. The flag alone does
+        // not stop that: UpdateCulling unculls when it is off and then still culls by distance in the same call, so
+        // Rv_PropertySetContentCulled_Patch refuses the cull itself while the RV is away.
         private static void SetCulling(Property prop, bool enabled)
         {
             if (prop == null) return;
@@ -212,6 +214,28 @@ namespace RVRepairVan.Base
         {
             _waitPoints.Clear();
             _heldDock = null;
+        }
+    }
+
+    /// <summary>
+    /// Keeps the RV's contents shown while it is away from its spot. Property.UpdateCulling culls by the distance
+    /// from the camera to the property root, which stays home, so every pot and station on board vanished once the
+    /// RV was driven more than 60 m. Virtual, so the call from FixedUpdate is not inlined past this patch.
+    /// </summary>
+    [HarmonyPatch(typeof(Property), nameof(Property.SetContentCulled))]
+    internal static class Rv_PropertySetContentCulled_Patch
+    {
+        private static int _refused;
+
+        private static bool Prefix(Property __instance, bool culled)
+        {
+            try
+            {
+                if (!culled || !RvMobile.Away || RVManager.Root == null || __instance.transform != RVManager.Root) return true;
+                if (_refused++ == 0) Core.Log.Msg("[Away] the RV's contents stay shown while it is away (distance cull refused).");
+                return false;
+            }
+            catch (Exception e) { Core.Swallowed("Rv_PropertySetContentCulled_Patch", e); return true; }
         }
     }
 

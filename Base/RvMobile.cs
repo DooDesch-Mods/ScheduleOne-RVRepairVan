@@ -44,6 +44,7 @@ namespace RVRepairVan.Base
         private static float _pendingSince, _spawnedAt, _lastOccupiedAt, _lastSaveAt, _lastDockAt;
         private static int _attachFrame;
         private static object _loop;
+        private static PropertyContentsContainer _contents;
 
         /// <summary>True while the RV is on its chassis, wherever that is - including parked right at home.</summary>
         internal static bool Away => _chassis != null;
@@ -91,6 +92,8 @@ namespace RVRepairVan.Base
             _static.Clear();
             if (_draw != null) { MelonCoroutines.Stop(_draw); _draw = null; }
             _hull = null;
+            _contents = null;
+            RvWheels.Reset();
             RvLights.Reset();
             RvAway.Reset();
         }
@@ -303,6 +306,7 @@ namespace RVRepairVan.Base
             // Captured at home, before anything moves: the static-batch redraw measures the drive offset from here.
             _modelHomeInverse = _model.worldToLocalMatrix;
             Bounds homeBounds = BodyBounds(_model);
+            RvWheels.Capture(_model, chassis, _homePos, _homeRot);
 
             Carried.Clear();
             Carry(_model);
@@ -335,6 +339,15 @@ namespace RVRepairVan.Base
             SetDriving(chassis.CurrentPlayerOccupancy > 0);
 
             Property prop = root.GetComponent<Property>();
+            // Placing an item looks up its property through the parents of the grid it goes on. The grids ride on
+            // the chassis now, out from under the property root, and the lookup came back empty: the build threw
+            // and the item was lost. A contents container on the chassis answers that lookup with the RV.
+            if (prop != null)
+            {
+                _contents = chassis.gameObject.AddComponent<PropertyContentsContainer>();
+                _contents.SetProperty(prop);
+            }
+            else Core.Log.Warning("[Mobile] no RV property - items placed away from home will fail.");
             RvAway.Begin(prop, chassis);
             Core.Log.Msg("[Mobile] RV on the chassis (id " + _chassisId + "): " + Carried.Count + " part(s) carried, "
                 + hidden + " chassis renderer(s) hidden, " + baked + " static part(s) redrawn, " + _chassisColliders.Count
@@ -375,6 +388,8 @@ namespace RVRepairVan.Base
                 p.T.localRotation = p.LocalRot;
             }
             Carried.Clear();
+            if (_contents != null) { UnityEngine.Object.Destroy(_contents); _contents = null; }
+            RvWheels.Release();
             RvLights.Unbind();
             ReleaseStaticParts();
             if (_hull != null) { UnityEngine.Object.Destroy(_hull.gameObject); _hull = null; }
@@ -860,7 +875,7 @@ namespace RVRepairVan.Base
                 Matrix4x4 delta = _model.localToWorldMatrix * _modelHomeInverse;
                 foreach (StaticPart p in _static)
                 {
-                    Matrix4x4 m = delta * p.HomeBase;
+                    Matrix4x4 m = delta * RvWheels.Spin(p.Renderer) * p.HomeBase;
                     for (int i = 0; i < p.Materials.Length; i++)
                     {
                         int sub = p.FirstSubMesh + i;

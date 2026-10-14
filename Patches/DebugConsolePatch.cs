@@ -171,6 +171,7 @@ namespace RVRepairVan.Patches
                         else if (parts.Length > 1 && parts[1].ToLower() == "stat") Base.RvDrive.Stat(parts.Length > 2 ? parts[2] : "-");
                         else if (parts.Length > 1 && parts[1].ToLower() == "probe") Base.RvDrive.Probe();
                         else if (parts.Length > 1 && parts[1].ToLower() == "look") Base.RvDrive.Look(parts.Length > 2 && parts[2].ToLower() == "off", parts.Length > 2 && parts[2].ToLower() == "rear");
+                        else if (parts.Length > 3 && parts[1].ToLower() == "lamps" && parts[2].ToLower() == "inside") Base.RvLights.SwitchInside(parts[3].ToLower() == "on");
                         else if (parts.Length > 2 && parts[1].ToLower() == "lamps") Base.RvLights.Force(parts[2].ToLower());
                         else if (parts.Length > 1 && parts[1].ToLower() == "exit") Base.RvDrive.Exit();
                         else if (parts.Length > 2 && parts[1].ToLower() == "gas") Base.RvDrive.Gas(parts[2].ToLower(), parts.Length > 3 ? parts[3] : "0");
