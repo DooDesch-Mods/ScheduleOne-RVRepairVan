@@ -14,9 +14,9 @@
 ![Status](https://img.shields.io/badge/status-working-brightgreen)
 [![Polyfill](https://polyfill.doomods.com/badge/rvrepairvan.svg)](https://polyfill.doomods.com/mod/rvrepairvan)
 
-![The wrecked RV and the repaired one](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
+[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_ewKFi6WYO1ixoivBTukWkPBm/badge.svg)](https://mlvscan.com/attestations/att_ewKFi6WYO1ixoivBTukWkPBm)
 
-[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_RhcyMUaP3ywqKoI8_vN9ayEg/badge.svg)](https://mlvscan.com/attestations/att_RhcyMUaP3ywqKoI8_vN9ayEg)
+![The wrecked RV and the repaired one](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
 
 ## Features
 
