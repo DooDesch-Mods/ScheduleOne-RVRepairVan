@@ -38,7 +38,7 @@ namespace RVRepairVan.Base
         private static Transform _model;
         private static Vector3 _homePos;
         private static Quaternion _homeRot = Quaternion.identity;
-        private static bool _homeKnown;
+        private static bool _homeKnown, _homeLevelled;
 
         private static bool _driving, _localWasIn, _pendingEnter, _restored;
         private static float _pendingSince, _spawnedAt, _lastOccupiedAt, _lastSaveAt, _lastDockAt;
@@ -83,7 +83,7 @@ namespace RVRepairVan.Base
             _chassisId = -1;
             _wheel = null;
             _model = null;
-            _homeKnown = false;
+            _homeKnown = _homeLevelled = false;
             _driving = _localWasIn = _pendingEnter = _restored = false;
             Carried.Clear();
             _muted.Clear();
@@ -222,6 +222,36 @@ namespace RVRepairVan.Base
             Core.Log.Msg("[Mobile] home chassis pose " + _homePos + " fwd=" + (_homeRot * Vector3.forward) + ".");
         }
 
+        // The guessed home height leaves the RV's tyres in the air once the chassis rests on its own suspension. The
+        // home pose is lifted or lowered once, so the RV's tyres sit where the chassis wheels meet the road.
+        private static void LevelHome(LandVehicle chassis)
+        {
+            if (_homeLevelled) return;
+            _homeLevelled = true;
+            float bottom = float.MaxValue;
+            int wheels = 0;
+            Transform body = _model.Find("rv") ?? _model;
+            foreach (Renderer r in body.GetComponentsInChildren<Renderer>(false))
+            {
+                string n = r.name;
+                if (!n.StartsWith("Wheel", StringComparison.OrdinalIgnoreCase) || n.StartsWith("WheelBracket", StringComparison.OrdinalIgnoreCase)) continue;
+                bottom = Mathf.Min(bottom, r.bounds.min.y);
+                wheels++;
+            }
+            if (wheels == 0) { Core.Log.Warning("[Mobile] no RV wheel renderers - home height left at " + _homePos.y.ToString("0.00") + "."); return; }
+            float y = bottom - WheelGroundY(chassis);
+            bool atOldHome = Vector3.Distance(chassis.transform.position, _homePos) < 0.5f;
+            Core.Log.Msg("[Mobile] home chassis height " + _homePos.y.ToString("0.00") + " -> " + y.ToString("0.00") + " (" + wheels
+                + " RV tyre(s), lowest at " + bottom.ToString("0.00") + ")" + (atOldHome ? ", chassis moved with it." : "."));
+            _homePos.y = y;
+            if (atOldHome)
+            {
+                chassis.transform.position = _homePos;
+                Rigidbody rb = chassis.Rb;
+                if (rb != null) rb.position = _homePos;
+            }
+        }
+
         private static bool HostSpawn(Vector3 pos, Quaternion rot)
         {
             try
@@ -268,6 +298,7 @@ namespace RVRepairVan.Base
             HideChassisExtras(chassis);
             RvLights.MuteChassis(chassis);
             CollectChassisColliders(chassis);
+            LevelHome(chassis);
 
             // Captured at home, before anything moves: the static-batch redraw measures the drive offset from here.
             _modelHomeInverse = _model.worldToLocalMatrix;
