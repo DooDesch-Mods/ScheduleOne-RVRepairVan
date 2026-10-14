@@ -97,7 +97,7 @@ namespace RVRepairVan.Base
                 // retry would add another one, with another set of GUID registrations to fight over.
                 if (dock != null)
                 {
-                    try { UnityEngine.Object.Destroy(dock.gameObject); } catch { }
+                    try { UnityEngine.Object.Destroy(dock.gameObject); } catch (Exception e) { Core.Swallowed("RvDeliveryDock.Apply", e); }
                     Core.LogDebug("[Dock] discarded an unattached dock clone.");
                 }
             }
@@ -141,7 +141,7 @@ namespace RVRepairVan.Base
                 var orig = originalComp != null ? originalComp.TryCast<Il2CppScheduleOne.IGUIDRegisterable>() : null;
                 if (orig != null) Il2Cpp.GUIDManager.RegisterObject(orig, null);
             }
-            catch (Exception e) { Core.LogDebug("[Dock] reassign guid: " + e.Message); }
+            catch (Exception e) { Core.Swallowed("RvDeliveryDock.ReassignGuid", e); }
         }
 
         private static bool HasOurDock(Property prop)
@@ -152,7 +152,7 @@ namespace RVRepairVan.Base
                 foreach (LoadingDock d in prop.LoadingDocks)
                     if (d != null && d.name == DockName) return true;
             }
-            catch { }
+            catch (Exception e) { Core.Swallowed("RvDeliveryDock.HasOurDock", e); }
             return false;
         }
 
@@ -166,7 +166,7 @@ namespace RVRepairVan.Base
                     LoadingDock d = go != null ? go.GetComponent<LoadingDock>() : null;
                     if (d != null) return d;
                 }
-                catch { }
+                catch (Exception e) { Core.Swallowed("RvDeliveryDock.FindTemplate.path", e); }
             }
             // Fall back to any dock in the scene: the Manor paths are the likely ones, but a renamed hierarchy
             // should degrade to "some working dock" rather than to no delivery at all.
@@ -177,7 +177,7 @@ namespace RVRepairVan.Base
                     foreach (LoadingDock d in all)
                         if (d != null && d.name != DockName) return d;
             }
-            catch { }
+            catch (Exception e) { Core.Swallowed("RvDeliveryDock.FindTemplate.anyDock", e); }
             return null;
         }
     }
@@ -213,7 +213,7 @@ namespace RVRepairVan.Base
 
                 __result.Add(rv);
             }
-            catch (Exception e) { Core.LogDebug("[Dock] destination patch: " + e.Message); }
+            catch (Exception e) { Core.Swallowed("RvDeliveryDock.DestinationPatch", e); }
         }
     }
 }

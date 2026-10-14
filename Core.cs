@@ -26,6 +26,19 @@ namespace RVRepairVan
         [System.Diagnostics.Conditional("DEBUG")]
         public static void LogDebug(string msg) { Log?.Msg(msg); }
 
+        // Keys already reported by Swallowed. Several callers sit in per-frame paths, so each site logs once per process.
+        private static readonly System.Collections.Generic.HashSet<string> _swallowed = new System.Collections.Generic.HashSet<string>();
+
+        /// <summary>Report a caught exception that deliberately stays without effect. Logs once per <paramref name="where"/> key.</summary>
+        internal static void Swallowed(string where, Exception e)
+        {
+            lock (_swallowed)
+            {
+                if (!_swallowed.Add(where)) return;
+            }
+            Log?.Warning("[Swallowed] " + where + ": " + e.GetType().Name + ": " + e.Message);
+        }
+
         public override void OnInitializeMelon()
         {
             Instance = this;
@@ -85,6 +98,7 @@ namespace RVRepairVan
             }
 
             RVRepairVan.Base.RvUpgrades.Reset();   // drop last scene's cached transforms; the mask lives in the save
+            RVRepairVan.Net.ClientPayment.Reset();  // a ticket from the last session can never be answered now
 
             MelonCoroutines.Start(RestoreRepairCoroutine());
             MelonCoroutines.Start(RVRepairVan.Base.RvRepairJob.InstantRepairCoroutine());

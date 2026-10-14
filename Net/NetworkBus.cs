@@ -30,24 +30,24 @@ namespace RVRepairVan.Net
 
         private static NetworkManager Nm
         {
-            get { try { return InstanceFinder.NetworkManager; } catch { return null; } }
+            get { try { return InstanceFinder.NetworkManager; } catch (Exception e) { Core.Swallowed("NetworkBus.Nm", e); return null; } }
         }
 
         /// <summary>True while in a real networked session (host or client). False = offline single-player.</summary>
         internal static bool Online
         {
-            get { var nm = Nm; try { return nm != null && (nm.IsServer || nm.IsClient); } catch { return false; } }
+            get { var nm = Nm; try { return nm != null && (nm.IsServer || nm.IsClient); } catch (Exception e) { Core.Swallowed("NetworkBus.Online", e); return false; } }
         }
 
         /// <summary>True on the host/server (authoritative for the shared questline state).</summary>
         internal static bool IsServer
         {
-            get { var nm = Nm; try { return nm != null && nm.IsServer; } catch { return false; } }
+            get { var nm = Nm; try { return nm != null && nm.IsServer; } catch (Exception e) { Core.Swallowed("NetworkBus.IsServer", e); return false; } }
         }
 
         private static GameQuestManager Qm
         {
-            get { try { return GameQuestManager.Instance; } catch { return null; } }
+            get { try { return GameQuestManager.Instance; } catch (Exception e) { Core.Swallowed("NetworkBus.Qm", e); return null; } }
         }
 
         /// <summary>Client -> host intent (rides SendQuestState, a ServerRpc). Harmless to call on the host too.</summary>

@@ -53,7 +53,7 @@ namespace RVRepairVan.Profiling
                 }
                 return n;
             }
-            catch { return 0; }
+            catch (Exception e) { Core.Swallowed("Probe.CountQuestItemDrops", e); return 0; }
         }
 
         public static void Register()
