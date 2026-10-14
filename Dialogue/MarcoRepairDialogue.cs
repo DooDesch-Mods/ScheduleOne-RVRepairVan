@@ -121,7 +121,7 @@ namespace RVRepairVan.Dialogue
                         Conversation = null,
                         Priority = 93 - u
                     };
-                    Func<bool, bool> show = (_) => { try { return Base.RvUpgrades.Available(up); } catch { return false; } };
+                    Func<bool, bool> show = (_) => { try { return Base.RvUpgrades.Available(up); } catch (Exception e) { Core.Swallowed("MarcoRepairDialogue.UpgradeShowCheck", e); return false; } };
                     uc.shouldShowCheck = DelegateSupport.ConvertDelegate<DialogueController.DialogueChoice.ShouldShowCheck>(show);
                     uc.onChoosen = new UnityEvent();
                     uc.onChoosen.AddListener((Action)(() => Base.RvUpgrades.Buy(up)));
@@ -162,14 +162,15 @@ namespace RVRepairVan.Dialogue
                     }
                 }
             }
-            catch { /* fall through */ }
+            catch (Exception e) { Core.Swallowed("MarcoRepairDialogue.FindController.direct", e); /* fall through */ }
 
             try
             {
                 return ((Component)marco).GetComponentInChildren<DialogueController>();
             }
-            catch
+            catch (Exception e)
             {
+                Core.Swallowed("MarcoRepairDialogue.FindController.children", e);
                 return null;
             }
         }
@@ -186,7 +187,7 @@ namespace RVRepairVan.Dialogue
             {
                 if (npc != null) npc.SendWorldSpaceDialogue(line, 5f);
             }
-            catch { /* worldspace lines are nice-to-have */ }
+            catch (Exception e) { Core.Swallowed("MarcoRepairDialogue.WorldSay", e); /* worldspace lines are nice-to-have */ }
         }
 
         private static void OnRepairChosen()
@@ -215,11 +216,13 @@ namespace RVRepairVan.Dialogue
 
                 Marco marco = FindMarco();
 
-                // Co-op CLIENT: the repair (RV state + money charge + persistence) is host-authoritative - send the
-                // intent and play the cinematic locally; the host's RepairApplied swaps the RV during the black.
+                // Co-op CLIENT: the repair (RV state + persistence) is host-authoritative; the money is this player's
+                // own cash, taken here and refunded if the host refuses. The host's RepairApplied swaps the RV.
                 if (NetworkBus.Online && !NetworkBus.IsServer)
                 {
-                    NetworkBus.SendToHost(RvOp.PayRepair);
+                    int ticket = ClientPayment.Charge((int)price, "repair");
+                    if (ticket == 0) return;
+                    NetworkBus.SendToHost(RvOp.PayRepair, 0, ticket, (int)price);
                     RVRepairVan.Effects.RepairCinematic.Play(
                         null,
                         () => WorldSay(marco, L10n.T("There she is - back from the dead. Try not to total her again.")),

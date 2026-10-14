@@ -28,8 +28,8 @@ namespace RVRepairVan.Base
     /// not serialized world state. So the save holds only the bitmask and <see cref="ApplyOwned"/> re-applies
     /// everything on each scene load. Every module's Apply must therefore be idempotent.
     ///
-    /// Co-op mirrors the questline: a client sends <see cref="RvOp.BuyUpgrade"/>, the host validates funds and
-    /// prerequisites, charges the shared pool once, and broadcasts the new mask.
+    /// Co-op mirrors the questline: the buyer pays from its own cash, a client then sends
+    /// <see cref="RvOp.BuyUpgrade"/>, the host validates prerequisites and the amount, and broadcasts the new mask.
     /// </summary>
     internal static class RvUpgrades
     {
@@ -132,8 +132,8 @@ namespace RVRepairVan.Base
         // --- buying ---------------------------------------------------------------------------------------
 
         /// <summary>
-        /// Player picked an upgrade at Marco. On a co-op client this is an intent - the host charges the shared
-        /// pool and broadcasts; we still play the cinematic locally so it does not look like nothing happened.
+        /// Player picked an upgrade at Marco. On a co-op client this player pays and sends an intent - the host
+        /// applies and broadcasts; we still play the cinematic locally so it does not look like nothing happened.
         /// </summary>
         internal static void Buy(RvUpgrade up)
         {
@@ -143,9 +143,16 @@ namespace RVRepairVan.Base
 
                 if (NetworkBus.Online && !NetworkBus.IsServer)
                 {
-                    // The host owns the money and the mask. Play the black locally with no effect of our own -
-                    // the host's UpgradeSync applies the actual change while we are looking at the veil.
-                    NetworkBus.SendToHost(RvOp.BuyUpgrade, (int)up);
+                    // The host owns the mask, this player owns the money. Play the black locally with no effect of
+                    // our own - the host's UpgradeSync applies the actual change while we are looking at the veil.
+                    int price = Price(up);
+                    int ticket = ClientPayment.Charge(price, "upgrade " + up);
+                    if (ticket == 0)
+                    {
+                        Questline.SayMarco(L10n.T("Come back when you've got {0}.", MoneyManager.FormatAmount(price)));
+                        return;
+                    }
+                    NetworkBus.SendToHost(RvOp.BuyUpgrade, (int)up, ticket, price);
                     Effects.RepairCinematic.PlayUpgrade(null, null);
                     return;
                 }
@@ -158,24 +165,35 @@ namespace RVRepairVan.Base
         /// <summary>
         /// Host (or offline): validate, charge once, apply, replicate. Charging happens BEFORE the cinematic for
         /// the same reason the repair does it - an interrupted fade must never be able to bill twice.
+        /// <paramref name="clientPaid"/> &lt; 0 = the host player buys with its own cash; otherwise a client already
+        /// paid that much, which must match the price. Returns false when nothing was bought.
         /// </summary>
-        internal static void HostBuy(RvUpgrade up, bool withCinematic)
+        internal static bool HostBuy(RvUpgrade up, bool withCinematic, int clientPaid = -1)
         {
             try
             {
-                if (!Available(up)) return;
+                if (!Available(up)) { Core.LogDebug("[Upgrade] " + up + " not available - ignored."); return false; }
                 int price = Price(up);
-                if (S1API.Money.Money.GetCashBalance() < price)
+                if (clientPaid < 0)
                 {
-                    Core.Log.Msg("[Upgrade] " + up + " rejected - short of " + MoneyManager.FormatAmount(price) + ".");
-                    Questline.SayMarco(L10n.T("Come back when you've got {0}.", MoneyManager.FormatAmount(price)));
-                    return;
+                    if (S1API.Money.Money.GetCashBalance() < price)
+                    {
+                        Core.Log.Msg("[Upgrade] " + up + " rejected - short of " + MoneyManager.FormatAmount(price) + ".");
+                        Questline.SayMarco(L10n.T("Come back when you've got {0}.", MoneyManager.FormatAmount(price)));
+                        return false;
+                    }
+                    // Charge and record ownership in the SAME step. Deferring the mask to the cinematic's midpoint
+                    // callback meant two purchases arriving before that callback both saw the upgrade as unowned and
+                    // both charged, while ScreenTransition rejected the second fade - two charges, one upgrade. The
+                    // cinematic is presentation; it must not carry the transaction.
+                    S1API.Money.Money.ChangeCashBalance(-price, true, true);
                 }
-                // Charge and record ownership in the SAME step. Deferring the mask to the cinematic's midpoint
-                // callback meant two purchases arriving before that callback both saw the upgrade as unowned and
-                // both charged, while ScreenTransition rejected the second fade - two charges, one upgrade. The
-                // cinematic is presentation; it must not carry the transaction.
-                S1API.Money.Money.ChangeCashBalance(-price, true, true);
+                else if (clientPaid != price)
+                {
+                    Core.Log.Warning("[Upgrade] " + up + " refused - client paid " + MoneyManager.FormatAmount(clientPaid)
+                        + ", price is " + MoneyManager.FormatAmount(price) + ".");
+                    return false;
+                }
                 Mask = Mask | (int)up;   // setter replicates to clients
                 Core.Log.Msg("[Upgrade] " + up + " bought for " + MoneyManager.FormatAmount(price) + ".");
 
@@ -185,8 +203,9 @@ namespace RVRepairVan.Base
                     Effects.RepairCinematic.PlayUpgrade(() => Apply(up), () => Questline.SayMarco(DoneLine(up)));
                 else
                     Apply(up);   // a client acted - their own cinematic is already running
+                return true;
             }
-            catch (Exception e) { Core.Log.Warning("[Upgrade] host buy " + up + " failed: " + e.Message); }
+            catch (Exception e) { Core.Log.Warning("[Upgrade] host buy " + up + " failed: " + e.Message); return false; }
         }
 
         /// <summary>Client: adopt the host's mask and apply whatever is newly owned.</summary>

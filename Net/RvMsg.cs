@@ -24,13 +24,15 @@ namespace RVRepairVan.Net
         AskDonna = 11,
         CheckedRv = 12,   // client reached the post-repair "check on the RV" spot
         ErrandItemPicked = 13,   // client now HOLDS the current errand item (Ming's crate / Marco's package)
-        BuyUpgrade = 14,   // A = RvUpgrade bit the client wants to buy (host validates funds + prerequisites)
+        BuyUpgrade = 14,   // A = RvUpgrade bit the client wants to buy (host validates prerequisites)
+        // Paid intents (PayRepair, MingPayLoss, MarcoPayLoss, BuyUpgrade) also carry B = ticket, C = amount paid.
 
         // host -> all clients state (absolute values, idempotent on re-receive)
         StageSync = 100,      // A = stage, B = discount total
         RepairApplied = 101,
         TransientSync = 102,  // A = flags (1=pickupActive, 2=hasPackage); B = drop world X, C = drop world Z (0,0 = none)
         UpgradeSync = 103,    // A = the full owned-upgrade bitmask (absolute, so a re-send just re-applies)
+        PaymentSettled = 104, // A = ticket, B = 1 refund / 0 keep - only the client holding the ticket acts
         Ping = 200,   // connectivity / latency ping
 #if DEBUG
         DebugGiveItems = 201,   // DEBUG: host -> clients, spawn packaged test products into each client's inventory
@@ -63,7 +65,7 @@ namespace RVRepairVan.Net
                 if (p.Length > 3) int.TryParse(p[3], out msg.C);
                 return true;
             }
-            catch { return false; }
+            catch (Exception e) { Core.Swallowed("RvMsg.TryDecode", e); return false; }
         }
 
         public override string ToString() => Op + "(" + A + "," + B + "," + C + ")";
