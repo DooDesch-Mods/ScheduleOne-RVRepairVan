@@ -89,10 +89,10 @@ namespace RVRepairVan.Quests
         private static readonly Base.RvUpgrade[] UpgradeOrder =
         {
             Base.RvUpgrade.GutInterior, Base.RvUpgrade.WorkshopFloor,
-            Base.RvUpgrade.CrewQuarters, Base.RvUpgrade.LoadingDock,
+            Base.RvUpgrade.CrewQuarters, Base.RvUpgrade.LoadingDock, Base.RvUpgrade.Engine,
         };
         private static readonly DialogueController.DialogueChoice[] _upgradeChoices =
-            new DialogueController.DialogueChoice[4];
+            new DialogueController.DialogueChoice[UpgradeOrder.Length];
 
         private const int MAX_SAMPLE_CHOICES = 1;   // only the product in the player's hand
         private static readonly DialogueController.DialogueChoice[] _sampleChoices = new DialogueController.DialogueChoice[MAX_SAMPLE_CHOICES];

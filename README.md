@@ -32,14 +32,16 @@
   model. Lose one and the owner wants **$500** before the quest goes on.
 - **Repair cinematic.** You pay, the screen goes black, Marco works on the RV, and it fades
   back in repaired. Plays in both modes.
-- **Marco's build-outs.** Once the RV stands again, he sells four upgrades, each with its
+- **Marco's build-outs.** Once the RV stands again, he sells five upgrades, each with its
   own short cinematic:
   - **Clear out the inside** ($2,500): bed, bench and cabinets go, dash and seats stay.
   - **Put in a work floor** ($7,500): 24 build tiles on top of the RV's own 32.
   - **Make room for a crew** ($15,000): three employees work inside. Put a locker in.
   - **Build a loading dock** ($25,000): your supplier delivers to the RV.
+  - **Get the engine running** ($10,000): take the wheel and drive the RV anywhere. Parked
+    away, it keeps its stations; the crew and deliveries wait until it is back on its spot.
 
-  The first three build on each other. The dock stands alone.
+  The first three build on each other. The dock and the engine stand alone.
 - **Save-bound progress.** Quest progress and the repaired RV live in the game save. Quit
   without saving and they go back with the world.
 - **Simple mode** (`QuestMode = Simple`): skip the story, talk to Marco, pay the flat price.
@@ -87,6 +89,7 @@ Settings live in
 | `PriceWorkshopFloor` | `7500` | Extends the build grid. Needs the interior gutted first. |
 | `PriceCrewQuarters` | `15000` | Lets employees be stationed at the RV. Needs the workshop floor. |
 | `PriceLoadingDock` | `25000` | Adds a delivery dock. |
+| `PriceEngine` | `10000` | Makes the RV drivable. Away from its spot, the crew and deliveries wait. |
 | `CrewSize` | `3` | How many employees the RV holds once the crew quarters are built. |
 | `BuildGridExtraTiles` | `24` | Tiles the workshop floor adds on top of the RV's own 32. |
 | `InstantRepair` | `false` | Repairs the RV free of charge as soon as it is wrecked. |

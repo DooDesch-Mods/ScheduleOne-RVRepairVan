@@ -79,7 +79,7 @@ namespace RVRepairVan.Patches
             new[] { "rvreach", "for every RV pot and rack: is each access point in bounds and reachable by the crew", "rvreach" },
             new[] { "rvpay", "put cash in every RV locker, the way a player pays the crew", "rvpay 500" },
             new[] { "rvpayrepair", "pay Marco for the repair the way his dialogue choice does", "rvpayrepair" },
-            new[] { "rvdrive", "drive the RV on a hidden chassis; 'home' snaps it back, 'info' dumps state", "rvdrive veeper 90" },
+            new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
         };
 
         private static bool Dispatch(string[] parts)
@@ -150,7 +150,7 @@ namespace RVRepairVan.Patches
                             Core.Log.Msg("[Debug] rvbuy " + bit + ": cash " + before + " -> " + S1API.Money.Money.GetCashBalance()
                                 + ", mask=" + RVRepairVan.Base.RvUpgrades.Mask);
                         }
-                        else Core.Log.Warning("[Debug] rvbuy <bit>  (1=GutInterior 2=WorkshopFloor 4=CrewQuarters 8=LoadingDock)");
+                        else Core.Log.Warning("[Debug] rvbuy <bit>  (1=GutInterior 2=WorkshopFloor 4=CrewQuarters 8=LoadingDock 16=Engine)");
                         break;
                     case "rvupg":     // 'rvupg' dumps the build-out state; 'rvupg <mask>' grants/revokes (host)
                         if (parts.Length > 1 && int.TryParse(parts[1], out int mask))
@@ -161,19 +161,18 @@ namespace RVRepairVan.Patches
                     case "rvreinject":   // 'rvreinject degraded' exercises the no-container fallback (adds duplicates)
                         RVRepairVan.Quests.Questline.DebugReinject(parts.Length > 1 && parts[1].ToLower() == "degraded");
                         break;
-                    case "rvdrive":   // 'rvdrive [code] [yaw]' drives, 'rvdrive home' returns, 'rvdrive info' dumps
-                        if (parts.Length > 1 && parts[1].ToLower() == "home") Base.RvDrive.ReturnHome();
+                    case "rvdrive":   // 'rvdrive' = use the wheel, 'home' snaps back, 'info' dumps, 'look', 'exit', 'gas'
+                        if (parts.Length > 1 && parts[1].ToLower() == "home") Base.RvMobile.DebugHome();
                         else if (parts.Length > 1 && parts[1].ToLower() == "info") Base.RvDrive.Info();
-                    else if (parts.Length > 1 && parts[1].ToLower() == "look") Base.RvDrive.Look(parts.Length > 2 && parts[2].ToLower() == "off");
-                    else if (parts.Length > 1 && parts[1].ToLower() == "exit") Base.RvDrive.Exit();
-                    else if (parts.Length > 1 && parts[1].ToLower() == "bare") Base.RvDrive.Bare(parts.Length > 2 ? parts[2].ToLower() : "veeper");
+                        else if (parts.Length > 1 && parts[1].ToLower() == "probe") Base.RvDrive.Probe();
+                        else if (parts.Length > 1 && parts[1].ToLower() == "look") Base.RvDrive.Look(parts.Length > 2 && parts[2].ToLower() == "off");
+                        else if (parts.Length > 1 && parts[1].ToLower() == "exit") Base.RvDrive.Exit();
                         else if (parts.Length > 2 && parts[1].ToLower() == "gas") Base.RvDrive.Gas(parts[2].ToLower(), parts.Length > 3 ? parts[3] : "0");
-                        else Base.RvDrive.Drive(parts.Length > 1 ? parts[1].ToLower() : "veeper",
-                            parts.Length > 2 && float.TryParse(parts[2], System.Globalization.NumberStyles.Float,
-                                System.Globalization.CultureInfo.InvariantCulture, out float yaw) ? yaw : 0f);
+                        else Base.RvMobile.DebugDrive();
                         break;
                     case "rvcam":     // fixed camera views around and inside the RV, for screenshot rounds
-                        RvCam(parts.Length > 1 ? parts[1].ToLower() : "");
+                        if (parts.Length > 7 && parts[1].ToLower() == "at") RvCamAt(parts);
+                        else RvCam(parts.Length > 1 ? parts[1].ToLower() : "");
                         break;
                     case "rvwreck":   // back to a wrecked RV and quest stage Started, to replay the questline
                         if (RVRepairVan.Managers.RVManager.Destroy())
@@ -222,6 +221,9 @@ namespace RVRepairVan.Patches
 
         // Camera offsets from the RV root (world axes; the RV is static and lies along X). Eye height inside is the
         // cabin floor (y 1.08) plus a standing player's eye line.
+        // The model sits 0.2 m above the root; the offsets above are from the root.
+        private static readonly Vector3 ModelLift = new Vector3(0f, 0.2f, 0f);
+
         private static readonly (string name, Vector3 eye, Vector3 target)[] CamViews =
         {
             ("side_n",  new Vector3(0f, 2.0f, 7.0f),    new Vector3(0f, 1.4f, 0f)),
@@ -250,7 +252,10 @@ namespace RVRepairVan.Patches
             foreach (var v in CamViews)
             {
                 if (v.name != view) continue;
-                Vector3 eye = root.position + v.eye, at = root.position + v.target;
+                // Relative to the model, so the views follow the RV when it is driven off its spot.
+                Transform model = RVRepairVan.Managers.RVManager.Model;
+                Vector3 eye = model != null ? model.TransformPoint(v.eye - ModelLift) : root.position + v.eye;
+                Vector3 at = model != null ? model.TransformPoint(v.target - ModelLift) : root.position + v.target;
                 cam.OverrideTransform(eye, Quaternion.LookRotation(at - eye), 0f, false);
                 Core.Log.Msg("[Debug] rvcam " + view + ": eye=" + eye + " looking at " + at);
                 return;
@@ -258,6 +263,20 @@ namespace RVRepairVan.Patches
             string names = "";
             foreach (var v in CamViews) names += " " + v.name;
             Core.Log.Warning("[Debug] rvcam <view|off>, views:" + names);
+        }
+
+        // rvcam at ex ey ez tx ty tz - a free view in the same frame as the named views.
+        private static void RvCamAt(string[] parts)
+        {
+            var cam = PlayerSingleton<PlayerCamera>.Instance;
+            Transform model = RVRepairVan.Managers.RVManager.Model;
+            if (cam == null || model == null) { Core.Log.Warning("[Debug] rvcam at: no camera or RV model."); return; }
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            float F(int i) => float.Parse(parts[i], ci);
+            Vector3 eye = model.TransformPoint(new Vector3(F(2), F(3), F(4)) - ModelLift);
+            Vector3 at = model.TransformPoint(new Vector3(F(5), F(6), F(7)) - ModelLift);
+            cam.OverrideTransform(eye, Quaternion.LookRotation(at - eye), 0f, false);
+            Core.Log.Msg("[Debug] rvcam at: eye=" + eye + " looking at " + at);
         }
 
         internal static void ClearErrandItems()

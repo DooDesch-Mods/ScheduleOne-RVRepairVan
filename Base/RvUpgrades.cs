@@ -17,6 +17,7 @@ namespace RVRepairVan.Base
         WorkshopFloor = 2,   // turns on the RV's build grid so equipment can be placed
         CrewQuarters = 4,    // employee capacity + idle points + a walkable interior
         LoadingDock = 8,     // a delivery destination at the RV
+        Engine = 16,         // the RV can be driven (RvMobile)
     }
 
     /// <summary>
@@ -36,7 +37,7 @@ namespace RVRepairVan.Base
         // Applied in dependency order - the crew needs the grid, which needs the room.
         private static readonly RvUpgrade[] Order =
         {
-            RvUpgrade.GutInterior, RvUpgrade.WorkshopFloor, RvUpgrade.CrewQuarters, RvUpgrade.LoadingDock,
+            RvUpgrade.GutInterior, RvUpgrade.WorkshopFloor, RvUpgrade.CrewQuarters, RvUpgrade.LoadingDock, RvUpgrade.Engine,
         };
 
         /// <summary>The full owned mask. Setting it on the host replicates, exactly like Questline.Stage.</summary>
@@ -52,7 +53,7 @@ namespace RVRepairVan.Base
 
         /// <summary>Every bit we actually support - used to sanitise anything that arrives over the wire.</summary>
         private const int AllBits = (int)(RvUpgrade.GutInterior | RvUpgrade.WorkshopFloor
-                                        | RvUpgrade.CrewQuarters | RvUpgrade.LoadingDock);
+                                        | RvUpgrade.CrewQuarters | RvUpgrade.LoadingDock | RvUpgrade.Engine);
 
         /// <summary>
         /// Exactly one known upgrade? A purchase arrives as an int over the network, and anything else - a
@@ -61,7 +62,7 @@ namespace RVRepairVan.Base
         /// </summary>
         internal static bool IsValid(RvUpgrade up) =>
             up == RvUpgrade.GutInterior || up == RvUpgrade.WorkshopFloor
-            || up == RvUpgrade.CrewQuarters || up == RvUpgrade.LoadingDock;
+            || up == RvUpgrade.CrewQuarters || up == RvUpgrade.LoadingDock || up == RvUpgrade.Engine;
 
         internal static bool Owned(RvUpgrade up) => IsValid(up) && (Mask & (int)up) != 0;
 
@@ -73,6 +74,7 @@ namespace RVRepairVan.Base
                 case RvUpgrade.WorkshopFloor: return RVRepairVanPreferences.PriceWorkshopFloor;
                 case RvUpgrade.CrewQuarters: return RVRepairVanPreferences.PriceCrewQuarters;
                 case RvUpgrade.LoadingDock: return RVRepairVanPreferences.PriceLoadingDock;
+                case RvUpgrade.Engine: return RVRepairVanPreferences.PriceEngine;
                 default: return 0;
             }
         }
@@ -98,6 +100,7 @@ namespace RVRepairVan.Base
                 case RvUpgrade.WorkshopFloor: return L10n.T("Put in a work floor ({0})", money);
                 case RvUpgrade.CrewQuarters: return L10n.T("Make room for a crew ({0})", money);
                 case RvUpgrade.LoadingDock: return L10n.T("Build a loading dock ({0})", money);
+                case RvUpgrade.Engine: return L10n.T("Get the engine running ({0})", money);
                 default: return "";
             }
         }
@@ -114,6 +117,8 @@ namespace RVRepairVan.Base
                     return L10n.T("Room for {0} now. Hire 'em through the Fixer, and put a locker in there so they get paid.", RVRepairVanPreferences.CrewSize);
                 case RvUpgrade.LoadingDock:
                     return L10n.T("Dock's done. Deliveries can come straight to the RV now.");
+                case RvUpgrade.Engine:
+                    return L10n.T("She runs. Don't wreck her.");
                 default: return "";
             }
         }
@@ -225,6 +230,7 @@ namespace RVRepairVan.Base
         /// </summary>
         internal static void ApplyOwned()
         {
+            RvLiner.Ensure();   // not an upgrade: the stock model has holes whether or not anything was bought
             if (!RVRepairVanPreferences.UpgradesEnabled) return;
             foreach (RvUpgrade up in Order)
                 if (Owned(up)) Apply(up);
@@ -240,6 +246,7 @@ namespace RVRepairVan.Base
                     case RvUpgrade.WorkshopFloor: RvBuildGrid.Apply(); break;
                     case RvUpgrade.CrewQuarters: RvCrew.Apply(); break;
                     case RvUpgrade.LoadingDock: RvDeliveryDock.Apply(); break;
+                    case RvUpgrade.Engine: RvMobile.Apply(); break;
                 }
             }
             catch (Exception e) { Core.Log.Warning("[Upgrade] apply " + up + " failed: " + e.Message); }
@@ -252,6 +259,7 @@ namespace RVRepairVan.Base
             RvBuildGrid.Reset();
             RvCrew.Reset();
             RvDeliveryDock.Reset();
+            RvMobile.Reset();
         }
 
 #if DEBUG

@@ -146,8 +146,7 @@ namespace RVRepairVan.Base
         // The furniture hangs off the INTACT model ("RV"), not the wreck - so this only resolves once repaired.
         private static Transform ModelRoot()
         {
-            Transform root = RVManager.Root;
-            return root != null ? root.Find("RV") : null;
+            return RVManager.Model;
         }
     }
 }
