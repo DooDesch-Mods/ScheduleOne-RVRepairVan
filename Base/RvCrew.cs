@@ -37,6 +37,12 @@ namespace RVRepairVan.Base
         private static bool _applied;
         private static bool _navBaked;
         private static readonly HashSet<int> _bakedAgents = new HashSet<int>();
+        private static readonly List<NavMeshLinkInstance> _doorLinks = new List<NavMeshLinkInstance>();
+
+        // The entry steps in the RV's own frame, measured with rvparts (rv/Main/Steps), used when the model node
+        // cannot be found. The cabin floor sits at about y 1.08 in the same frame, the ground at y 0.
+        private static readonly Vector3 StepsFallback = new Vector3(-1.80f, 0.50f, -2.03f);
+        private const float CabinFloorY = 1.08f;
 
         /// <summary>True once the upgrade is owned and applied - read by the Fixer patch below.</summary>
         internal static bool CrewUnlocked { get; private set; }
@@ -46,6 +52,7 @@ namespace RVRepairVan.Base
             _applied = false;
             _navBaked = false;
             _bakedAgents.Clear();
+            RemoveDoorLinks();
             CrewUnlocked = false;
         }
 
@@ -114,7 +121,7 @@ namespace RVRepairVan.Base
                 if (prop.EmployeeIdlePoints != null && prop.EmployeeIdlePoints.Length >= size) return;
                 BuildIdlePoints(((Component)prop).transform, prop, size);
             }
-            catch (Exception e) { Core.LogDebug("[Crew] peer idle points: " + e.Message); }
+            catch (Exception e) { Core.Swallowed("RvCrew.PeerIdlePoints", e); }
         }
 
         internal static void Apply()
@@ -235,6 +242,32 @@ namespace RVRepairVan.Base
         }
 
         /// <summary>Bounds of the RV's build grids = the walkable cabin floor. Null when there are no grids.</summary>
+        /// <summary>Extent of every active build tile, in the RV root's local frame.</summary>
+        private static Bounds? TileBoundsLocal(Transform root, Property prop)
+        {
+            try
+            {
+                var grids = prop.Grids;
+                if (grids == null) return null;
+                bool any = false;
+                Bounds b = default;
+                for (int i = 0; i < grids.Count; i++)
+                {
+                    Il2CppScheduleOne.Tiles.Grid g = grids[i];
+                    if (g == null || !g.gameObject.activeInHierarchy || g.Tiles == null) continue;
+                    for (int k = 0; k < g.Tiles.Count; k++)
+                    {
+                        var t = g.Tiles[k];
+                        if (t == null) continue;
+                        Vector3 p = root.InverseTransformPoint(t.transform.position);
+                        if (!any) { b = new Bounds(p, Vector3.zero); any = true; } else b.Encapsulate(p);
+                    }
+                }
+                return any ? b : (Bounds?)null;
+            }
+            catch (Exception e) { Core.Swallowed("RvCrew.TileBoundsLocal", e); return null; }
+        }
+
         private static Bounds? FloorBounds(Property prop)
         {
             try
@@ -254,7 +287,7 @@ namespace RVRepairVan.Base
                 b.Expand(new Vector3(1.5f, 0f, 1.5f));   // a grid's transform is its corner-ish anchor, not its extent
                 return b;
             }
-            catch { return null; }
+            catch (Exception e) { Core.Swallowed("RvCrew.FloorBounds", e); return null; }
         }
 
         // --- navmesh --------------------------------------------------------------------------------------
@@ -271,7 +304,7 @@ namespace RVRepairVan.Base
                 if (_navBaked) return;
 
                 var agents = new HashSet<int>();
-                try { agents.Add(Il2CppScheduleOne.DevUtilities.NavMeshUtility.GetNavMeshAgentID("Humanoid")); } catch { agents.Add(0); }
+                try { agents.Add(Il2CppScheduleOne.DevUtilities.NavMeshUtility.GetNavMeshAgentID("Humanoid")); } catch (Exception e) { Core.Swallowed("RvCrew.BakeNavMesh.HumanoidAgentId", e); agents.Add(0); }
                 if (prop.Employees != null)
                     for (int i = 0; i < prop.Employees.Count; i++)
                     {
@@ -317,21 +350,16 @@ namespace RVRepairVan.Base
                 holder.transform.position = root.position;
                 holder.transform.rotation = root.rotation;
 
-                Bounds? floor = FloorBounds(prop);
-                if (floor == null) { Core.Log.Warning("[Crew] no floor bounds - NavMesh bake skipped."); return false; }
+                Bounds? floor = TileBoundsLocal(root, prop);
+                if (floor == null) { Core.Log.Warning("[Crew] no build tiles - NavMesh bake skipped."); return false; }
                 Bounds b = floor.Value;
 
-                // The cabin floor, sized from the grids, and a ramp from its edge down to the ground so the baked
-                // island connects to the world mesh instead of floating unreachable above it.
-                AddSlab(holder.transform, "Floor", new Vector3(b.center.x, b.center.y, b.center.z),
-                    root.rotation, new Vector3(Mathf.Max(b.size.x, 1f) + 1f, 0.2f, Mathf.Max(b.size.z, 1f) + 1f));
-
-                bool alongX = b.size.x >= b.size.z;
-                float half = (alongX ? b.size.x : b.size.z) * 0.5f + 1.2f;
-                Vector3 rampCenter = new Vector3(
-                    b.center.x - (alongX ? half : 0f), b.center.y * 0.5f, b.center.z - (alongX ? 0f : half));
-                AddSlab(holder.transform, "Ramp", rampCenter, root.rotation * Quaternion.Euler(0f, 0f, alongX ? -35f : 0f),
-                    new Vector3(3.5f, 0.2f, 3.5f));
+                // The cabin floor, sized from the build tiles in the RV's own frame so it covers the whole floor up to
+                // the door. The grid origins alone left the front of the cabin, where the door is, off the island. It
+                // becomes its own NavMesh island; the door link below is what joins it to the world mesh.
+                float pad = Il2CppScheduleOne.Tiles.Grid.TileSize;
+                AddSlab(holder.transform, "Floor", root.TransformPoint(new Vector3(b.center.x, b.center.y - 0.1f, b.center.z)),
+                    root.rotation, new Vector3(b.size.x + pad, 0.2f, b.size.z + pad));
 
                 var surface = holder.GetComponent<NavMeshSurface>();
                 if (surface == null)
@@ -341,21 +369,84 @@ namespace RVRepairVan.Base
                 }
                 if (surface == null) return false;
 
-                try { surface.collectObjects = CollectObjects.Children; } catch { }
-                try { surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders; } catch { }
-                try { surface.agentTypeID = agentTypeID; surface.defaultArea = 0; } catch { }
+                try { surface.collectObjects = CollectObjects.Children; } catch (Exception e) { Core.Swallowed("RvCrew.BakeForAgent.collectObjects", e); }
+                try { surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders; } catch (Exception e) { Core.Swallowed("RvCrew.BakeForAgent.useGeometry", e); }
+                try { surface.agentTypeID = agentTypeID; surface.defaultArea = 0; } catch (Exception e) { Core.Swallowed("RvCrew.BakeForAgent.agentTypeID", e); }
                 surface.BuildNavMesh();
 
                 DestroySlabColliders(holder.transform);
                 Core.LogDebug("[Crew] baked NavMesh for agent " + agentTypeID + ".");
-                return true;
+                return AddDoorLink(root, agentTypeID);
             }
             catch (Exception e)
             {
-                if (holder != null) { try { DestroySlabColliders(holder.transform); } catch { } }
-                Core.LogDebug("[Crew] bake for agent " + agentTypeID + " failed: " + e.Message);
+                if (holder != null) { try { DestroySlabColliders(holder.transform); } catch (Exception ex) { Core.Swallowed("RvCrew.BakeForAgent.DestroySlabColliders", ex); } }
+                Core.Log?.Warning("[Crew] bake for agent " + agentTypeID + " failed: " + e.Message);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Join the baked cabin island to the world NavMesh with a link down the entry steps.
+        ///
+        /// A NavMeshSurface bake is separate NavMesh data, and Unity never stitches separate data together, even
+        /// where they touch. The earlier ramp slab therefore only extended the island: every path from outside
+        /// ended as PathPartial, so <c>Botanist.IsEntityAccessible</c> rejected every pot and rack inside, and the
+        /// crew stood at their idle point saying there was nothing to do.
+        /// </summary>
+        private static bool AddDoorLink(Transform root, int agentTypeID)
+        {
+            Transform steps = root.Find("RV/rv/Main/Steps");
+            Vector3 stepsLocal = steps != null ? root.InverseTransformPoint(steps.position) : StepsFallback;
+            if (steps == null) Core.Log.Warning("[Crew] entry steps not found on the model - using the measured position.");
+
+            // Inside: one step in from the door on the cabin floor. Outside: past the bottom step on the ground,
+            // on the side the steps face (the door is on the side of the RV the steps stand out from).
+            float outward = Mathf.Sign(stepsLocal.x);
+            Vector3 inside = root.TransformPoint(new Vector3(stepsLocal.x - outward * 0.9f, CabinFloorY, stepsLocal.z));
+            Vector3 outside = root.TransformPoint(new Vector3(stepsLocal.x + outward * 1.0f, 0f, stepsLocal.z));
+
+            if (!NavMesh.SamplePosition(inside, out NavMeshHit inHit, 0.6f, NavMesh.AllAreas))
+            {
+                Core.Log.Warning("[Crew] door link: no cabin NavMesh near " + inside + " - the crew cannot get inside.");
+                return false;
+            }
+            if (!NavMesh.SamplePosition(outside, out NavMeshHit outHit, 1.5f, NavMesh.AllAreas)
+                || outHit.position.y > inHit.position.y - 0.5f)
+            {
+                Core.Log.Warning("[Crew] door link: no ground NavMesh near " + outside + " - the crew cannot get inside.");
+                return false;
+            }
+
+            var data = new NavMeshLinkData
+            {
+                startPosition = outHit.position,
+                endPosition = inHit.position,
+                width = 0.8f,
+                costModifier = -1f,
+                bidirectional = true,
+                area = 0,
+                agentTypeID = agentTypeID,
+            };
+            NavMeshLinkInstance link = NavMesh.AddLink(data);
+            if (!link.valid)
+            {
+                Core.Log.Warning("[Crew] door link for agent " + agentTypeID + " was refused by the NavMesh.");
+                return false;
+            }
+            _doorLinks.Add(link);
+            Core.Log.Msg("[Crew] door link for agent " + agentTypeID + ": ground " + outHit.position + " <-> cabin " + inHit.position + ".");
+            return true;
+        }
+
+        private static void RemoveDoorLinks()
+        {
+            foreach (NavMeshLinkInstance link in _doorLinks)
+            {
+                try { if (link.valid) NavMesh.RemoveLink(link); }
+                catch (Exception e) { Core.Swallowed("RvCrew.RemoveDoorLinks", e); }
+            }
+            _doorLinks.Clear();
         }
 
         private static void AddSlab(Transform parent, string name, Vector3 worldPos, Quaternion worldRot, Vector3 size)
@@ -429,7 +520,7 @@ namespace RVRepairVan.Base
                 if (prop == null || prop.PropertyCode != "rv") return;
                 RvCrew.EnsureIdlePointsForPeer(prop);
             }
-            catch (Exception e) { Core.LogDebug("[Crew] AssignProperty prefix: " + e.Message); }
+            catch (Exception e) { Core.Swallowed("RvCrew.AssignPropertyPrefix", e); }
         }
     }
 
@@ -461,7 +552,50 @@ namespace RVRepairVan.Base
                 var entry = new DialogueChoiceData { ChoiceLabel = "rv", ChoiceText = rv.PropertyName };
                 existingChoices.Add(entry);
             }
-            catch (Exception e) { Core.LogDebug("[Crew] fixer patch: " + e.Message); }
+            catch (Exception e) { Core.Swallowed("RvCrew.FixerPatch", e); }
+        }
+    }
+
+    /// <summary>
+    /// Walk employees across the RV's door link.
+    ///
+    /// Vanilla treats every off-mesh link as a ladder: <c>NPCMovement.Update</c> calls
+    /// <c>TraverseLadder(currentOffMeshLinkData.offMeshLink.GetComponent&lt;Ladder&gt;())</c> as soon as the agent
+    /// stands on one. A link added through <c>NavMesh.AddLink</c> has no component, so that line throws every frame
+    /// and the agent never leaves the link. For those links only, step the NPC along the link here and hand the
+    /// agent back to the NavMesh at the far end; ladders keep the vanilla path.
+    /// </summary>
+    [HarmonyPatch(typeof(Il2CppScheduleOne.NPCs.NPCMovement), nameof(Il2CppScheduleOne.NPCs.NPCMovement.Update))]
+    internal static class Rv_DoorLinkTraversal_Patch
+    {
+        private const float StepSpeed = 1.6f;   // m/s, a calm walk up three steps
+
+        private static bool Prefix(Il2CppScheduleOne.NPCs.NPCMovement __instance)
+        {
+            try
+            {
+                NavMeshAgent agent = __instance._agent;
+                if (agent == null || !agent.enabled || !agent.isOnOffMeshLink) return true;
+                OffMeshLinkData link = agent.currentOffMeshLinkData;
+                if (link.offMeshLink != null) return true;   // a component link - vanilla's ladder
+
+                Transform t = agent.transform;
+                Vector3 end = link.endPos + Vector3.up * agent.baseOffset;
+                t.position = Vector3.MoveTowards(t.position, end, StepSpeed * Time.deltaTime);
+                Vector3 flat = new Vector3(end.x - t.position.x, 0f, end.z - t.position.z);
+                if (flat.sqrMagnitude > 0.0001f) t.rotation = Quaternion.LookRotation(flat);
+                if ((t.position - end).sqrMagnitude < 0.0025f)
+                {
+                    agent.CompleteOffMeshLink();
+                    Core.LogDebug("[Crew] " + __instance.gameObject.name + " crossed the RV door link.");
+                }
+                return false;
+            }
+            catch (Exception e)
+            {
+                Core.Swallowed("Rv_DoorLinkTraversal", e);
+                return true;
+            }
         }
     }
 }
