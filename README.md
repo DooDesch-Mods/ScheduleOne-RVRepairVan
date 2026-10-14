@@ -14,7 +14,7 @@
 ![Status](https://img.shields.io/badge/status-working-brightgreen)
 [![Polyfill](https://polyfill.doomods.com/badge/rvrepairvan.svg)](https://polyfill.doomods.com/mod/rvrepairvan)
 
-[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_6RA4CO2FCzmKLJ6HhmsC2MUw/badge.svg)](https://mlvscan.com/attestations/att_6RA4CO2FCzmKLJ6HhmsC2MUw)
+[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_RhcyMUaP3ywqKoI8_vN9ayEg/badge.svg)](https://mlvscan.com/attestations/att_RhcyMUaP3ywqKoI8_vN9ayEg)
 
 ## Features
 

@@ -11,7 +11,7 @@
 ![MelonLoader](https://img.shields.io/badge/MelonLoader-0.7.3+-green)
 ![S1API](https://img.shields.io/badge/S1API-required-orange)
 
-[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_6RA4CO2FCzmKLJ6HhmsC2MUw/badge.svg)](https://mlvscan.com/attestations/att_6RA4CO2FCzmKLJ6HhmsC2MUw)
+[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_RhcyMUaP3ywqKoI8_vN9ayEg/badge.svg)](https://mlvscan.com/attestations/att_RhcyMUaP3ywqKoI8_vN9ayEg)
 
 ## Features
 
