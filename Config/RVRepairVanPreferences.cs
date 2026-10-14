@@ -25,6 +25,7 @@ namespace RVRepairVan.Config
         private static MelonPreferences_Entry<int> _priceWorkshopFloor;
         private static MelonPreferences_Entry<int> _priceCrewQuarters;
         private static MelonPreferences_Entry<int> _priceLoadingDock;
+        private static MelonPreferences_Entry<int> _priceEngine;
         private static MelonPreferences_Entry<int> _crewSize;
         private static MelonPreferences_Entry<int> _buildGridExtraTiles;
         private static MelonPreferences_Entry<bool> _instantRepair;
@@ -59,7 +60,7 @@ namespace RVRepairVan.Config
                 "Largest price cut a single free sample can give. Each packaged sample cuts the price by its value, clamped between min and max, down to the Repair Price floor.");
 
             _upgradesEnabled = CreateEntry("UpgradesEnabled", true, "Marco's RV upgrades",
-                "After the repair, Marco sells four build-outs that turn the RV into a working base. Turn off to keep the RV as a plain shell.");
+                "After the repair, Marco sells five build-outs that turn the RV into a working base you can drive. Turn off to keep the RV as a plain shell.");
             _priceGutInterior = CreateEntry("PriceGutInterior", 2500, "Upgrade price: gut the interior",
                 "Rips out the bed, bench, cabinets, chairs and the partition wall to make room. Prerequisite for the workshop floor.");
             _priceWorkshopFloor = CreateEntry("PriceWorkshopFloor", 7500, "Upgrade price: workshop floor",
@@ -68,6 +69,8 @@ namespace RVRepairVan.Config
                 "Lets you hire and station employees at the RV. They still need a locker placed inside before they work.");
             _priceLoadingDock = CreateEntry("PriceLoadingDock", 25000, "Upgrade price: loading dock",
                 "Adds a delivery dock so suppliers can drop orders at the RV.");
+            _priceEngine = CreateEntry("PriceEngine", 10000, "Upgrade price: engine",
+                "Makes the RV drivable. While it is away from its spot, the crew and deliveries wait for it.");
             _crewSize = CreateEntry("CrewSize", 3, "Crew size",
                 "How many employees the RV can hold once the crew quarters are built.");
             _buildGridExtraTiles = CreateEntry("BuildGridExtraTiles", 96, "Extra build tiles (cap)",
@@ -114,6 +117,7 @@ namespace RVRepairVan.Config
         internal static int PriceWorkshopFloor => Mathf.Max(0, _priceWorkshopFloor?.Value ?? 7500);
         internal static int PriceCrewQuarters => Mathf.Max(0, _priceCrewQuarters?.Value ?? 15000);
         internal static int PriceLoadingDock => Mathf.Max(0, _priceLoadingDock?.Value ?? 25000);
+        internal static int PriceEngine => Mathf.Max(0, _priceEngine?.Value ?? 10000);
         /// <summary>Employee capacity the crew upgrade grants. Clamped: 0 would leave the upgrade inert, and every
         /// slot needs its own idle point, so a silly number just wastes transforms.</summary>
         internal static int CrewSize => Mathf.Clamp(_crewSize?.Value ?? 3, 1, 10);

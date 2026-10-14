@@ -95,6 +95,7 @@ namespace RVRepairVan.Quests
                     case RvOp.ErrandItemPicked: HostErrandItemPicked(); break;  // a client picked up the crate/package
                     case RvOp.BuyUpgrade: Settle(m, Base.RvUpgrades.HostBuy((Base.RvUpgrade)m.A, false, PaidAmount(m))); break;   // client is already playing its own cinematic
                     case RvOp.RequestSnapshot: HostSendSnapshot(); break;
+                    case RvOp.DriveRequest: Base.RvMobile.HostOnDriveRequest(); break;
 #if DEBUG
                     case RvOp.Ping: Core.Log.Msg("[Net] host <- Ping " + m.A); break;
 #endif
@@ -125,6 +126,7 @@ namespace RVRepairVan.Quests
                     case RvOp.StageSync: ApplyStageSync(m.A, m.B); break;
                     case RvOp.TransientSync: ApplyTransient(m.A, m.B, m.C); break;
                     case RvOp.UpgradeSync: Base.RvUpgrades.ApplySync(m.A); break;
+                    case RvOp.MobileSync: Base.RvMobile.ApplySync(m.A); break;
                     case RvOp.RepairApplied: ApplyRepair(); break;
                     case RvOp.PaymentSettled: if (!NetworkBus.IsServer) ClientPayment.Settle(m.A, m.B != 0); break;
 #if DEBUG
@@ -145,6 +147,7 @@ namespace RVRepairVan.Quests
             // Send the build-out mask AFTER RepairApplied: the client applies the upgrades against the repaired
             // RV, and the interior/grid modules only resolve once the intact model is the active one.
             NetworkBus.BroadcastToAll(RvOp.UpgradeSync, Base.RvUpgrades.Mask);
+            Base.RvMobile.HostSnapshot();   // after the upgrades: the client attaches the model the Engine upgrade set up
             HostResyncErrandItem();
             Core.LogDebug("[Net] host snapshot sent: Stage=" + Stage + " Discount=" + DiscountTotal
                 + " Repaired=" + RepairStateStore.GetRepaired() + " Upgrades=" + Base.RvUpgrades.Mask);

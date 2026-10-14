@@ -26,10 +26,10 @@ namespace RVRepairVan.Dialogue
         private static readonly Base.RvUpgrade[] UpgradeOrder =
         {
             Base.RvUpgrade.GutInterior, Base.RvUpgrade.WorkshopFloor,
-            Base.RvUpgrade.CrewQuarters, Base.RvUpgrade.LoadingDock,
+            Base.RvUpgrade.CrewQuarters, Base.RvUpgrade.LoadingDock, Base.RvUpgrade.Engine,
         };
         private static readonly DialogueController.DialogueChoice[] _upgradeChoices =
-            new DialogueController.DialogueChoice[4];
+            new DialogueController.DialogueChoice[UpgradeOrder.Length];
 
         internal static void Reset()
         {

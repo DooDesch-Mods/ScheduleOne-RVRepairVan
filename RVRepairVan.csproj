@@ -165,6 +165,16 @@
       <HintPath>$(GameManagedPath)/UnityEngine.PhysicsModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- ScreenCapture: frame recorder of the debug drive clip -->
+    <Reference Include="UnityEngine.ScreenCaptureModule">
+      <HintPath>$(GameManagedPath)/UnityEngine.ScreenCaptureModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- WheelCollider: drive diagnostics of the RV chassis -->
+    <Reference Include="UnityEngine.VehiclesModule">
+      <HintPath>$(GameManagedPath)/UnityEngine.VehiclesModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <!-- NavMesh sampling: needed to tell whether the RV interior is walkable for employees -->
     <Reference Include="UnityEngine.AIModule">
       <HintPath>$(GameManagedPath)/UnityEngine.AIModule.dll</HintPath>

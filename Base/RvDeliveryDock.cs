@@ -144,6 +144,19 @@ namespace RVRepairVan.Base
             catch (Exception e) { Core.Swallowed("RvDeliveryDock.ReassignGuid", e); }
         }
 
+        /// <summary>The dock this mod attached to the RV, or null.</summary>
+        internal static LoadingDock OurDock(Property prop)
+        {
+            try
+            {
+                if (prop == null || prop.LoadingDocks == null) return null;
+                foreach (LoadingDock d in prop.LoadingDocks)
+                    if (d != null && d.name == DockName) return d;
+            }
+            catch (Exception e) { Core.Log.Warning("[Dock] dock lookup failed: " + e.Message); }
+            return null;
+        }
+
         private static bool HasOurDock(Property prop)
         {
             try

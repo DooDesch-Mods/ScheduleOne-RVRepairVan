@@ -45,5 +45,19 @@ namespace RVRepairVan.Persistence
         // Only meaningful on the host/offline: the "repair takes a day" job clock. A client never runs the timer.
         internal static int GetRepairStartedAt() => S != null ? S.RepairStartedAt : 0;
         internal static void SetRepairStartedAt(int minSum) { if (S != null) S.RepairStartedAt = minSum; }
+
+        // Host/offline only: where the RV was driven to (RvMobile). A client never saves the world.
+        internal static bool TryGetAwayPose(out Vector3 pos, out Quaternion rot)
+        {
+            pos = Vector3.zero;
+            rot = Quaternion.identity;
+            if (S == null || !S.Away) return false;
+            pos = S.AwayPos;
+            rot = S.AwayRot;
+            return true;
+        }
+
+        internal static void SetAwayPose(Vector3 pos, Quaternion rot) { if (!ClientMode && S != null) S.SetAway(pos, rot); }
+        internal static void ClearAwayPose() { if (!ClientMode && S != null) S.ClearAway(); }
     }
 }

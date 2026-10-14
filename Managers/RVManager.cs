@@ -25,6 +25,12 @@ namespace RVRepairVan.Managers
         /// <summary>The RV root transform (@Properties/RV), or null. Locates on demand.</summary>
         internal static Transform Root => TryLocate() ? _root : null;
 
+        /// <summary>
+        /// The intact model (child "RV"), wherever it is. Driven off its spot it rides on the RvMobile chassis and is
+        /// no longer under the root, so a root.Find("RV") misses it.
+        /// </summary>
+        internal static Transform Model => TryLocate() ? (_model != null ? _model : _root.Find("RV")) : null;
+
         /// <summary>World position of the RV (used as a quest-marker fallback). Never throws.</summary>
         internal static bool TryGetPosition(out Vector3 position)
         {
@@ -245,6 +251,7 @@ namespace RVRepairVan.Managers
             }
             catch (Exception e) { Core.Swallowed("RVManager.RepairVisualOnly.FXContainer", e); /* FXContainer optional */ }
 
+            Base.RvLiner.Ensure();
             Core.Log.Msg("[RVManager] RV repaired (visual).");
             return true;
         }

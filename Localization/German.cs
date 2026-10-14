@@ -102,6 +102,7 @@ namespace RVRepairVan.Localization
                 ["Put in a work floor ({0})"] = "Einen Arbeitsboden einbauen ({0})",
                 ["Make room for a crew ({0})"] = "Platz für eine Crew schaffen ({0})",
                 ["Build a loading dock ({0})"] = "Eine Laderampe bauen ({0})",
+                ["Get the engine running ({0})"] = "Den Motor zum Laufen bringen ({0})",
                 ["All cleared out. Want to build in there? You'll need a proper floor."] =
                     "Alles raus. Willst du da drin was bauen? Dann brauchst du einen richtigen Boden.",
                 ["Floor's in. You can set up shop in there now."] = "Boden ist drin. Jetzt kannst du da drin aufbauen.",
@@ -109,6 +110,11 @@ namespace RVRepairVan.Localization
                     "Jetzt ist Platz für {0}. Stell sie über den Fixer ein und stell einen Spind rein, damit sie bezahlt werden.",
                 ["Dock's done. Deliveries can come straight to the RV now."] =
                     "Rampe steht. Lieferungen kommen jetzt direkt zum Wohnmobil.",
+                ["She runs. Don't wreck her."] = "Sie läuft. Fahr sie nicht zu Schrott.",
+                ["Drive"] = "Fahren",
+                ["Seats taken"] = "Alle Plätze belegt",
+                ["The RV is away."] = "Das Wohnmobil ist unterwegs.",
+                ["Drive it back to its spot."] = "Fahr es zurück an seinen Platz.",
 
                 // Repair-takes-a-day option
                 ["Alright, I'll send the boys over to your RV. Give me a day - I'll text ya when she's done."] =

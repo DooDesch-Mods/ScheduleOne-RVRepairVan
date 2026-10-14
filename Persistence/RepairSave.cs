@@ -42,6 +42,15 @@ namespace RVRepairVan.Persistence
         // In-game minute stamp (TimeManager.GetTotalMinSum) at which Marco took the job, for the
         // "repair takes a day" option. 0 = no job running. Persisted so a reload keeps the remaining time.
         [SaveableField("rv_repair_started")] private int _repairStartedAt;
+        // Where the RV stands when it was driven off its spot (Engine upgrade): the chassis pose. Not away = home.
+        [SaveableField("rv_away")] private bool _away;
+        [SaveableField("rv_away_px")] private float _awayPx;
+        [SaveableField("rv_away_py")] private float _awayPy;
+        [SaveableField("rv_away_pz")] private float _awayPz;
+        [SaveableField("rv_away_rx")] private float _awayRx;
+        [SaveableField("rv_away_ry")] private float _awayRy;
+        [SaveableField("rv_away_rz")] private float _awayRz;
+        [SaveableField("rv_away_rw")] private float _awayRw;
 
         public RepairSave() { Instance = this; }
 
@@ -51,6 +60,27 @@ namespace RVRepairVan.Persistence
         internal int Discount { get => _discount; set => _discount = value; }
         internal int Upgrades { get => _upgrades; set => _upgrades = value; }
         internal int RepairStartedAt { get => _repairStartedAt; set => _repairStartedAt = value; }
+
+        internal bool Away => _away;
+        internal Vector3 AwayPos => new Vector3(_awayPx, _awayPy, _awayPz);
+        internal Quaternion AwayRot => new Quaternion(_awayRx, _awayRy, _awayRz, _awayRw);
+
+        internal void SetAway(Vector3 pos, Quaternion rot)
+        {
+            _away = true;
+            _awayPx = pos.x; _awayPy = pos.y; _awayPz = pos.z;
+            _awayRx = rot.x; _awayRy = rot.y; _awayRz = rot.z; _awayRw = rot.w;
+        }
+
+        internal void ClearAway() => SetAwayFields(false);
+
+        private void SetAwayFields(bool away)
+        {
+            _away = away;
+            _awayPx = _awayPy = _awayPz = 0f;
+            _awayRx = _awayRy = _awayRz = 0f;
+            _awayRw = 1f;
+        }
 
         /// <summary>
         /// Reset to defaults between saves. The wipe matters because S1API keeps ONE instance per type for the
@@ -74,6 +104,7 @@ namespace RVRepairVan.Persistence
                 Instance._discount = 0;
                 Instance._upgrades = 0;
                 Instance._repairStartedAt = 0;
+                Instance.SetAwayFields(false);
             }
         }
 
@@ -83,7 +114,7 @@ namespace RVRepairVan.Persistence
             Instance = this;
             Loaded = true;
             _stage = Quests.Questline.StageForLoad(_repaired, _stage);
-            Core.Log.Msg($"[State] loaded: repaired={_repaired} stage={_stage} samples={_samples} discount={_discount} upgrades={_upgrades}");
+            Core.Log.Msg($"[State] loaded: repaired={_repaired} stage={_stage} samples={_samples} discount={_discount} upgrades={_upgrades} away={_away}");
         }
 
         // No mod data for this save yet (fresh save / first time / a save from before the mod) -> clean defaults.
@@ -97,6 +128,7 @@ namespace RVRepairVan.Persistence
             _discount = 0;
             _upgrades = 0;
             _repairStartedAt = 0;
+            SetAwayFields(false);
             Loaded = true;
             Core.Log.Msg("[State] created (fresh save) - defaults applied.");
         }

@@ -175,6 +175,22 @@ namespace RVRepairVan.Patches
                 Core.Log.Msg("[Debug] rvgrid '" + grid.name + "' active=" + grid.gameObject.activeInHierarchy + " tiles=" + n
                     + (n > 0 ? " x " + min.x.ToString("F2") + ".." + max.x.ToString("F2") + " z " + min.z.ToString("F2") + ".." + max.z.ToString("F2") : ""));
             }
+            Transform model = RVManager.Model ?? root;
+            for (int i = 0; rv.BuildableItems != null && i < rv.BuildableItems.Count; i++)
+            {
+                BuildableItem item = rv.BuildableItems[i];
+                if (item == null) { Core.Log.Warning("[Debug] rvgrid item " + i + " is null."); continue; }
+                Transform t = item.transform;
+                int shown = 0, all = 0;
+                foreach (Renderer r in t.GetComponentsInChildren<Renderer>(true)) { all++; if (r.enabled && r.gameObject.activeInHierarchy && !r.forceRenderingOff) shown++; }
+                Core.Log.Msg("[Debug] rvgrid item '" + item.name + "' at model " + model.InverseTransformPoint(t.position).ToString("F2")
+                    + " active=" + item.gameObject.activeInHierarchy + " renderers " + shown + "/" + all
+                    + " parent=" + (t.parent != null ? t.parent.name : "none") + " layer=" + LayerMask.LayerToName(item.gameObject.layer));
+                foreach (Renderer r in t.GetComponentsInChildren<Renderer>(false))
+                    Core.Log.Msg("[Debug] rvgrid   " + r.name + " enabled=" + r.enabled + " forcedOff=" + r.forceRenderingOff + " visible=" + r.isVisible
+                        + " layer=" + LayerMask.LayerToName(r.gameObject.layer) + " at model " + model.InverseTransformPoint(r.bounds.center).ToString("F2")
+                        + " size " + r.bounds.size.ToString("F2"));
+            }
         }
 
         internal static void Reach()
