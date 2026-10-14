@@ -7,7 +7,7 @@
 > haggled price and a repair cinematic. After that, Marco turns the RV into a workshop. Built on
 > [S1API](https://github.com/ifBars/S1API).
 
-![Version](https://img.shields.io/badge/version-3.0.1-blue)
+![Version](https://img.shields.io/badge/version-3.1.0-blue)
 ![Game](https://img.shields.io/badge/game-Schedule%20I-purple)
 ![MelonLoader](https://img.shields.io/badge/MelonLoader-0.7.3+-green)
 ![S1API](https://img.shields.io/badge/S1API-required-orange)
@@ -16,7 +16,7 @@
 
 [![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_ewKFi6WYO1ixoivBTukWkPBm/badge.svg)](https://mlvscan.com/attestations/att_ewKFi6WYO1ixoivBTukWkPBm)
 
-![The wrecked RV and the repaired one](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
+![The RV driving through town at dusk](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
 
 ## Features
 

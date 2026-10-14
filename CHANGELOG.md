@@ -4,6 +4,19 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.1.0] - 2026-10-15
+
+### Added
+- Marco sells a fifth build-out, **Get the engine running** ($10,000): drive the RV anywhere. `PriceEngine` sets the price.
+- Parked away, the RV keeps its stations and the items you place in it. Crew and deliveries wait until it is back on its spot.
+- Headlights (H), brake and reverse lights work while you drive. The light switch inside works wherever the RV stands.
+- The RV rolls and steers on its own tyres, and the entry step folds in while you drive.
+
+### Fixed
+- A paid repair survives a restart again. On a slow load the RV came back wrecked and Marco asked for the money again.
+- The repair sound follows the Master and Sound Effects sliders.
+- Small gaps in the RV's walls no longer show the outside.
+
 ## [3.0.1] - 2026-10-14
 
 ### Changed

@@ -6,14 +6,14 @@
 > from Donna at the motel to Mrs. Ming to Marco the mechanic, with dead-drop errands, a
 > haggled price and a repair cinematic. After that, Marco turns the RV into a workshop.
 
-![Version](https://img.shields.io/badge/version-3.0.1-blue)
+![Version](https://img.shields.io/badge/version-3.1.0-blue)
 ![Game](https://img.shields.io/badge/game-Schedule%20I-purple)
 ![MelonLoader](https://img.shields.io/badge/MelonLoader-0.7.3+-green)
 ![S1API](https://img.shields.io/badge/S1API-required-orange)
 
 [![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_ewKFi6WYO1ixoivBTukWkPBm/badge.svg)](https://mlvscan.com/attestations/att_ewKFi6WYO1ixoivBTukWkPBm)
 
-![The wrecked RV and the repaired one](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
+![The RV driving through town at dusk](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
 
 ## Features
 
@@ -26,8 +26,8 @@
   $500.
 - **Repair cinematic** when you pay. Plays in both modes.
 - **Marco's build-outs** once the RV stands again: clear out the inside ($2,500), a work
-  floor with 24 more build tiles ($7,500), room for a crew of three ($15,000), and a loading
-  dock for your supplier ($25,000).
+  floor with 24 more build tiles ($7,500), room for a crew of three ($15,000), a loading
+  dock for your supplier ($25,000), and an engine to drive the RV anywhere ($10,000).
 - **Save-bound progress** - quest and repair live in the game save.
 - **Simple mode** (`QuestMode = Simple`): skip the story, just pay Marco the flat price.
 
