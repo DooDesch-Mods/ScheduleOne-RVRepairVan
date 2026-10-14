@@ -38,6 +38,44 @@ namespace RVRepairVan.Base
             Core.Log.Msg("[Drive] look: eye=" + eye + " at " + at);
         }
 
+        private static object _rec;
+
+        /// <summary>rvdrive rec [seconds] [fps]: write every frame to &lt;game&gt;/rvrec as PNG. Game time runs at a fixed step,
+        /// so the clip plays smoothly however long each frame takes to save.</summary>
+        internal static void Rec(string[] args)
+        {
+            if (_rec != null) { Core.Log.Warning("[Drive] rec: already recording."); return; }
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            float seconds = args.Length > 0 && float.TryParse(args[0], System.Globalization.NumberStyles.Float, inv, out float a) ? a : 6f;
+            int fps = args.Length > 1 && int.TryParse(args[1], out int f) ? f : 30;
+            string dir = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..", "rvrec"));
+            try
+            {
+                if (System.IO.Directory.Exists(dir))
+                    foreach (string old in System.IO.Directory.GetFiles(dir, "f_*.png")) System.IO.File.Delete(old);
+                System.IO.Directory.CreateDirectory(dir);
+            }
+            catch (Exception e) { Core.Log.Error("[Drive] rec: cannot prepare " + dir + ": " + e.Message); return; }
+            _rec = MelonCoroutines.Start(Record(dir, Mathf.Max(1, Mathf.RoundToInt(seconds * fps)), fps));
+        }
+
+        private static IEnumerator Record(string dir, int frames, int fps)
+        {
+            Core.Log.Msg("[Drive] rec: " + frames + " frame(s) at " + fps + " fps to " + dir);
+            Time.captureFramerate = fps;
+            int written = 0;
+            for (int i = 0; i < frames; i++)
+            {
+                try { ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(dir, "f_" + i.ToString("0000") + ".png")); written++; }
+                catch (Exception e) { Core.Log.Error("[Drive] rec: frame " + i + " failed: " + e.Message); break; }
+                yield return null;
+            }
+            yield return null;
+            Time.captureFramerate = 0;
+            _rec = null;
+            Core.Log.Msg("[Drive] rec: done, " + written + " frame(s).");
+        }
+
         /// <summary>rvdrive gas &lt;throttle&gt; [steer] | rvdrive gas off: drive without a keyboard, for console tests.</summary>
         internal static void Gas(string throttle, string steer)
         {

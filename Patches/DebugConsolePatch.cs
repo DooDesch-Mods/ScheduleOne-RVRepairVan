@@ -165,6 +165,7 @@ namespace RVRepairVan.Patches
                         if (parts.Length > 1 && parts[1].ToLower() == "home") Base.RvMobile.DebugHome();
                         else if (parts.Length > 1 && parts[1].ToLower() == "info") Base.RvDrive.Info();
                         else if (parts.Length > 1 && parts[1].ToLower() == "lights") Base.RvDrive.Lights();
+                        else if (parts.Length > 1 && parts[1].ToLower() == "rec") Base.RvDrive.Rec(parts.Length > 2 ? parts[2..] : Array.Empty<string>());
                         else if (parts.Length > 1 && parts[1].ToLower() == "tp") Base.RvDrive.Tp(parts.Length > 2 ? parts[2..] : Array.Empty<string>());
                         else if (parts.Length > 1 && parts[1].ToLower() == "hull") Base.RvDrive.HullToggle(parts.Length > 2 ? parts[2].ToLower() : "");
                         else if (parts.Length > 1 && parts[1].ToLower() == "stat") Base.RvDrive.Stat(parts.Length > 2 ? parts[2] : "-");
