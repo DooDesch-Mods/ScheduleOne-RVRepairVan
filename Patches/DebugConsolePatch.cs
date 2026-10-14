@@ -79,6 +79,7 @@ namespace RVRepairVan.Patches
             new[] { "rvreach", "for every RV pot and rack: is each access point in bounds and reachable by the crew", "rvreach" },
             new[] { "rvpay", "put cash in every RV locker, the way a player pays the crew", "rvpay 500" },
             new[] { "rvpayrepair", "pay Marco for the repair the way his dialogue choice does", "rvpayrepair" },
+            new[] { "rvdrive", "drive the RV on a hidden chassis; 'home' snaps it back, 'info' dumps state", "rvdrive veeper 90" },
         };
 
         private static bool Dispatch(string[] parts)
@@ -89,7 +90,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvreinject" && cmd != "rvprobe"
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach"
-                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold")
+                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive")
                 return false;   // not ours - let the game handle it
 
             // Both overloads can fire for a single submission (the string body calls the List body), so run the
@@ -159,6 +160,17 @@ namespace RVRepairVan.Patches
                         break;
                     case "rvreinject":   // 'rvreinject degraded' exercises the no-container fallback (adds duplicates)
                         RVRepairVan.Quests.Questline.DebugReinject(parts.Length > 1 && parts[1].ToLower() == "degraded");
+                        break;
+                    case "rvdrive":   // 'rvdrive [code] [yaw]' drives, 'rvdrive home' returns, 'rvdrive info' dumps
+                        if (parts.Length > 1 && parts[1].ToLower() == "home") Base.RvDrive.ReturnHome();
+                        else if (parts.Length > 1 && parts[1].ToLower() == "info") Base.RvDrive.Info();
+                    else if (parts.Length > 1 && parts[1].ToLower() == "look") Base.RvDrive.Look(parts.Length > 2 && parts[2].ToLower() == "off");
+                    else if (parts.Length > 1 && parts[1].ToLower() == "exit") Base.RvDrive.Exit();
+                    else if (parts.Length > 1 && parts[1].ToLower() == "bare") Base.RvDrive.Bare(parts.Length > 2 ? parts[2].ToLower() : "veeper");
+                        else if (parts.Length > 2 && parts[1].ToLower() == "gas") Base.RvDrive.Gas(parts[2].ToLower(), parts.Length > 3 ? parts[3] : "0");
+                        else Base.RvDrive.Drive(parts.Length > 1 ? parts[1].ToLower() : "veeper",
+                            parts.Length > 2 && float.TryParse(parts[2], System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out float yaw) ? yaw : 0f);
                         break;
                     case "rvcam":     // fixed camera views around and inside the RV, for screenshot rounds
                         RvCam(parts.Length > 1 ? parts[1].ToLower() : "");
