@@ -463,6 +463,50 @@ namespace RVRepairVan.Patches
             foreach (var b in beds) Core.Log.Msg("[Debug] rvbed:   " + Path(b.transform) + " active=" + b.gameObject.activeInHierarchy);
         }
 
+        /// <summary>rvdoor: every door script on or near the RV, with the access a player gets from outside; 'open' presses the outside handle.</summary>
+        internal static void DoorInfo(string action)
+        {
+            Transform root = RVManager.Root;
+            if (root == null) { Core.Log.Warning("[Debug] rvdoor: RV root not found."); return; }
+            Property rv = root.GetComponent<Property>();
+            Core.Log.Msg("[Debug] rvdoor: property " + (rv != null ? "'" + rv.PropertyName + "' owned=" + rv.IsOwned : "none")
+                + " destroyed=" + RVManager.IsDestroyed() + " away=" + Base.RvMobile.Away);
+            foreach (var d in root.GetComponentsInChildren<Il2CppScheduleOne.Doors.DoorController>(true))
+                Core.Log.Msg("[Debug] rvdoor: DoorController '" + Path(d.transform) + "' active=" + d.gameObject.activeInHierarchy + " enabled=" + d.enabled
+                    + " access=" + d.PlayerAccess + " outside=" + d.CanPlayerAccess(Il2CppScheduleOne.Doors.EDoorSide.Exterior)
+                    + " inside=" + d.CanPlayerAccess(Il2CppScheduleOne.Doors.EDoorSide.Interior) + " open=" + d.IsOpen);
+            if (action == "open")
+                foreach (var d in root.GetComponentsInChildren<Il2CppScheduleOne.Doors.DoorController>(false))
+                {
+                    d.ExteriorHandleInteracted();
+                    MelonLoader.MelonCoroutines.Start(ReportDoor(d));
+                }
+            Vector3 at = root.position;
+            foreach (var s in UnityEngine.Object.FindObjectsOfType<Il2CppScheduleOne.Doors.StaticDoor>(true))
+            {
+                float dist = Vector3.Distance(s.transform.position, at);
+                bool under = s.transform.IsChildOf(root);
+                if (!under && dist > 15f) continue;
+                Core.Log.Msg("[Debug] rvdoor: StaticDoor '" + Path(s.transform) + "' " + dist.ToString("0.0") + " m from the RV, underRv=" + under
+                    + " active=" + s.gameObject.activeInHierarchy + " usable=" + s.Usable + " canKnock=" + s.CanKnock
+                    + " building=" + (s.Building != null ? "'" + s.Building.name + "'" : "none"));
+            }
+            foreach (var io in UnityEngine.Object.FindObjectsOfType<Il2CppScheduleOne.Interaction.InteractableObject>(false))
+            {
+                float dist = Vector3.Distance(io.transform.position, at);
+                if (dist > 8f || io.name.IndexOf("door", StringComparison.OrdinalIgnoreCase) < 0 && (io.transform.parent == null
+                    || io.transform.parent.name.IndexOf("door", StringComparison.OrdinalIgnoreCase) < 0)) continue;
+                Core.Log.Msg("[Debug] rvdoor: interactable '" + Path(io.transform) + "' " + dist.ToString("0.0") + " m, enabled=" + io.enabled
+                    + " message='" + io.message + "'");
+            }
+        }
+
+        private static System.Collections.IEnumerator ReportDoor(Il2CppScheduleOne.Doors.DoorController d)
+        {
+            yield return new WaitForSeconds(1f);
+            Core.Log.Msg("[Debug] rvdoor: '" + (d != null ? d.name : "gone") + "' open=" + (d != null && d.IsOpen) + " one second after the handle.");
+        }
+
         private static string Path(Transform t)
         {
             string p = t.name;

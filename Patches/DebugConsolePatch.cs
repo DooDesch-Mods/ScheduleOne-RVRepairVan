@@ -79,6 +79,7 @@ namespace RVRepairVan.Patches
             new[] { "rvreach", "for every RV pot and rack: is each access point in bounds and reachable by the crew", "rvreach" },
             new[] { "rvpay", "put cash in every RV locker, the way a player pays the crew", "rvpay 500" },
             new[] { "rvpayrepair", "pay Marco for the repair the way his dialogue choice does", "rvpayrepair" },
+            new[] { "rvdoor", "list the door scripts on and near the RV with the access a player gets; 'open' presses the handle", "rvdoor" },
             new[] { "rvbed", "list the RV bed's parts, colliders and every Bed script in the scene; 'use' presses it", "rvbed" },
             new[] { "rvsow","drop a seed into the first RV pot and log where it lands; 'elsewhere' uses a pot of another property", "rvsow" },
             new[] { "rvsave","where the RV's save intercom hangs; 'rvsave at x y z' moves it, 'rvsave use' presses it", "rvsave" },
@@ -93,7 +94,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvreinject" && cmd != "rvprobe"
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach"
-                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed")
+                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor")
                 return false;   // not ours - let the game handle it
 
             // Both overloads can fire for a single submission (the string body calls the List body), so run the
@@ -226,6 +227,7 @@ namespace RVRepairVan.Patches
                     case "rvassign": RvDevTools.Assign(); break;
                     case "rvgrid":   RvDevTools.GridExtent(); break;
                     case "rvstock":  RvDevTools.Stock(); break;
+                    case "rvdoor":   RvDevTools.DoorInfo(parts.Length > 1 ? parts[1] : ""); break;
                     case "rvbed":    RvDevTools.BedInfo(parts.Length > 1 ? parts[1] : ""); break;
                     case "rvsow":   RvDevTools.Sow(parts.Length > 1 && parts[1] == "elsewhere"); break;
                     case "rvreach":  RvDevTools.Reach(); break;
