@@ -4,6 +4,12 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.5.2] - 2026-10-15
+
+### Fixed
+- Co-op: other players see the RV when you drive and park it, not a bare Veeper that glitches out and vanishes
+  after you get out.
+
 ## [3.5.1] - 2026-10-15
 
 ### Fixed
