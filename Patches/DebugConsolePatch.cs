@@ -87,7 +87,7 @@ namespace RVRepairVan.Patches
             new[] { "rvegg", "the easter-egg props; 'look <prop>' parks the camera, 'at <prop> x y z' moves one, 'pizza x z' drops the pizza, 'wall' measures the wall gaps, 'garages' lists roofs", "rvegg look Book" },
             new[] { "rvbattery", "the RV's flat battery; 'dead' / 'fix' set it, 'age 4' makes the RV stand 4 days", "rvbattery age 4" },
             new[] { "rvthanks", "the line Marco says for the product in hand", "rvthanks" },
-            new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
+            new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
         };
 
         private static bool Dispatch(string[] parts)
@@ -179,6 +179,7 @@ namespace RVRepairVan.Patches
                         else if (parts.Length > 1 && parts[1].ToLower() == "hull") Base.RvDrive.HullToggle(parts.Length > 2 ? parts[2].ToLower() : "");
                         else if (parts.Length > 1 && parts[1].ToLower() == "stat") { Base.RvDrive.Stat(parts.Length > 2 ? parts[2] : "-"); Base.RvWheels.Report(); }
                         else if (parts.Length > 1 && parts[1].ToLower() == "probe") Base.RvDrive.Probe();
+                        else if (parts.Length > 1 && parts[1].ToLower() == "overlap") Base.RvMobile.DebugOverlap("now");
                         else if (parts.Length > 1 && parts[1].ToLower() == "look") Base.RvDrive.Look(parts.Length > 2 && parts[2].ToLower() == "off", parts.Length > 2 && parts[2].ToLower() == "rear");
                         else if (parts.Length > 3 && parts[1].ToLower() == "lamps" && parts[2].ToLower() == "inside") Base.RvLights.SwitchInside(parts[3].ToLower() == "on");
                         else if (parts.Length > 2 && parts[1].ToLower() == "lamps") Base.RvLights.Force(parts[2].ToLower());
@@ -186,6 +187,17 @@ namespace RVRepairVan.Patches
                         else if (parts.Length > 1 && parts[1].ToLower() == "exit") Base.RvDrive.Exit();
                         else if (parts.Length > 1 && parts[1].ToLower() == "wheel") Base.RvMobile.DebugWheelView();
                         else if (parts.Length > 1 && parts[1].ToLower() == "hovered") Base.RvMobile.DebugHovered();
+                        else if (parts.Length > 1 && parts[1].ToLower() == "seat") Base.RvMobile.DebugSeat();
+                        else if (parts.Length > 1 && parts[1].ToLower() == "creator")
+                        {
+                            // A joining test client without saved looks starts in the character creator; finish it with the defaults.
+                            var cc = Il2CppScheduleOne.DevUtilities.Singleton<Il2CppScheduleOne.CharacterCreator.CharacterCreator>.Instance;
+                            if (cc == null || !cc.IsOpen) Core.Log.Msg("[Debug] creator: not open.");
+                            else { cc.Done(); Core.Log.Msg("[Debug] creator: done with the default looks."); }
+                        }
+                        else if (parts.Length > 1 && parts[1].ToLower() == "board") Base.RvMobile.DebugBoard(parts.Length > 2 ? parts[2..] : Array.Empty<string>());
+                        else if (parts.Length > 1 && parts[1].ToLower() == "station") Base.RvMobile.DebugStation(parts.Length > 2 ? parts[2].ToLower() : "pack");
+                        else if (parts.Length > 1 && parts[1].ToLower() == "ride") Base.RvRide.DebugWatch(parts.Length > 2 ? parts[2] : "");
                         else if (parts.Length > 1 && parts[1].ToLower() == "npc") Base.RvDrive.Npc(parts.Length > 2 ? parts[2].ToLower() : "");
                         else if (parts.Length > 2 && parts[1].ToLower() == "steps") Base.RvSteps.SetIn(parts[2].ToLower() == "in");
                         else if (parts.Length > 2 && parts[1].ToLower() == "gas") Base.RvDrive.Gas(parts[2].ToLower(), parts.Length > 3 ? parts[3] : "0");
