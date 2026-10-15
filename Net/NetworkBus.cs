@@ -101,6 +101,39 @@ namespace RVRepairVan.Net
             catch (Exception e) { Core.Log.Warning("[Net] dispatch failed: " + e.Message); }
         }
 
+        private static int _versionCode = -1;
+
+        /// <summary>This build's version as one number (3.5.2 -> 30502), so it fits a message argument.</summary>
+        internal static int VersionCode
+        {
+            get
+            {
+                if (_versionCode >= 0) return _versionCode;
+                string v = DooDesch.ModVersion.Current;
+                try
+                {
+                    string[] p = v.Split('-', '+')[0].Split('.');
+                    int major = int.Parse(p[0]), minor = p.Length > 1 ? int.Parse(p[1]) : 0, patch = p.Length > 2 ? int.Parse(p[2]) : 0;
+                    _versionCode = major * 10000 + minor * 100 + patch;
+                }
+                catch (Exception e) { Core.Log.Warning("[Net] could not read the mod version '" + v + "': " + e.Message); _versionCode = 0; }
+                return _versionCode;
+            }
+        }
+
+        private static string VersionText(int code) => (code / 10000) + "." + (code / 100 % 100) + "." + (code % 100);
+
+        /// <summary>
+        /// Host: log which build a joining client runs. A client on another version can miss whole features - one
+        /// without the drivable RV sees the bare stock vehicle drive - and the host log is the one testers send.
+        /// </summary>
+        internal static void LogClientVersion(int code)
+        {
+            if (code == VersionCode) { Core.Log.Msg("[Net] a client asked for the state, on RVRepairVan " + VersionText(code) + " like the host."); return; }
+            Core.Log.Warning("[Net] a client runs RVRepairVan " + (code == 0 ? "3.5.1 or older" : VersionText(code)) + ", the host runs "
+                + VersionText(VersionCode) + " - co-op needs the same version on every player.");
+        }
+
         internal static void Init(HarmonyLib.Harmony h)
         {
             QuestManagerNetPatches.Apply(h);

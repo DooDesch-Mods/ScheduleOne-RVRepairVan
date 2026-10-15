@@ -27,6 +27,8 @@ namespace RVRepairVan.Net
         BuyUpgrade = 14,   // A = RvUpgrade bit the client wants to buy (host validates prerequisites)
         DriveRequest = 15,   // client used the RV's wheel while the RV is home - the host spawns the chassis
         BatterySwap = 16,    // client used up a battery at the wheel - the RV's flat battery is fixed
+        MobileReport = 17,   // A = chassis the RV rides on at the client; -1 = attach failed, -2 = not spawned there yet (B = the named chassis)
+        // RequestSnapshot carries A = the client's mod version (NetworkBus.VersionCode), 0 from builds before it existed.
         // Paid intents (PayRepair, MingPayLoss, MarcoPayLoss, BuyUpgrade) also carry B = ticket, C = amount paid.
 
         // host -> all clients state (absolute values, idempotent on re-receive)

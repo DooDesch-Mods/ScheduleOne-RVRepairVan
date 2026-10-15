@@ -64,9 +64,9 @@ namespace RVRepairVan.Quests
             if (!NetworkBus.Online || NetworkBus.IsServer) yield break;   // offline or host: nothing to request
 
             // Ask twice, a beat apart, in case the first rides in before the host's QuestManager is ready.
-            NetworkBus.SendToHost(RvOp.RequestSnapshot);
+            NetworkBus.SendToHost(RvOp.RequestSnapshot, NetworkBus.VersionCode);
             yield return new WaitForSeconds(2f);
-            NetworkBus.SendToHost(RvOp.RequestSnapshot);
+            NetworkBus.SendToHost(RvOp.RequestSnapshot, NetworkBus.VersionCode);
         }
 
         // ---- HOST: an intent arrived (from a client, or from the host itself via RPC loopback) ----
@@ -94,8 +94,9 @@ namespace RVRepairVan.Quests
                     case RvOp.CheckedRv: HostCheckedRv(); break;       // a client reached the post-repair RV
                     case RvOp.ErrandItemPicked: HostErrandItemPicked(); break;  // a client picked up the crate/package
                     case RvOp.BuyUpgrade: Settle(m, Base.RvUpgrades.HostBuy((Base.RvUpgrade)m.A, false, PaidAmount(m))); break;   // client is already playing its own cinematic
-                    case RvOp.RequestSnapshot: HostSendSnapshot(); break;
+                    case RvOp.RequestSnapshot: NetworkBus.LogClientVersion(m.A); HostSendSnapshot(); break;
                     case RvOp.DriveRequest: Base.RvMobile.HostOnDriveRequest(); break;
+                    case RvOp.MobileReport: Base.RvMobile.HostOnClientReport(m.A, m.B); break;
                     case RvOp.BatterySwap: Base.RvBattery.HostOnSwap(); break;
 #if DEBUG
                     case RvOp.Ping: Core.Log.Msg("[Net] host <- Ping " + m.A); break;
