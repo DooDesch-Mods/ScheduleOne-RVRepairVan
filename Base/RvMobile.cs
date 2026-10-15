@@ -20,9 +20,10 @@ namespace RVRepairVan.Base
     /// through its NetworkTransform. The host spawns and despawns it and tells the clients which one it is
     /// (<see cref="RvOp.MobileSync"/>); each side parents its own copy of the model onto it.
     ///
-    /// Two states. Parked: the RV's own colliders are on, the chassis body is off and frozen, so the RV is walkable
-    /// wherever it stands. Driving: the RV colliders are off (parented under the chassis they would join its
-    /// Rigidbody and drag on the ground) and the chassis body plus a hull box carry the collisions.
+    /// Two states. Parked: the chassis body is off and frozen. Driving (someone in the driver seat): the chassis body
+    /// plus a hull box carry the collisions with the world. In both the RV's own colliders stay on, each part on its
+    /// own kinematic body that ignores the chassis' colliders, so the RV stays walkable while it moves and
+    /// <see cref="RvRide"/> carries whoever stands in it.
     /// </summary>
     internal static class RvMobile
     {
@@ -35,13 +36,13 @@ namespace RVRepairVan.Base
 
         private static LandVehicle _chassis;
         private static int _chassisId = -1;   // NetworkObject.ObjectId - a handle within this server session only
-        private static InteractableObject _wheel;
+        private static InteractableObject _wheel, _seat;
         private static Transform _model;
         private static Vector3 _homePos;
         private static Quaternion _homeRot = Quaternion.identity;
         private static bool _homeKnown, _homeLevelled;
 
-        private static bool _driving, _localWasIn, _pendingEnter, _restored;
+        private static bool _driving, _localWasIn, _pendingEnter, _pendingPassenger, _restored;
         private static float _pendingSince, _spawnedAt, _lastOccupiedAt, _lastSaveAt, _lastDockAt;
         private static int _attachFrame;
         private static object _loop, _hitLoop;
@@ -69,6 +70,7 @@ namespace RVRepairVan.Base
             _model = model;
 
             if (_wheel == null) _wheel = MakeWheel(model);
+            if (_seat == null) _seat = MakeSeat(model);
             if (_loop == null) _loop = MelonCoroutines.Start(Loop());
             if (_hitLoop == null) _hitLoop = MelonCoroutines.Start(HitLoop());
 
@@ -92,13 +94,15 @@ namespace RVRepairVan.Base
             _chassis = null;
             _chassisId = -1;
             _wheel = null;
+            _seat = null;
             _model = null;
             _homeKnown = _homeLevelled = false;
-            _driving = _localWasIn = _pendingEnter = _restored = false;
+            _driving = _localWasIn = _pendingEnter = _pendingPassenger = _restored = false;
             Carried.Clear();
             _bodies.Clear();
-            _muted.Clear();
+            _ignored.Clear();
             _chassisColliders.Clear();
+            _wheelColliders.Clear();
             _static.Clear();
             if (_draw != null) { MelonCoroutines.Stop(_draw); _draw = null; }
             _hull = null;
@@ -108,6 +112,7 @@ namespace RVRepairVan.Base
             RvSteps.Reset();
             RvLights.Reset();
             RvAway.Reset();
+            RvRide.Reset();
         }
 
         // --- the wheel ------------------------------------------------------------------------------------
@@ -155,22 +160,61 @@ namespace RVRepairVan.Base
                 if (found != null) local = model.InverseTransformPoint(found.position);
                 Core.Log.Msg("[Mobile] drive point at model-local " + local + (found != null ? " (" + found.name + ")" : " (fallback)") + ".");
 
-                var go = new GameObject(WheelName);
-                go.transform.SetParent(model, false);
-                go.transform.localPosition = local;
-                go.layer = InteractionLayer();
-                var col = go.AddComponent<BoxCollider>();
-                col.isTrigger = true;
-                col.size = new Vector3(0.7f, 0.6f, 0.7f);
-                var io = go.AddComponent<InteractableObject>();
-                io.SetMessage(L10n.T("Drive"));
-                io.MaxInteractionRange = 2.5f;
-                io.RequiresUniqueClick = true;
-                io.onHovered.AddListener((UnityEngine.Events.UnityAction)OnWheelHovered);
-                io.onInteractStart.AddListener((UnityEngine.Events.UnityAction)OnWheel);
-                return io;
+                return MakePoint(model, WheelName, local, new Vector3(0.7f, 0.6f, 0.7f), L10n.T("Drive"), OnWheelHovered, OnWheel);
             }
             catch (Exception e) { Core.Log.Error("[Mobile] drive point failed: " + e); return null; }
+        }
+
+        private const string SeatName = "RVRepairVan_PassengerSeat";
+
+        // The cab has two chairs beside the steering column; the passenger's is the one further from the wheel.
+        private static InteractableObject MakeSeat(Transform model)
+        {
+            try
+            {
+                Transform existing = model.Find(SeatName);
+                if (existing != null)
+                {
+                    var old = existing.GetComponent<InteractableObject>();
+                    if (old != null) { Core.Log.Msg("[Mobile] passenger seat already on the model - reusing it."); return old; }
+                    Core.Log.Warning("[Mobile] passenger seat object without its interactable - building a new one.");
+                    UnityEngine.Object.Destroy(existing.gameObject);
+                }
+                Transform interior = model.Find("rv/Main/Interior");
+                Transform a = interior != null ? interior.Find("Chair") : null, b = interior != null ? interior.Find("Chair (1)") : null;
+                if (a == null || b == null) { Core.Log.Warning("[Mobile] cab chairs not found under rv/Main/Interior - no passenger seat."); return null; }
+                Vector3 wheel = _wheel != null ? _wheel.transform.position : model.TransformPoint(WheelFallbackLocal);
+                Transform chair = Vector3.Distance(Centre(a), wheel) >= Vector3.Distance(Centre(b), wheel) ? a : b;
+                Vector3 local = model.InverseTransformPoint(Centre(chair));
+                Core.Log.Msg("[Mobile] passenger seat at model-local " + local + " (" + chair.name + ").");
+                return MakePoint(model, SeatName, local, new Vector3(0.7f, 0.9f, 0.7f), L10n.T("Sit"), OnSeatHovered, OnSeat);
+            }
+            catch (Exception e) { Core.Log.Error("[Mobile] passenger seat failed: " + e); return null; }
+        }
+
+        private static Vector3 Centre(Transform t)
+        {
+            Renderer r = t.GetComponent<Renderer>();
+            return r != null ? r.bounds.center : t.position;
+        }
+
+        private static InteractableObject MakePoint(Transform model, string name, Vector3 local, Vector3 size, string message,
+            Action hovered, Action used)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(model, false);
+            go.transform.localPosition = local;
+            go.layer = InteractionLayer();
+            var col = go.AddComponent<BoxCollider>();
+            col.isTrigger = true;
+            col.size = size;
+            var io = go.AddComponent<InteractableObject>();
+            io.SetMessage(message);
+            io.MaxInteractionRange = 2.5f;
+            io.RequiresUniqueClick = true;
+            io.onHovered.AddListener(hovered);
+            io.onInteractStart.AddListener(used);
+            return io;
         }
 
         internal static int InteractionLayer()
@@ -186,7 +230,7 @@ namespace RVRepairVan.Base
         {
             if (_wheel == null) return;
             bool engine = RvUpgrades.Owned(RvUpgrade.Engine);
-            bool full = _chassis != null && _chassis.GetFirstFreeSeat() == null;
+            bool full = _chassis != null && FreeSeat(_chassis, false) == null;
             if (engine && RvBattery.Dead)
             {
                 bool battery = RvBattery.HoldsBattery(out _);
@@ -194,19 +238,32 @@ namespace RVRepairVan.Base
                 _wheel.SetInteractableState(battery ? InteractableObject.EInteractableState.Default : InteractableObject.EInteractableState.Invalid);
                 return;
             }
-            _wheel.SetMessage(!engine ? L10n.T("Missing engine") : full ? L10n.T("Seats taken") : L10n.T("Drive"));
+            _wheel.SetMessage(!engine ? L10n.T("Missing engine") : full ? L10n.T("Seat taken") : L10n.T("Drive"));
             _wheel.SetInteractableState(!engine || full ? InteractableObject.EInteractableState.Invalid : InteractableObject.EInteractableState.Default);
         }
 
-        private static void OnWheel()
+        private static void OnSeatHovered()
+        {
+            if (_seat == null) return;
+            bool full = _chassis != null && FreeSeat(_chassis, true) == null;
+            _seat.SetMessage(full ? L10n.T("Seat taken") : L10n.T("Sit"));
+            _seat.SetInteractableState(full ? InteractableObject.EInteractableState.Invalid : InteractableObject.EInteractableState.Default);
+        }
+
+        private static void OnWheel() => UseSeat(false);
+        private static void OnSeat() => UseSeat(true);
+
+        private static void UseSeat(bool passenger)
         {
             try
             {
                 if (!RvUpgrades.Owned(RvUpgrade.Engine)) { Core.Log.Msg("[Mobile] wheel used without the engine upgrade - it shows Missing engine."); return; }
-                if (RvBattery.Dead && !RvBattery.TrySwap()) return;
+                if (!passenger && RvBattery.Dead && !RvBattery.TrySwap()) return;
+                if (_chassis != null) { EnterChassis(passenger); return; }
+                // A passenger alone puts the RV on its chassis too; it stays parked until someone takes the wheel.
                 if (RvBattery.HostBlocksStart()) { RvBattery.TellLocalPlayer(); OnWheelHovered(); return; }
-                if (_chassis != null) { EnterChassis(); return; }
                 _pendingEnter = true;
+                _pendingPassenger = passenger;
                 _pendingSince = Time.time;
                 if (NetworkBus.Online && !NetworkBus.IsServer)
                 {
@@ -216,7 +273,7 @@ namespace RVRepairVan.Base
                 }
                 if (!HostStartAtHome()) _pendingEnter = false;
             }
-            catch (Exception e) { Core.Log.Error("[Mobile] wheel failed: " + e); }
+            catch (Exception e) { Core.Log.Error("[Mobile] " + (passenger ? "passenger seat" : "wheel") + " failed: " + e); }
         }
 
         /// <summary>Host: a client wants to drive the RV from its spot.</summary>
@@ -242,17 +299,58 @@ namespace RVRepairVan.Base
             if (root == null || _model == null) { Core.Log.Warning("[Mobile] start: RV not ready."); return false; }
             if (RVManager.IsDestroyed()) { Core.Log.Warning("[Mobile] start: the RV is wrecked."); return false; }
             ComputeHome(root, _model);
+            // Levelled from the stock vehicle before the spawn, so the chassis appears at its final height instead of
+            // being moved there after it spawned.
+            VehicleManager vm = NetworkSingleton<VehicleManager>.Instance;
+            LandVehicle prefab = vm != null ? vm.GetVehiclePrefab(ChassisCode) : null;
+            if (prefab != null) LevelHome(prefab);
+            else Core.Log.Warning("[Mobile] no '" + ChassisCode + "' prefab - the chassis is levelled after it spawns.");
             return HostSpawn(_homePos, _homeRot);
         }
 
-        private static void EnterChassis()
+        private static void EnterChassis(bool passenger)
         {
             if (_chassis == null) { Core.Log.Warning("[Mobile] enter: no chassis."); return; }
             if (_chassis.LocalPlayerIsInVehicle) { Core.Log.Msg("[Mobile] enter: already inside."); return; }
-            if (_chassis.GetFirstFreeSeat() == null) { Core.Log.Msg("[Mobile] enter: every seat is taken."); return; }
-            _chassis.EnterVehicle();
+            VehicleSeat want = FreeSeat(_chassis, passenger);
+            if (want == null) { Core.Log.Msg("[Mobile] enter: the " + (passenger ? "passenger" : "driver") + " seat is taken."); return; }
+            // The game seats a player in the first free seat. Every other free seat is marked taken by the local player
+            // for the length of the call, so the first free one is the one asked for. Entering is synchronous: the
+            // vehicle's state is pushed and its enter handler picks the seat inside this call.
+            var held = new List<VehicleSeat>();
+            Player local = Player.Local;
+            try
+            {
+                foreach (VehicleSeat s in _chassis.Seats)
+                    if (s != null && s.Pointer != want.Pointer && !s.isOccupied) { s.Occupant = local; held.Add(s); }
+                _chassis.EnterVehicle();
+            }
+            finally
+            {
+                foreach (VehicleSeat s in held) if (s.Occupant != null && s.Occupant.Pointer == local.Pointer) s.Occupant = null;
+            }
             MelonCoroutines.Start(ResetReverseCamera(_chassis));
-            Core.Log.Msg("[Mobile] entering the RV.");
+            bool gotDriver = _chassis.LocalPlayerIsDriver;
+            if (!_chassis.LocalPlayerIsInVehicle) Core.Log.Error("[Mobile] entering the RV as " + (passenger ? "passenger" : "driver") + " did not seat the player.");
+            else if (passenger == gotDriver) Core.Log.Error("[Mobile] asked for the " + (passenger ? "passenger" : "driver") + " seat, got the " + (gotDriver ? "driver" : "passenger") + " seat.");
+            else Core.Log.Msg("[Mobile] entering the RV as " + (passenger ? "passenger" : "driver") + ".");
+        }
+
+        private static VehicleSeat FreeSeat(LandVehicle chassis, bool passenger)
+        {
+            if (chassis.Seats == null) return null;
+            foreach (VehicleSeat s in chassis.Seats)
+                if (s != null && s.isDriverSeat != passenger && !s.isOccupied) return s;
+            return null;
+        }
+
+        // The driver seat as the network knows it, or the local driver whose seat claim is still on its way to the host.
+        private static bool HasDriver(LandVehicle chassis)
+        {
+            if (chassis.LocalPlayerIsDriver) return true;
+            if (chassis.Seats == null) return false;
+            foreach (VehicleSeat s in chassis.Seats) if (s != null && s.isDriverSeat && s.isOccupied) return true;
+            return false;
         }
 
         // The spawn teleport reads as a big negative speed for a few frames, and VehicleCamera then flips to the
@@ -286,7 +384,7 @@ namespace RVRepairVan.Base
         // home pose is lifted or lowered once, so the RV's tyres sit where the chassis wheels meet the road.
         private static void LevelHome(LandVehicle chassis)
         {
-            if (_homeLevelled) return;
+            if (_homeLevelled || chassis == null) return;
             _homeLevelled = true;
             float bottom = float.MaxValue;
             int wheels = 0;
@@ -309,6 +407,7 @@ namespace RVRepairVan.Base
                 chassis.transform.position = _homePos;
                 Rigidbody rb = chassis.Rb;
                 if (rb != null) rb.position = _homePos;
+                Physics.SyncTransforms();
             }
         }
 
@@ -378,6 +477,8 @@ namespace RVRepairVan.Base
 
             // Place each part relative to the chassis exactly as it sits relative to the home chassis pose. On the
             // host at spawn that changes nothing; on a client or after a load the chassis is elsewhere already.
+            _lastBodyScan = Time.time;
+            StopInterpolation();
             Quaternion invHome = Quaternion.Inverse(_homeRot);
             foreach (CarriedPart p in Carried)
             {
@@ -395,7 +496,7 @@ namespace RVRepairVan.Base
             RvLights.Bind(_model);
 
             _driving = true;   // force the first SetDriving to run in full
-            SetDriving(chassis.CurrentPlayerOccupancy > 0);
+            SetDriving(HasDriver(chassis));
 
             Property prop = root.GetComponent<Property>();
             // Placing an item looks up its property through the parents of the grid it goes on. The grids ride on
@@ -451,6 +552,33 @@ namespace RVRepairVan.Base
             _bodies.Add(rb);
         }
 
+        // A station shows its bags and buds as clones with their own kinematic, interpolated body. An interpolated body
+        // writes its own pose back to its transform every frame, so those clones stay where they were while the RV drives
+        // off and float in the air outside it. Without interpolation a kinematic body follows its parent. Placed items
+        // never move on their own, so it stays off; a station makes new clones as its contents change, hence the rescan.
+        private const float BodyScanInterval = 1f;
+        private static float _lastBodyScan;
+
+        private static void StopInterpolation()
+        {
+            int n = 0;
+            try
+            {
+                foreach (CarriedPart p in Carried)
+                {
+                    if (p.T == null) continue;
+                    foreach (Rigidbody b in p.T.GetComponentsInChildren<Rigidbody>(true))
+                    {
+                        if (b == null || !b.isKinematic || b.interpolation == RigidbodyInterpolation.None) continue;
+                        b.interpolation = RigidbodyInterpolation.None;
+                        n++;
+                    }
+                }
+            }
+            catch (Exception e) { Core.Log.Error("[Mobile] stopping interpolation failed - station items may stay behind: " + e.Message); return; }
+            if (n > 0) Core.Log.Msg("[Mobile] " + n + " placed item body(ies) no longer interpolated, so they ride along.");
+        }
+
         private static void DropBodies()
         {
             foreach (Rigidbody rb in _bodies) if (rb != null) UnityEngine.Object.Destroy(rb);
@@ -480,7 +608,7 @@ namespace RVRepairVan.Base
             bool carryPlayer = false;
             Vector3 playerInModel = Vector3.zero;
             Transform player = LocalPlayerTransform();
-            if (player != null && _model != null && !chassis.LocalPlayerIsInVehicle && InsideRv(player.position))
+            if (player != null && _model != null && !chassis.LocalPlayerIsInVehicle && Inside(player.position, 0.3f))
             {
                 carryPlayer = true;
                 playerInModel = _model.InverseTransformPoint(player.position);
@@ -497,6 +625,7 @@ namespace RVRepairVan.Base
                 p.T.localRotation = p.LocalRot;
             }
             Carried.Clear();
+            _ignored.Clear();
             DropBodies();
             if (_contents != null) { UnityEngine.Object.Destroy(_contents); _contents = null; }
             RvWheels.Release();
@@ -506,6 +635,7 @@ namespace RVRepairVan.Base
             if (_hull != null) { UnityEngine.Object.Destroy(_hull.gameObject); _hull = null; }
             if (_hitBox != null) { UnityEngine.Object.Destroy(_hitBox.gameObject); _hitBox = null; }
             _chassisColliders.Clear();
+            _wheelColliders.Clear();
             _chassis = null;
             _chassisId = -1;
 
@@ -701,7 +831,7 @@ namespace RVRepairVan.Base
         {
             if (_pendingEnter)
             {
-                if (_chassis != null && Time.frameCount - _attachFrame >= 2) { _pendingEnter = false; EnterChassis(); }
+                if (_chassis != null && Time.frameCount - _attachFrame >= 2) { _pendingEnter = false; EnterChassis(_pendingPassenger); }
                 else if (Time.time - _pendingSince > 10f) { _pendingEnter = false; Core.Log.Warning("[Mobile] no chassis 10 s after the wheel was used - gave up."); }
             }
             if (_chassis == null) return;
@@ -718,11 +848,11 @@ namespace RVRepairVan.Base
             bool localIn = _chassis.LocalPlayerIsInVehicle;
             bool occupied = localIn || _chassis.CurrentPlayerOccupancy > 0;
             if (occupied) { _lastOccupiedAt = Time.time; RvBattery.HostStamp(); }
-            if (occupied != _driving)
-            {
-                SetDriving(occupied);
-                if (occupied && !localIn) EvictLocalPlayer();
-            }
+            bool driven = HasDriver(_chassis);
+            if (driven != _driving) SetDriving(driven);
+            if (_driving) IgnoreChassis(false);
+            RvRide.KeepClear();
+            if (Time.time - _lastBodyScan > BodyScanInterval) { _lastBodyScan = Time.time; StopInterpolation(); }
             if (_localWasIn && !localIn) MelonCoroutines.Start(PlaceInCabin());
             _localWasIn = localIn;
             RvLights.Update();
@@ -771,8 +901,10 @@ namespace RVRepairVan.Base
 
         // --- parked / driving -----------------------------------------------------------------------------
 
-        private static readonly List<Collider> _muted = new List<Collider>();
         private static readonly List<Collider> _chassisColliders = new List<Collider>();
+        private static readonly List<Collider> _wheelColliders = new List<Collider>();
+        // RV colliders already set to ignore the chassis' colliders, by pointer.
+        private static readonly HashSet<IntPtr> _ignored = new HashSet<IntPtr>();
         private static BoxCollider _hull;
         private static BoxCollider _hitBox;
         private const float HitBoxClearance = 0.2f;   // its bottom above the road
@@ -790,10 +922,15 @@ namespace RVRepairVan.Base
             Rigidbody rb = _chassis.Rb;
             if (driving)
             {
-                // RV colliders off first, then free the body - the other order lets the floor drag on the ground.
-                int muted = 0;
-                foreach (CarriedPart p in Carried) if (p.T != null) muted += MuteColliders(p.T);
+                // The ignores first, then free the body: an RV collider overlapping the chassis' box would shove it.
+                // Switching a collider off can drop its ignores, so they are set again each time.
                 SetChassisColliders(true);
+                _ignored.Clear();
+                int ignored = IgnoreChassis(true);
+                RvRide.KeepClear(true);
+#if DEBUG
+                DebugOverlap("before the body goes free");
+#endif
                 // A body that was frozen falls asleep, and wheel torque does not wake it: the wheels spin up with no
                 // load, then grip all at once when something nudges the body, and the RV flips. So it never sleeps
                 // while someone drives.
@@ -804,7 +941,7 @@ namespace RVRepairVan.Base
                     rb.constraints = RigidbodyConstraints.None;
                     rb.WakeUp();
                 }
-                Core.Log.Msg("[Mobile] driving: " + muted + " RV collider(s) off, chassis body on.");
+                Core.Log.Msg("[Mobile] driving: " + ignored + " RV collider(s) ignore the chassis, chassis body on.");
             }
             else
             {
@@ -815,31 +952,48 @@ namespace RVRepairVan.Base
                     if (_sleepThreshold >= 0f) rb.sleepThreshold = _sleepThreshold;
                 }
                 SetChassisColliders(false);
-                int back = RestoreColliders();
-                Core.Log.Msg("[Mobile] parked: " + back + " RV collider(s) on, chassis body off and frozen.");
+                Core.Log.Msg("[Mobile] parked: chassis body off and frozen.");
             }
         }
 
-        private static int MuteColliders(Transform t)
+        private static int _ignoreFailures;
+
+        /// <summary>
+        /// Every RV collider ignores the chassis' colliders, its wheels and the hull. Runs on each watch tick while
+        /// driving and picks up what was switched on or placed since: an item built in the RV on the way, a door.
+        /// Returns how many RV colliders were newly set.
+        /// </summary>
+        private static int IgnoreChassis(bool first)
         {
-            int n = 0;
-            foreach (Collider c in t.GetComponentsInChildren<Collider>(false))
+            int added = 0;
+            try
             {
-                if (!c.enabled || c.isTrigger) continue;
-                c.enabled = false;
-                _muted.Add(c);
-                n++;
+                foreach (CarriedPart p in Carried)
+                {
+                    if (p.T == null) continue;
+                    foreach (Collider c in p.T.GetComponentsInChildren<Collider>(false))
+                    {
+                        if (c.isTrigger) continue;
+                        if (!c.enabled) { _ignored.Remove(c.Pointer); continue; }
+                        if (!_ignored.Add(c.Pointer)) continue;
+                        foreach (Collider k in SolidChassisColliders())
+                            if (k != null && k.enabled && k.gameObject.activeInHierarchy) Physics.IgnoreCollision(c, k, true);
+                        added++;
+                    }
+                }
+                _ignoreFailures = 0;
+                if (added > 0 && !first) Core.Log.Msg("[Mobile] " + added + " more RV collider(s) ignore the chassis.");
             }
-            return n;
+            catch (Exception e) { if (_ignoreFailures++ == 0) Core.Log.Error("[Mobile] RV colliders ignoring the chassis failed: " + e); }
+            return added;
         }
 
-        private static int RestoreColliders()
+        /// <summary>The chassis' solid colliders, its wheels and the hull: what the RV and its riders must not touch.</summary>
+        internal static IEnumerable<Collider> SolidChassisColliders()
         {
-            int back = 0;
-            foreach (Collider c in _muted) if (c != null) { c.enabled = true; back++; }
-            if (back != _muted.Count) Core.Log.Warning("[Mobile] " + (_muted.Count - back) + " RV collider(s) gone before restore.");
-            _muted.Clear();
-            return back;
+            foreach (Collider c in _chassisColliders) yield return c;
+            foreach (Collider c in _wheelColliders) yield return c;
+            if (_hull != null) yield return _hull;
         }
 
         // The veeper's body and its bounding box sit inside the RV; parked, they are the invisible wall in the cabin.
@@ -848,10 +1002,12 @@ namespace RVRepairVan.Base
         private static void CollectChassisColliders(LandVehicle chassis)
         {
             _chassisColliders.Clear();
+            _wheelColliders.Clear();
             int skipped = 0;
             foreach (Collider c in chassis.GetComponentsInChildren<Collider>(true))
             {
-                if (c.isTrigger || c.TryCast<WheelCollider>() != null) continue;
+                if (c.isTrigger) continue;
+                if (c.TryCast<WheelCollider>() != null) { _wheelColliders.Add(c); continue; }
                 if (!c.enabled || !c.gameObject.activeInHierarchy) { skipped++; continue; }
                 _chassisColliders.Add(c);
             }
@@ -1004,30 +1160,21 @@ namespace RVRepairVan.Base
             return pm != null ? pm.transform : null;
         }
 
-        private static bool InsideRv(Vector3 world)
+        /// <summary>A point in the RV body, or within <paramref name="margin"/> metres of its sides, at standing height.</summary>
+        internal static bool Inside(Vector3 world, float margin)
         {
             if (_chassis == null || _hull == null) return false;
             Vector3 local = _chassis.transform.InverseTransformPoint(world);
             Vector3 c = _hull.center, h = _hull.size * 0.5f;
-            return Mathf.Abs(local.x - c.x) <= h.x + 0.3f && Mathf.Abs(local.z - c.z) <= h.z + 0.3f
+            return Mathf.Abs(local.x - c.x) <= h.x + margin && Mathf.Abs(local.z - c.z) <= h.z + margin
                 && local.y >= c.y - h.y - 1.2f && local.y <= c.y + h.y;
         }
 
-        // Model-local spots: the cab behind the wheel, and the ground outside the side door (the door is on +z).
+        // Model-local spot in the cab, between the two chairs.
         private static readonly Vector3 CabStandLocal = new Vector3(-3.7f, 1.8f, -0.3f);
-        private static readonly Vector3 DoorOutsideLocal = new Vector3(-2.2f, 1.5f, 3.0f);
 
-        // Someone else just took the wheel. The floor is about to stop being solid, so step out by the door.
-        private static void EvictLocalPlayer()
-        {
-            Transform player = LocalPlayerTransform();
-            if (player == null || _model == null || !InsideRv(player.position)) return;
-            Vector3 at = Ground(_model.TransformPoint(DoorOutsideLocal));
-            TeleportLocalPlayer(at, "out of the RV, someone drives off");
-        }
-
-        // Vanilla drops the driver at the stock vehicle's door, which is inside the RV's wall. Stand them up in the
-        // cab instead, behind the wheel, once the RV floor is solid again.
+        // Vanilla drops a leaving player at the stock vehicle's door, which is inside the RV's wall. Stand them up in
+        // the cab instead, between the chairs.
         private static IEnumerator PlaceInCabin()
         {
             yield return null;
@@ -1035,6 +1182,7 @@ namespace RVRepairVan.Base
             if (_chassis == null || _model == null) yield break;
             Vector3 at = Ground(_model.TransformPoint(CabStandLocal));
             TeleportLocalPlayer(at, "into the cab");
+            RvRide.KeepClear(true);
         }
 
         private static Vector3 Ground(Vector3 from)
@@ -1200,6 +1348,90 @@ namespace RVRepairVan.Base
         /// <summary>rvdrive: the same as using the wheel.</summary>
         internal static void DebugDrive() => OnWheel();
 
+        /// <summary>rvdrive seat: the same as using the passenger chair.</summary>
+        internal static void DebugSeat() => OnSeat();
+
+        /// <summary>rvdrive board [x z]: stand the player on the RV floor at model-local x/z (default: the middle of the living area).</summary>
+        internal static void DebugBoard(string[] args)
+        {
+            Transform model = _model != null ? _model : RVManager.Model;
+            if (model == null) { Core.Log.Warning("[Mobile] board: RV model not found."); return; }
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var num = System.Globalization.NumberStyles.Float;
+            float x = args.Length > 0 && float.TryParse(args[0], num, inv, out float a) ? a : 0f;
+            float z = args.Length > 1 && float.TryParse(args[1], num, inv, out float b) ? b : -0.3f;
+            TeleportLocalPlayer(Ground(model.TransformPoint(new Vector3(x, 1.8f, z))), "onto the RV floor at model-local x=" + x + " z=" + z);
+        }
+
+        /// <summary>rvdrive station [mix|pack]: use the first mixing or packaging station placed in the RV.</summary>
+        internal static void DebugStation(string kind)
+        {
+            Transform root = RVManager.Root;
+            RV rv = root != null ? root.GetComponent<RV>() : null;
+            if (rv == null || rv.Container == null) { Core.Log.Warning("[Mobile] station: RV contents not found."); return; }
+            if (kind == "mix")
+            {
+                var m = rv.Container.GetComponentInChildren<Il2CppScheduleOne.ObjectScripts.MixingStation>();
+                if (m == null) { Core.Log.Warning("[Mobile] station: no mixing station in the RV - 'rvplace mixingstation' first."); return; }
+                m.Interacted();
+                Core.Log.Msg("[Mobile] station: using the mixing station at " + m.transform.position + ".");
+                return;
+            }
+            var p = rv.Container.GetComponentInChildren<Il2CppScheduleOne.ObjectScripts.PackagingStation>();
+            if (p == null) { Core.Log.Warning("[Mobile] station: no packaging station in the RV - 'rvplace packagingstation' first."); return; }
+            if (kind == "fill")
+            {
+                var bags = Il2CppScheduleOne.Registry.GetItem("baggie")?.GetDefaultInstance(20);
+                var weed = Il2CppScheduleOne.Registry.GetItem("ogkush")?.GetDefaultInstance(20);
+                if (bags == null || weed == null) { Core.Log.Warning("[Mobile] station: baggie or ogkush not in the registry."); return; }
+                p.PackagingSlot.SetStoredItem(bags);
+                p.ProductSlot.SetStoredItem(weed);
+                Core.Log.Msg("[Mobile] station: filled with 20 baggies and 20 OG Kush.");
+                return;
+            }
+            if (kind == "task" || kind == "close")
+            {
+                var canvas = Singleton<Il2CppScheduleOne.UI.Stations.PackagingStationCanvas>.Instance;
+                var tasks = Singleton<Il2CppScheduleOne.PlayerTasks.TaskManager>.Instance;
+                if (canvas == null || tasks == null) { Core.Log.Warning("[Mobile] station: packaging canvas or task manager missing."); return; }
+                if (kind == "task") { canvas.BeginButtonPressed(); Core.Log.Msg("[Mobile] station: begin pressed, task active=" + tasks.IsTaskActive + "."); return; }
+                if (tasks.CurrentTask != null) tasks.CurrentTask.CancelTask();
+                else if (canvas.IsOpen) canvas.Close();
+                Core.Log.Msg("[Mobile] station: closed, task active=" + tasks.IsTaskActive + " canvas open=" + canvas.IsOpen + ".");
+                return;
+            }
+            if (kind == "drift")
+            {
+                // How far each shown bag and bud sits from the spot the station puts it on, in metres.
+                float worst = 0f;
+                int n = 0;
+                foreach (Transform a in p.PackagingAlignments) worst = Mathf.Max(worst, Drift(a, ref n));
+                foreach (Transform a in p.ProductAlignments) worst = Mathf.Max(worst, Drift(a, ref n));
+                Core.Log.Msg("[Mobile] station drift: " + n + " visual(s), worst " + worst.ToString("F3") + " m off its alignment.");
+                return;
+            }
+            p.Interacted();
+            Core.Log.Msg("[Mobile] station: using the packaging station at " + p.transform.position + ".");
+        }
+
+        private static float Drift(Transform alignment, ref int count)
+        {
+            float worst = 0f;
+            if (alignment == null) return 0f;
+            for (int i = 0; i < alignment.childCount; i++)
+            {
+                Transform c = alignment.GetChild(i);
+                Rigidbody rb = c.GetComponent<Rigidbody>();
+                float d = Vector3.Distance(c.position, alignment.position);
+                float dRb = rb != null ? Vector3.Distance(rb.position, alignment.position) : 0f;
+                worst = Mathf.Max(worst, Mathf.Max(d, dRb));
+                if (count++ < 3)
+                    Core.Log.Msg("[Mobile]   " + c.name + " transform " + d.ToString("F3") + " m, body " + dRb.ToString("F3") + " m"
+                        + (rb != null ? " (kinematic=" + rb.isKinematic + " interpolation=" + rb.interpolation + ")" : " (no body)"));
+            }
+            return worst;
+        }
+
         /// <summary>rvdrive wheel: stand the player in the cab and look at the wheel, so the real hover prompt shows.</summary>
         internal static void DebugWheelView()
         {
@@ -1241,13 +1473,45 @@ namespace RVRepairVan.Base
             Detach();
         }
 
+        /// <summary>rvdrive overlap: every collider on the chassis' body that touches an RV collider, and whether the pair is ignored.</summary>
+        internal static void DebugOverlap(string tag)
+        {
+            if (_chassis == null) { Core.Log.Msg("[Mobile] overlap " + tag + ": no chassis."); return; }
+            Rigidbody own = _chassis.Rb;
+            var body = new List<Collider>();
+            foreach (Collider c in _chassis.GetComponentsInChildren<Collider>(true))
+                if (c.attachedRigidbody == own && c.enabled && c.gameObject.activeInHierarchy && !c.isTrigger && c.TryCast<WheelCollider>() == null) body.Add(c);
+            int pairs = 0, live = 0;
+            foreach (CarriedPart p in Carried)
+            {
+                if (p.T == null) continue;
+                foreach (Collider r in p.T.GetComponentsInChildren<Collider>(false))
+                {
+                    if (!r.enabled || r.isTrigger) continue;
+                    foreach (Collider b in body)
+                    {
+                        if (!Physics.ComputePenetration(r, r.transform.position, r.transform.rotation, b, b.transform.position, b.transform.rotation, out Vector3 dir, out float depth)) continue;
+                        pairs++;
+                        bool ignored = Physics.GetIgnoreCollision(r, b);
+                        if (!ignored) live++;
+                        if (!ignored || pairs <= 5)
+                            Core.Log.Msg("[Mobile]   overlap '" + r.name + "' x '" + b.name + "' depth " + depth.ToString("F2") + " ignored=" + ignored);
+                    }
+                }
+            }
+            Core.Log.Msg("[Mobile] overlap " + tag + ": " + body.Count + " body collider(s), " + pairs + " overlapping pair(s), " + live + " not ignored.");
+        }
+
         internal static string DebugState() =>
             "away=" + Away + " id=" + _chassisId + " driving=" + _driving + " homeKnown=" + _homeKnown
             + (_chassis != null ? " pos=" + _chassis.transform.position + " fromHome=" + Vector3.Distance(_chassis.transform.position, _homePos).ToString("0.0")
                 + " angleToHome=" + Vector3.Angle(_chassis.transform.forward, _homeRot * Vector3.forward).ToString("0")
-                + " occupants=" + _chassis.CurrentPlayerOccupancy + " speed=" + _chassis.Speed_Kmh.ToString("0.0")
+                + " occupants=" + _chassis.CurrentPlayerOccupancy + " driver=" + HasDriver(_chassis) + " localDriver=" + _chassis.LocalPlayerIsDriver
+                + " localIn=" + _chassis.LocalPlayerIsInVehicle + " speed=" + _chassis.Speed_Kmh.ToString("0.0")
                 + " constraints=" + (_chassis.Rb != null ? _chassis.Rb.constraints.ToString() : "no rb") : "")
-            + (_wheel != null ? " wheel=" + _wheel.transform.position : " no wheel");
+            + (_wheel != null ? " wheel=" + _wheel.transform.position : " no wheel")
+            + (_seat != null ? " seat=" + _seat.transform.position : " no seat")
+            + " | " + RvRide.DebugState();
 #endif
     }
 }
