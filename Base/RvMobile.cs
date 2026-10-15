@@ -46,6 +46,9 @@ namespace RVRepairVan.Base
         private static int _attachFrame;
         private static object _loop, _hitLoop;
         private static PropertyContentsContainer _contents;
+        // Client: the chassis the host named last (-1 = home), and the search that waits for it to spawn here.
+        private static int _wantedId = -1;
+        private static object _find;
 
         /// <summary>True while the RV is on its chassis, wherever that is - including parked right at home.</summary>
         internal static bool Away => _chassis != null;
@@ -84,6 +87,8 @@ namespace RVRepairVan.Base
         {
             if (_loop != null) { MelonCoroutines.Stop(_loop); _loop = null; }
             if (_hitLoop != null) { MelonCoroutines.Stop(_hitLoop); _hitLoop = null; }
+            if (_find != null) { MelonCoroutines.Stop(_find); _find = null; }
+            _wantedId = -1;
             _chassis = null;
             _chassisId = -1;
             _wheel = null;
@@ -319,7 +324,7 @@ namespace RVRepairVan.Base
                 if (chassis == null) { Core.Log.Error("[Mobile] spawn of '" + ChassisCode + "' returned null."); return false; }
                 if (vm.PlayerOwnedVehicles.Contains(chassis)) vm.PlayerOwnedVehicles.Remove(chassis);
                 _spawnedAt = Time.time;
-                if (!Attach(chassis)) { chassis.DestroyVehicle(); return false; }
+                if (!TryAttach(chassis)) { chassis.DestroyVehicle(); return false; }
                 Broadcast();
                 return true;
             }
@@ -409,6 +414,24 @@ namespace RVRepairVan.Base
             return true;
         }
 
+        // An exception halfway through Attach leaves the chassis hidden and the RV half on it. Take the RV back off, so
+        // it stands whole at home and the stock vehicle shows instead of an invisible one.
+        private static bool TryAttach(LandVehicle chassis)
+        {
+            try { return Attach(chassis); }
+            catch (Exception e)
+            {
+                Core.Log.Error("[Mobile] putting the RV on the chassis failed: " + e);
+                try
+                {
+                    PutBack();
+                    foreach (Renderer r in chassis.GetComponentsInChildren<Renderer>(true)) r.forceRenderingOff = false;
+                }
+                catch (Exception e2) { Core.Log.Error("[Mobile] taking the RV back off the chassis failed: " + e2); }
+                return false;
+            }
+        }
+
         private static void Carry(Transform t)
         {
             Carried.Add(new CarriedPart { T = t, Parent = t.parent, LocalPos = t.localPosition, LocalRot = t.localRotation });
@@ -437,7 +460,19 @@ namespace RVRepairVan.Base
         /// <summary>Put everything back on its spot. Host: then despawn the chassis.</summary>
         private static void Detach()
         {
-            if (_chassis == null) return;
+            LandVehicle chassis = PutBack();
+            if (chassis == null) return;
+            if (!NetworkBus.Online || NetworkBus.IsServer)
+            {
+                Broadcast();
+                MelonCoroutines.Start(DespawnLater(chassis));
+            }
+        }
+
+        /// <summary>Put everything back on its spot and let go of the chassis. Returns that chassis, null if there was none.</summary>
+        private static LandVehicle PutBack()
+        {
+            if (_chassis == null) return null;
             LandVehicle chassis = _chassis;
             Transform root = RVManager.Root;
 
@@ -478,12 +513,7 @@ namespace RVRepairVan.Base
             RvAway.End(root != null ? root.GetComponent<Property>() : null);
             RepairStateStore.ClearAwayPose();
             Core.Log.Msg("[Mobile] RV back on its spot.");
-
-            if (!NetworkBus.Online || NetworkBus.IsServer)
-            {
-                Broadcast();
-                MelonCoroutines.Start(DespawnLater(chassis));
-            }
+            return chassis;
         }
 
         // The clients must have put the model back before the chassis despawns: on a client the model is a child of
@@ -526,6 +556,7 @@ namespace RVRepairVan.Base
         internal static void ApplySync(int id)
         {
             if (NetworkBus.IsServer) return;
+            _wantedId = id;
             if (id < 0)
             {
                 if (_chassis != null) { Core.Log.Msg("[Mobile] host: the RV is home."); Detach(); }
@@ -534,38 +565,110 @@ namespace RVRepairVan.Base
             }
             if (_chassis != null && _chassisId == id) return;
             if (_chassis != null) { Core.Log.Warning("[Mobile] host names chassis " + id + ", we ride on " + _chassisId + " - switching."); Detach(); }
-            MelonCoroutines.Start(FindAndAttach(id));
+            if (_find == null) _find = MelonCoroutines.Start(FindAndAttach());
+            else Core.Log.Msg("[Mobile] host names chassis " + id + " - the search for it is running already.");
         }
 
-        // The sync can arrive before FishNet has spawned the vehicle on this client.
-        private static IEnumerator FindAndAttach(int id)
+        private const float FindPatience = 10f;   // after this the search slows down and the host hears about it
+        private const int MaxAttachFailures = 5;
+
+        // The sync can arrive before FishNet has spawned the vehicle on this client. The search runs until the RV rides
+        // on the named chassis or the host says the RV is home, and the host hears how it went, so its log shows both
+        // sides.
+        private static IEnumerator FindAndAttach()
         {
-            for (int i = 0; i < 40; i++)
+            float started = Time.time;
+            bool reported = false;
+            int failures = 0;
+            Core.Log.Msg("[Mobile] host names chassis " + _wantedId + " - looking for it here.");
+            while (_wantedId >= 0 && _chassis == null)
             {
-                LandVehicle v = FindVehicle(id);
-                if (v != null)
+                bool found = false, done;
+                try { done = FindStep(_wantedId, started, ref failures, ref reported, out found); }
+                catch (Exception e)
                 {
-                    if (_chassis != null) yield break;
-                    if (_model == null) Apply();
-                    if (_model == null) { Core.Log.Warning("[Mobile] chassis " + id + " found, but the RV model is not ready."); yield break; }
-                    if (Attach(v)) Core.Log.Msg("[Mobile] riding on the host's chassis " + id + ".");
-                    yield break;
+                    Core.Log.Error("[Mobile] looking for chassis " + _wantedId + " failed: " + e);
+                    done = ++failures >= MaxAttachFailures;
                 }
-                yield return new WaitForSeconds(0.25f);
+                if (done) break;
+                yield return new WaitForSeconds(found || Time.time - started > FindPatience ? 1f : 0.25f);
             }
-            Core.Log.Error("[Mobile] chassis " + id + " never appeared on this client - the RV stays at its spot here.");
+            if (_wantedId < 0 && _chassis == null) Core.Log.Msg("[Mobile] the RV went home before its chassis showed up here.");
+            _find = null;
         }
 
-        private static LandVehicle FindVehicle(int id)
+        // One look for the chassis. True when the search is over, either way.
+        private static bool FindStep(int id, float started, ref int failures, ref bool reported, out bool found)
+        {
+            LandVehicle v = FindVehicle(id, Time.time - started > FindPatience);
+            found = v != null;
+            if (v == null)
+            {
+                if (!reported && Time.time - started > FindPatience)
+                {
+                    reported = true;
+                    Core.Log.Warning("[Mobile] chassis " + id + " is not on this client after " + FindPatience + " s - still looking. " + DescribeVehicles());
+                    NetworkBus.SendToHost(RvOp.MobileReport, -2, id);
+                }
+                return false;
+            }
+            if (_model == null) Apply();
+            if (_model == null) Core.Log.Warning("[Mobile] chassis " + id + " found, but the RV model is not ready - trying again.");
+            else if (TryAttach(v))
+            {
+                Core.Log.Msg("[Mobile] riding on the host's chassis " + id + " after " + (Time.time - started).ToString("0.0") + " s.");
+                NetworkBus.SendToHost(RvOp.MobileReport, id);
+                return true;
+            }
+            if (++failures < MaxAttachFailures) return false;
+            Core.Log.Error("[Mobile] the RV could not be put on chassis " + id + " - this player sees the stock vehicle drive.");
+            NetworkBus.SendToHost(RvOp.MobileReport, -1, id);
+            return true;
+        }
+
+        // The vehicle list fills in each vehicle's Start. If the chassis is in the scene but missing from the list, the
+        // scene search still finds it; that costs a full object search, so it only runs in the slow phase of the search.
+        private static LandVehicle FindVehicle(int id, bool searchScene = false)
         {
             VehicleManager vm = NetworkSingleton<VehicleManager>.Instance;
-            if (vm == null || vm.AllVehicles == null) return null;
+            if (vm != null && vm.AllVehicles != null)
+            {
+                for (int i = 0; i < vm.AllVehicles.Count; i++)
+                {
+                    LandVehicle v = vm.AllVehicles[i];
+                    if (v != null && v.NetworkObject != null && v.NetworkObject.ObjectId == id) return v;
+                }
+            }
+            if (!searchScene) return null;
+            foreach (LandVehicle v in UnityEngine.Object.FindObjectsOfType<LandVehicle>())
+            {
+                if (v == null || v.NetworkObject == null || v.NetworkObject.ObjectId != id) continue;
+                Core.Log.Warning("[Mobile] chassis " + id + " is in the scene but not in the vehicle list.");
+                return v;
+            }
+            return null;
+        }
+
+        private static string DescribeVehicles()
+        {
+            VehicleManager vm = NetworkSingleton<VehicleManager>.Instance;
+            if (vm == null || vm.AllVehicles == null) return "No vehicle list.";
+            var sb = new System.Text.StringBuilder(vm.AllVehicles.Count + " vehicle(s) here:");
             for (int i = 0; i < vm.AllVehicles.Count; i++)
             {
                 LandVehicle v = vm.AllVehicles[i];
-                if (v != null && v.NetworkObject != null && v.NetworkObject.ObjectId == id) return v;
+                if (v == null) continue;
+                sb.Append(' ').Append(v.VehicleCode).Append('#').Append(v.NetworkObject != null ? v.NetworkObject.ObjectId.ToString() : "?");
             }
-            return null;
+            return sb.ToString();
+        }
+
+        /// <summary>Host: a client says whether the RV rides on the chassis there. Logged, so the host log shows both sides.</summary>
+        internal static void HostOnClientReport(int state, int id)
+        {
+            if (state >= 0) Core.Log.Msg("[Mobile] a client rides the RV on chassis " + state + ".");
+            else if (state == -2) Core.Log.Warning("[Mobile] a client has no chassis " + id + " after " + FindPatience + " s - the RV stands at home there.");
+            else Core.Log.Error("[Mobile] a client could not put the RV on chassis " + id + " - it sees the stock vehicle. Its own log has the cause.");
         }
 
         // --- the watch loop -------------------------------------------------------------------------------
