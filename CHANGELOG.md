@@ -4,6 +4,13 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.5.1] - 2026-10-15
+
+### Fixed
+- Workers you hire after building the crew quarters walk into the RV and work. They used to wait outside with
+  nothing to do.
+- The hazmat suit in the RV hangs flat on a wire hook like an empty suit, not like someone is standing in it.
+
 ## [3.5.0] - 2026-10-15
 
 ### Added
