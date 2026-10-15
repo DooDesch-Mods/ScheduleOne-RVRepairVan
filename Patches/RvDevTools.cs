@@ -303,6 +303,173 @@ namespace RVRepairVan.Patches
             return true;
         }
 
+        /// <summary>
+        /// rvsow [elsewhere]: drop a seed into the first empty pot of the RV (or of any other property) the way
+        /// SowSeedTask does - soil parted, chunk colliders and task bounds on, the seed loose under _Temp - and log
+        /// where it falls. The vial is left out: in the task the seed leaves it before it falls.
+        /// </summary>
+        internal static void Sow(bool elsewhere)
+        {
+            Property rv = RvProperty();
+            Pot pot = null;
+            foreach (Pot p in UnityEngine.Object.FindObjectsOfType<Pot>())
+            {
+                if (p == null || p.ParentProperty == null) continue;
+                bool inRv = rv != null && p.ParentProperty == rv;
+                if (inRv == elsewhere) continue;
+                pot = p;
+                break;
+            }
+            if (pot == null) { Core.Log.Warning("[Debug] rvsow: no pot " + (elsewhere ? "outside" : "in") + " the RV."); return; }
+            var def = Il2CppScheduleOne.Registry.GetItem("ogkushseed")?.TryCast<Il2CppScheduleOne.Growing.SeedDefinition>();
+            if (def == null || def.FunctionSeedPrefab == null) { Core.Log.Warning("[Debug] rvsow: no seed prefab for 'ogkushseed'."); return; }
+            GameObject temp = GameObject.Find("_Temp");
+            if (temp == null) { Core.Log.Warning("[Debug] rvsow: no _Temp object in the scene."); return; }
+
+            if (pot.CurrentSoil == null || pot.NormalizedSoilAmount < 0.99f)
+            {
+                var soil = Il2CppScheduleOne.Registry.GetItem("soil")?.TryCast<Il2CppScheduleOne.ItemFramework.SoilDefinition>();
+                if (soil == null) { Core.Log.Warning("[Debug] rvsow: no soil definition 'soil'."); return; }
+                pot.SetSoil(soil);
+                pot.SetSoilAmount(pot.SoilCapacity);
+                pot.SyncSoilData();
+                Core.Log.Msg("[Debug] rvsow: pot filled with soil.");
+            }
+            Vector3 start = pot.SeedStartPoint.position;
+            Core.Log.Msg("[Debug] rvsow: pot '" + pot.name + "' of '" + pot.ParentProperty.name + "' at " + start.ToString("F2")
+                + " rest " + pot.SeedRestingPoint.position.ToString("F2") + " parent=" + (pot.transform.parent != null ? pot.transform.parent.name : "none")
+                + " rb=" + (pot.GetComponentInParent<Rigidbody>() != null ? pot.GetComponentInParent<Rigidbody>().name : "none"));
+
+            pot.TaskBounds.gameObject.SetActive(true);
+            pot.SetSoilState(Pot.ESoilState.Parted);
+            foreach (var chunk in pot.SoilChunks) { chunk.SetChunkClickable(false); chunk.SetColliderEnabled(true); }
+            foreach (Collider c in pot.GetComponentsInChildren<Collider>(false))
+            {
+                if (!c.enabled || c.isTrigger) continue;
+                MeshCollider mc = c.TryCast<MeshCollider>();
+                Core.Log.Msg("[Debug] rvsow:   pot collider '" + c.name + "' " + c.GetIl2CppType().Name + (mc != null ? " convex=" + mc.convex : "")
+                    + " layer " + LayerMask.LayerToName(c.gameObject.layer) + " rb=" + (c.attachedRigidbody != null ? c.attachedRigidbody.name + " kin=" + c.attachedRigidbody.isKinematic : "none"));
+            }
+
+            var seed = UnityEngine.Object.Instantiate(def.FunctionSeedPrefab.gameObject, temp.transform).GetComponent<Il2CppScheduleOne.Growing.FunctionalSeed>();
+            seed.transform.position = start;
+            seed.Vial.gameObject.SetActive(false);
+            Vector3 drop = start + Vector3.down * 0.05337f;
+            seed.SeedRigidbody.transform.position = drop;
+            seed.SeedRigidbody.position = drop;
+            seed.SeedRigidbody.isKinematic = false;
+            int seedLayer = seed.SeedCollider.gameObject.layer;
+            Core.Log.Msg("[Debug] rvsow: seed layer " + LayerMask.LayerToName(seedLayer) + " excludeLayers=" + seed.SeedRigidbody.excludeLayers.value);
+
+            foreach (RaycastHit h in Physics.RaycastAll(drop, Vector3.down, 1.5f, -1, QueryTriggerInteraction.Collide))
+            {
+                Collider c = h.collider;
+                Rigidbody arb = c.attachedRigidbody;
+                if (Physics.GetIgnoreLayerCollision(seedLayer, c.gameObject.layer)) continue;
+                Core.Log.Msg("[Debug] rvsow:   below " + h.distance.ToString("F3") + " '" + c.name + "' (" + (c.transform.parent != null ? c.transform.parent.name : "-") + ") layer "
+                    + LayerMask.LayerToName(c.gameObject.layer) + " trigger=" + c.isTrigger + " ignoresSeed=" + Physics.GetIgnoreLayerCollision(seedLayer, c.gameObject.layer)
+                    + " rb=" + (arb != null ? arb.name + " kin=" + arb.isKinematic + " exclude=" + arb.excludeLayers.value : "none"));
+            }
+            MelonLoader.MelonCoroutines.Start(Track(pot, seed));
+        }
+
+        private static System.Collections.IEnumerator Track(Pot pot, Il2CppScheduleOne.Growing.FunctionalSeed seed)
+        {
+            for (int i = 0; i < 12; i++)
+            {
+                yield return new WaitForSeconds(0.25f);
+                if (seed == null || pot == null) { Core.Log.Warning("[Debug] rvsow: seed or pot gone mid-drop."); yield break; }
+                Vector3 p = seed.SeedRigidbody.position;
+                Core.Log.Msg("[Debug] rvsow: t=" + ((i + 1) * 0.25f).ToString("F2") + " seed " + p.ToString("F3") + " toRest " + Vector3.Distance(seed.SeedCollider.transform.position, pot.SeedRestingPoint.position).ToString("F3")
+                    + " v=" + seed.SeedRigidbody.velocity.magnitude.ToString("F3"));
+            }
+            int seedLayer = seed.SeedCollider.gameObject.layer;
+            foreach (Collider c in Physics.OverlapSphere(seed.SeedRigidbody.position, 0.06f, -1, QueryTriggerInteraction.Ignore))
+            {
+                if (c == seed.SeedCollider || Physics.GetIgnoreLayerCollision(seedLayer, c.gameObject.layer)) continue;
+                Core.Log.Msg("[Debug] rvsow:   resting on '" + c.name + "' (" + (c.transform.parent != null ? c.transform.parent.name : "-") + ") layer "
+                    + LayerMask.LayerToName(c.gameObject.layer) + " rb=" + (c.attachedRigidbody != null ? c.attachedRigidbody.name : "none"));
+            }
+            UnityEngine.Object.Destroy(seed.gameObject);
+            pot.SetSoilState(Pot.ESoilState.Flat);
+            foreach (var chunk in pot.SoilChunks) { chunk.StopLerp(); chunk.SetColliderEnabled(false); }
+            pot.TaskBounds.gameObject.SetActive(false);
+            Core.Log.Msg("[Debug] rvsow: done, pot reset.");
+        }
+
+        /// <summary>rvbed: what the RV's bed is made of - Bed scripts, interactables and colliders under the model's 'Bed'.</summary>
+        internal static void BedInfo(string action)
+        {
+            Transform root = RVManager.Root;
+            if (root == null) { Core.Log.Warning("[Debug] rvbed: RV root not found."); return; }
+            foreach (var b in (RVManager.Model ?? root).GetComponentsInChildren<Il2CppScheduleOne.ObjectScripts.Bed>(true))
+            {
+                var io = b.intObj;
+                Core.Log.Msg("[Debug] rvbed: Bed script on '" + b.name + "' active=" + b.gameObject.activeInHierarchy + " enabled=" + b.enabled
+                    + " spawned=" + b.IsSpawned + " intObj=" + (io != null ? "'" + Path(io.transform) + "' enabled=" + io.enabled + " active=" + io.gameObject.activeInHierarchy
+                    + " layer " + LayerMask.LayerToName(io.gameObject.layer) + " hoverListeners=" + io.onHovered.GetPersistentEventCount() + " interactListeners=" + io.onInteractStart.GetPersistentEventCount() : "null"));
+                if (io == null) continue;
+                foreach (Collider c in io.GetComponentsInChildren<Collider>(true))
+                    Core.Log.Msg("[Debug] rvbed:   intObj collider '" + c.name + "' " + c.GetIl2CppType().Name + " enabled=" + c.enabled + " trigger=" + c.isTrigger
+                        + " layer " + LayerMask.LayerToName(c.gameObject.layer) + " size " + c.bounds.size.ToString("F2"));
+                // InteractionManager.CheckHover from eight standing spots around the bed, looking at its middle: an
+                // interactable only wins when the sphere cast meets it no later than the first plain collider on the ray.
+                var im = Il2CppScheduleOne.DevUtilities.Singleton<Il2CppScheduleOne.Interaction.InteractionManager>.Instance;
+                int mask = im != null ? im.Interaction_SearchMask.value : -1;
+                Core.Log.Msg("[Debug] rvbed:   search mask " + mask + " range " + io.MaxInteractionRange + " angleLimit=" + io.LimitInteractionAngle);
+                Vector3 target = io.transform.position;
+                for (int k = 0; k < 8; k++)
+                {
+                    Vector3 dir = Quaternion.Euler(0f, k * 45f, 0f) * Vector3.forward;
+                    Vector3 eye = target + dir * 1.3f + Vector3.up * 0.9f;
+                    var ray = new UnityEngine.Ray(eye, (target - eye).normalized);
+                    float block = float.MaxValue; string blocker = "none";
+                    foreach (RaycastHit h in Physics.RaycastAll(ray, 4f, mask, QueryTriggerInteraction.Collide))
+                        if (h.collider.GetComponentInParent<Il2CppScheduleOne.Interaction.InteractableObject>() == null && h.distance < block) { block = h.distance; blocker = Path(h.collider.transform); }
+                    string won = "nothing";
+                    float best = float.MaxValue;
+                    foreach (RaycastHit h in Physics.SphereCastAll(ray, 0.075f, 4f, mask, QueryTriggerInteraction.Collide))
+                    {
+                        if (h.distance + 0.075f > block + 0.01f || h.distance >= best) continue;
+                        var hit = h.collider.GetComponentInParent<Il2CppScheduleOne.Interaction.InteractableObject>();
+                        if (hit == null) continue;
+                        best = h.distance; won = Path(hit.transform);
+                    }
+                    Core.Log.Msg("[Debug] rvbed:   from " + (k * 45) + "deg: first plain collider " + (blocker == "none" ? "none" : "'" + blocker + "' at " + block.ToString("F2"))
+                        + ", hover -> " + won);
+                }
+                b.Hovered();
+                Core.Log.Msg("[Debug] rvbed:   after Hovered(): state=" + io._interactionState + " message='" + io.message + "'");
+                if (action == "use")
+                {
+                    // What pressing E on it does: InteractableObject.onInteractStart -> Bed.Interacted -> the sleep menu.
+                    io.onInteractStart.Invoke();
+                    var menu = Il2CppScheduleOne.DevUtilities.Singleton<Il2CppScheduleOne.UI.SleepMenu>.Instance;
+                    Core.Log.Msg("[Debug] rvbed use: sleep menu open=" + (menu != null && menu.IsMenuOpen));
+                }
+            }
+            Transform model = RVManager.Model;
+            foreach (Transform t in (model ?? root).GetComponentsInChildren<Transform>(true))
+            {
+                if (!t.name.Contains("Bed") && !t.name.Contains("Mattress") && !t.name.Contains("Pillow") && !t.name.Contains("Blanket")) continue;
+                var io = t.GetComponent<Il2CppScheduleOne.Interaction.InteractableObject>();
+                string cols = "";
+                foreach (Collider c in t.GetComponents<Collider>()) cols += " " + c.GetIl2CppType().Name + (c.enabled ? "" : "(off)") + (c.isTrigger ? "(trig)" : "") + " size " + c.bounds.size.ToString("F2");
+                Core.Log.Msg("[Debug] rvbed: '" + Path(t) + "' active=" + t.gameObject.activeInHierarchy + " layer " + LayerMask.LayerToName(t.gameObject.layer)
+                    + " at model " + (model != null ? model.InverseTransformPoint(t.position).ToString("F2") : "-") + " io=" + (io != null) + " colliders:" + (cols == "" ? " none" : cols));
+            }
+            var beds = UnityEngine.Object.FindObjectsOfType<Il2CppScheduleOne.ObjectScripts.Bed>(true);
+            Core.Log.Msg("[Debug] rvbed: " + beds.Length + " Bed script(s) in the scene.");
+            foreach (var b in beds) Core.Log.Msg("[Debug] rvbed:   " + Path(b.transform) + " active=" + b.gameObject.activeInHierarchy);
+        }
+
+        private static string Path(Transform t)
+        {
+            string p = t.name;
+            for (Transform up = t.parent; up != null; up = up.parent) p = up.name + "/" + p;
+            return p;
+        }
+
         private static Property RvProperty()
         {
             var pm = Il2CppScheduleOne.DevUtilities.Singleton<PropertyManager>.Instance;
