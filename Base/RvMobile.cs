@@ -605,14 +605,19 @@ namespace RVRepairVan.Base
             }
         }
 
-        private static bool AtHome()
+        private static bool AtHome() => OnSpot && Mathf.Abs(_chassis.Speed_Kmh) < HomeMaxSpeedKmh;
+
+        /// <summary>The chassis stands where leaving it snaps the RV home, once it has stopped. The hazards show it.</summary>
+        internal static bool OnSpot
         {
-            if (!_homeKnown || _chassis == null) return false;
-            float d = Vector3.Distance(_chassis.transform.position, _homePos);
-            // Either way round: a driver who left forwards comes back nose-first, and the RV snaps to its own pose anyway.
-            float a = Vector3.Angle(_chassis.transform.forward, _homeRot * Vector3.forward);
-            bool aligned = a <= HomeMaxAngle || a >= 180f - HomeMaxAngle;
-            return d <= HomeRadius && aligned && Mathf.Abs(_chassis.Speed_Kmh) < HomeMaxSpeedKmh;
+            get
+            {
+                if (!_homeKnown || _chassis == null) return false;
+                float d = Vector3.Distance(_chassis.transform.position, _homePos);
+                // Either way round: a driver who left forwards comes back nose-first, and the RV snaps to its own pose anyway.
+                float a = Vector3.Angle(_chassis.transform.forward, _homeRot * Vector3.forward);
+                return d <= HomeRadius && (a <= HomeMaxAngle || a >= 180f - HomeMaxAngle);
+            }
         }
 
         // --- parked / driving -----------------------------------------------------------------------------

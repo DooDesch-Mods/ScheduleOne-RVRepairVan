@@ -110,15 +110,28 @@ namespace RVRepairVan.Base
         }
 #endif
 
-        /// <summary>Follow the chassis: headlight toggle, brake and reverse.</summary>
+        // The rear lamps the RV uses for reversing are amber indicator lenses, so they double as the hazards.
+        private const float HazardHalfPeriod = 0.4f;
+        private static bool _hazards;
+        private static int _flashes;
+
+        /// <summary>Follow the chassis: headlight toggle, brake and reverse. On the home spot the hazards blink instead.</summary>
         internal static void Update()
         {
             if (!_bound || _chassis == null) return;
 #if DEBUG
             if (_forced) return;
 #endif
+            bool hazards = RvMobile.OnSpot;
+            if (hazards != _hazards)
+            {
+                _hazards = hazards;
+                Core.Log.Msg("[Lights] hazards " + (hazards ? "on: the RV stands on its home spot." : "off after " + _flashes + " flash(es)."));
+                _flashes = 0;
+            }
             bool head = _source != null && _source.HeadlightsOn;
-            Apply(head, _chassis.BrakesApplied, _chassis.IsReversing);
+            bool rear = hazards ? (int)(Time.time / HazardHalfPeriod) % 2 == 0 : _chassis.IsReversing;
+            Apply(head, _chassis.BrakesApplied, rear);
         }
 
         /// <summary>All lamps off and the lenses back to their own material; the RV goes home or the scene unloads.</summary>
@@ -133,6 +146,9 @@ namespace RVRepairVan.Base
                     catch (Exception e) { Core.Log.Warning("[Lights] restoring a headlight lens failed: " + e.Message); }
                 Core.Log.Msg("[Lights] RV lamps released.");
             }
+            if (_hazards) Core.Log.Msg("[Lights] hazards off after " + _flashes + " flash(es): the RV lamps are released.");
+            _hazards = false;
+            _flashes = 0;
             _bound = false;
 #if DEBUG
             _forced = false;
@@ -171,7 +187,13 @@ namespace RVRepairVan.Base
                 Core.LogDebug("[Lights] headlights " + (head ? "on" : "off") + ".");
             }
             if (brake != _brakeOn) { _brakeOn = brake; Switch(_brake, brake); Core.LogDebug("[Lights] brake lights " + (brake ? "on" : "off") + "."); }
-            if (reverse != _reverseOn) { _reverseOn = reverse; Switch(_reverse, reverse); Core.LogDebug("[Lights] reverse lights " + (reverse ? "on" : "off") + "."); }
+            if (reverse != _reverseOn)
+            {
+                _reverseOn = reverse;
+                Switch(_reverse, reverse);
+                if (_hazards) { if (reverse) _flashes++; }
+                else Core.LogDebug("[Lights] reverse lights " + (reverse ? "on" : "off") + ".");
+            }
         }
 
         private static string Describe(Il2CppReferenceArray<MeshRenderer> meshes)
@@ -195,7 +217,7 @@ namespace RVRepairVan.Base
         /// </summary>
         internal static void OnSwitched(ToggleableLight tl)
         {
-            if (!RvMobile.Away || tl == null) return;
+            if (!RvMobile.Away || tl == null || _switching) return;
             Transform model = RVManager.Model;
             if (model == null || !tl.transform.IsChildOf(model)) return;
             var meshes = tl.lightSurfacesMeshes;
@@ -226,17 +248,25 @@ namespace RVRepairVan.Base
         }
 #endif
 
+        // Set while this class switches its own lamps: it redraws them itself, so OnSwitched has nothing to add.
+        private static bool _switching;
+
         private static void Switch(List<ToggleableLight> lamps, bool on)
         {
-            foreach (ToggleableLight tl in lamps)
+            _switching = true;
+            try
             {
-                if (tl == null) continue;
-                tl.isOn = on;
-                var meshes = tl.lightSurfacesMeshes;
-                if (meshes != null)
-                    for (int i = 0; i < meshes.Length; i++)
-                        if (meshes[i] != null) RvMobile.RefreshStatic(meshes[i]);
+                foreach (ToggleableLight tl in lamps)
+                {
+                    if (tl == null) continue;
+                    tl.isOn = on;
+                    var meshes = tl.lightSurfacesMeshes;
+                    if (meshes != null)
+                        for (int i = 0; i < meshes.Length; i++)
+                            if (meshes[i] != null) RvMobile.RefreshStatic(meshes[i]);
+                }
             }
+            finally { _switching = false; }
         }
     }
 
