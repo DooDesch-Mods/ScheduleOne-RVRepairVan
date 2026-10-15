@@ -30,10 +30,11 @@ namespace RVRepairVan.Base
 
         // rv/Main space. Each prop is built facing its own +z with +y as its top; Out and Up turn those into the RV.
         // The book's height comes from a ray onto the dashboard; z here is only the fallback.
+        // The door-side wall: its inner face is at y 1.575 (the save intercom shares it), the ribbed outer skin at 1.665.
         private static readonly Spot Book = new Spot("Book", new Vector3(5.2f, 0.75f, 0.0f), new Vector3(0f, 0f, 1f), new Vector3(0.34f, 0.94f, 0f));
         private static readonly Spot Number = new Spot("HouseNumber", new Vector3(1.2f, 1.665f, 0.12f), new Vector3(0f, 1f, 0f), new Vector3(0f, 0f, 1f));
         private static readonly Spot Holes = new Spot("BulletHoles", new Vector3(1.05f, 1.665f, -0.4f), new Vector3(0f, 1f, 0f), new Vector3(0f, 0f, 1f));
-        private static readonly Spot Gear = new Spot("CookGear", new Vector3(-2.0f, 1.38f, 0.85f), new Vector3(0f, -1f, 0f), new Vector3(0f, 0f, 1f));
+        private static readonly Spot Gear = new Spot("CookGear", new Vector3(-2.0f, 1.563f, 0.85f), new Vector3(0f, -1f, 0f), new Vector3(0f, 0f, 1f));
 
         // The avatar accessories are modelled z-up; this stands them upright with their front out of the wall.
         private static Vector3 _meshEuler = new Vector3(-90f, 0f, 0f);
@@ -745,6 +746,17 @@ namespace RVRepairVan.Base
                     Vector3 lo = main.InverseTransformPoint(wb.min), hi = main.InverseTransformPoint(wb.max);
                     Core.Log.Msg("[Debug] rvegg probe '" + r.name + "' active=" + r.gameObject.activeInHierarchy + " local min=" + Vector3.Min(lo, hi).ToString("F2") + " max=" + Vector3.Max(lo, hi).ToString("F2"));
                 }
+            }
+            else if (a == "wall" && root != null)
+            {
+                // How far each wall prop's back sits from the wall behind it; its own +z points out of the wall.
+                foreach (Spot spot in new[] { Number, Holes, Gear })
+                {
+                    Transform t = root.Find(spot.Name);
+                    if (t == null) { Core.Log.Warning("[Debug] rvegg wall: no '" + spot.Name + "' under the props."); continue; }
+                    RvSavePoint.ProbeWall("egg " + spot.Name + " (active=" + t.gameObject.activeInHierarchy + ")", t, -t.forward);
+                }
+                return;
             }
 
             else if (a == "garages")
