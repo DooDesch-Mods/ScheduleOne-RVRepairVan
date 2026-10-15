@@ -4,6 +4,11 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.5.3] - 2026-10-15
+
+### Fixed
+- The save intercom and the hazmat suit inside the RV hang flat on the wall. They stood a hand's width off it.
+
 ## [3.5.2] - 2026-10-15
 
 ### Fixed
