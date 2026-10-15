@@ -204,8 +204,10 @@ namespace RVRepairVan.Patches
             Employee emp = rv.Employees != null && rv.Employees.Count > 0 ? rv.Employees[0] : null;
             if (emp == null) { Core.Log.Warning("[Debug] rvreach: no employee in the RV to test with."); return; }
             Vector3 from = emp.transform.position;
+            var nav = emp.GetComponent<UnityEngine.AI.NavMeshAgent>();
             Core.Log.Msg("[Debug] rvreach: from " + emp.FullName + " at RV-frame " + root.InverseTransformPoint(from)
-                + " onMesh=" + OnMesh(from, out float d0) + " (" + d0.ToString("F2") + "m)");
+                + " onMesh=" + OnMesh(from, out float d0) + " (" + d0.ToString("F2") + "m) agentType="
+                + (nav != null ? nav.agentTypeID.ToString() : "none") + " agentOnMesh=" + (nav != null && nav.isOnNavMesh));
 
             for (int i = 0; rv.BuildableItems != null && i < rv.BuildableItems.Count; i++)
             {
