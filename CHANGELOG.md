@@ -4,6 +4,11 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.2.1] - 2026-10-15
+
+### Fixed
+- Seeds no longer fall through pots in the RV while it is parked away from home.
+
 ## [3.2.0] - 2026-10-15
 
 ### Added
