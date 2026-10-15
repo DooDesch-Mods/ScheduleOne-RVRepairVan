@@ -4,9 +4,8 @@ using UnityEngine;
 namespace RVRepairVan.Config
 {
     /// <summary>
-    /// MelonPreferences wrapper. The category identifier is prefixed with the mod name
-    /// ("RVRepairVan_...") so it is auto-detected by the "Mod Manager &amp; Phone App"
-    /// settings UI (Prowiler).
+    /// MelonPreferences wrapper. The settings live in UserData/MelonPreferences.cfg under
+    /// "RVRepairVan_01_Main".
     /// </summary>
     internal static class RVRepairVanPreferences
     {

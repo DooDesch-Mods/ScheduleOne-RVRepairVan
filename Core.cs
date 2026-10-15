@@ -108,9 +108,7 @@ namespace RVRepairVan
         }
 
         /// <summary>
-        /// Fired when preferences are saved (incl. via the Mod Manager &amp; Phone App UI).
-        /// Handles the one-shot debug "Destroy RV" toggle. Full live-settings integration
-        /// follows in the Mod Manager phase.
+        /// Fired when MelonPreferences.cfg is saved. Handles the one-shot debug "Destroy RV" toggle.
         /// </summary>
         public override void OnPreferencesSaved()
         {
