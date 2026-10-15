@@ -222,7 +222,8 @@ namespace RVRepairVan.Base
                     float d = Vector3.Dot(h.point - wp, ct.up);
                     if (float.IsNaN(ground) || d > ground) ground = d;
                 }
-                Core.Log.Msg("[Wheels]   " + w.name + " grounded=" + w.isGrounded + " sprung=" + w.sprungMass.ToString("0")
+                Core.Log.Msg("[Wheels]   " + w.name + " at " + ct.InverseTransformPoint(wp).ToString("F2") + " (placed " + a.Rest.ToString("F2") + ") steer="
+                    + w.steerAngle.ToString("0.0") + " enabled=" + w.enabled + " grounded=" + w.isGrounded + " sprung=" + w.sprungMass.ToString("0")
                     + " compression=" + (1f - drop / Mathf.Max(0.001f, w.suspensionDistance * Scale(w, ct))).ToString("0.00")
                     + " (drop " + drop.ToString("0.00") + " of " + (w.suspensionDistance * Scale(w, ct)).ToString("0.00") + ", scale " + Scale(w, ct).ToString("0.00") + ", target " + w.suspensionSpring.targetPosition.ToString("0.00")
                     + ", spring " + w.suspensionSpring.spring.ToString("0") + ") tyre bottom "

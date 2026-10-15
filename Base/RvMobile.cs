@@ -862,6 +862,7 @@ namespace RVRepairVan.Base
             {
                 Rigidbody rb = _chassis.Rb;
                 if (rb != null && rb.IsSleeping()) rb.WakeUp();
+                RvSteering.Apply(_chassis);
             }
 
             if (NetworkBus.Online && !NetworkBus.IsServer) return;
