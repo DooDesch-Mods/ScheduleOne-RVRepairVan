@@ -1,0 +1,93 @@
+=== SUMMARY ===
+Repair your wrecked RV in Schedule I through a tracked side quest: from the motel manager to Mrs. Ming to Marco the mechanic, with referral haggling, dead-drop errands, and a repair cinematic.
+
+=== DESCRIPTION ===
+[size=6][b]RV Repair Van - Back on the Road[/b][/size]
+
+[b]🛟 Need help or found a bug?[/b] Get support at [url=https://support.doodesch.de/rvrepairvan]support.doodesch.de/rvrepairvan[/url].
+
+[url=https://github.com/DooDesch-Mods/ScheduleOne-RVRepairVan]GitHub[/url] | [url=https://github.com/DooDesch-Mods/ScheduleOne-RVRepairVan/releases]Releases[/url] | [url=https://thunderstore.io/package/DooDesch/RVRepairVan/]Thunderstore[/url]
+
+[url=https://polyfill.doomods.com/mod/rvrepairvan][img]https://polyfill.doomods.com/badge/rvrepairvan.png[/img][/url]
+
+[img]https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg[/img]
+
+Your RV blew up in the intro. Now you can fix it.
+
+A tracked side quest takes you from Donna at the motel to Mrs. Ming to Marco at the docks. You run a dead-drop errand, haggle the price down and watch Marco put the RV back together. After that, he turns it into a workshop, and on request gets the engine running again.
+
+[quote][center][size=4][b]New in 3.1: drive your RV[/b][/size]
+
+Marco's fifth build-out gets the engine running. Anyone can take the wheel and drive the RV anywhere.
+
+Works on Schedule I 0.4.7.[/center]
+[/quote]
+[size=5][b]The questline[/b][/size]
+
+[list]
+[*]Ask Donna at the motel. She sends you to Mrs. Ming[/*]
+[*]Mrs. Ming wants a crate from a dead drop. Bring it, and she calls Marco[/*]
+[*]Tell Marco that Mrs. Ming sent you: $10,000 instead of $50,000[/*]
+[*]Ask him to go lower. Fetch his package, then hand him packaged product for up to $500 off each[/*]
+[*]Pay, watch the repair, go see your RV[/*]
+[/list]
+Lose the crate or the package and the owner wants $500 before the quest goes on.
+
+[size=5][b]Marco's build-outs[/b][/size]
+
+[img]https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/crew.jpg[/img]
+
+[list]
+[*][b]Clear out the inside[/b] ($2,500): bed, bench and cabinets go, dash and seats stay[/*]
+[*][b]Put in a work floor[/b] ($7,500): 24 build tiles on top of the RV's own 32[/*]
+[*][b]Make room for a crew[/b] ($15,000): three employees work inside. Put a locker in[/*]
+[*][b]Build a loading dock[/b] ($25,000): your supplier delivers to the RV[/*]
+[*][b]Get the engine running[/b] ($10,000): drive the RV anywhere[/*]
+[/list]
+The first three build on each other. The dock and the engine stand alone. Each one has its own short cinematic.
+
+[size=5][b]Driving[/b][/size]
+
+[list]
+[*]Headlights on H, brake and reverse lights while you drive[/*]
+[*]Your stations and the items you place inside come along[/*]
+[*]Crew and deliveries wait until the RV is back on its spot[/*]
+[*]Stop on its old spot, facing either way, and leave the wheel: it parks itself back home[/*]
+[*]The hazards blink while the RV stands on that spot[/*]
+[/list]
+[size=5][b]Requirements[/b][/size]
+
+[list]
+[*]Schedule I 0.4.7 (IL2CPP, the normal Steam version)[/*]
+[*][url=https://github.com/LavaGang/MelonLoader]MelonLoader[/url] 0.7.3 or newer[/*]
+[*][url=https://thunderstore.io/c/schedule-i/p/ifBars/S1API_Forked/]S1API[/url] 3.2.1 or newer[/*]
+[/list]
+[size=5][b]Install[/b][/size]
+
+[font=Courier New]RVRepairVan.dll[/font] into the [font=Courier New]Mods[/font] folder. S1API goes in as its own page says.
+
+[size=5][b]Settings[/b][/size]
+
+In [font=Courier New]UserData/MelonPreferences.cfg[/font], section [font=Courier New]RVRepairVan_01_Main[/font]. Price changes apply without a restart.
+
+[list]
+[*][font=Courier New]QuestMode[/font] - [font=Courier New]Questline[/font] or [font=Courier New]Simple[/font] (skip the story, pay Marco a flat price)[/*]
+[*][font=Courier New]RepairPrice[/font], [font=Courier New]BasePriceNoReferral[/font], [font=Courier New]BasePriceWithReferral[/font] - the repair prices[/*]
+[*][font=Courier New]UpgradesEnabled[/font] and one price per build-out[/*]
+[*][font=Courier New]InstantRepair[/font] - the RV is fixed for free the moment it blows up[/*]
+[*][font=Courier New]RepairTakesADay[/font] - Marco keeps the RV for a day and texts you when it is done[/*]
+[/list]
+[size=5][b]Good to know[/b][/size]
+
+[list]
+[*]The RV has a save intercom on the wall behind the door, like every other property[/*]
+[*]Progress lives in your save. Quit without saving and it goes back with the world[/*]
+[*]English and German built in. Add your own language with a JSON file, see [url=https://docs.doodesch.de/mods/l10n/]the guide[/url][/*]
+[*]In co-op, whoever pays uses their own cash[/*]
+[*]Turn off other RV repair mods, or Marco shows two repair options[/*]
+[/list]
+[line]
+
+Schedule I by TVGS. Built on [url=https://github.com/LavaGang/MelonLoader]MelonLoader[/url] and [url=https://github.com/ifBars/S1API]S1API[/url]. MIT licence.
+
+[size=2][color=#888888]Thanks to everyone who endorses, reports bugs or shares ideas. Tips toward server costs: [url=https://ko-fi.com/doodesch]ko-fi.com/doodesch[/url][/color][/size]
