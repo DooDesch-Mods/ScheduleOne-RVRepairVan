@@ -25,7 +25,7 @@ namespace RVRepairVan.Base
         private const string Name = "RVRepairVan_SavePoint";
 
         // Door-side wall, beside the light switch next to the door, under the window: free of furniture, gutted or not.
-        private static Vector3 _local = new Vector3(0.98f, 1.38f, 0.12f);
+        private static Vector3 _local = new Vector3(0.98f, 1.563f, 0.12f);
         // Into the room from that wall.
         private static Vector3 _facing = new Vector3(0f, -1f, 0f);
 
@@ -190,6 +190,32 @@ namespace RVRepairVan.Base
                 Place(t);
             }
             if (t == null) { Core.Log.Warning("[Debug] rvsave: no intercom in the RV (model " + (model != null) + ")."); return; }
+            if (args.Length >= 1 && args[0].ToLower() == "probe")
+            {
+                // How far the back of each intercom sits from the wall behind it: vanilla's against its property wall,
+                // ours against the RV's.
+                SavePoint template = FindTemplate();
+                if (template != null) ProbeWall("vanilla", template.transform, template.transform.right);
+                ProbeWall("rv", t, t.parent.TransformDirection(-_facing));
+                return;
+            }
+            if (args.Length >= 1 && args[0].ToLower() == "look")
+            {
+                var pc = Il2CppScheduleOne.DevUtilities.PlayerSingleton<Il2CppScheduleOne.PlayerScripts.PlayerCamera>.Instance;
+                if (pc == null) { Core.Log.Warning("[Debug] rvsave look: no PlayerCamera."); return; }
+                if (args.Length >= 2 && args[1].ToLower() == "off") { pc.StopTransformOverride(0f, true, true); Core.Log.Msg("[Debug] rvsave look: camera back on the player."); return; }
+                // From inside the room and off to one side, so a gap between intercom and wall shows as a shadow.
+                // 'look <into> <along>' sets the offsets in metres; a small 'into' looks along the wall.
+                var inv = System.Globalization.CultureInfo.InvariantCulture;
+                float off = args.Length >= 2 ? float.Parse(args[1], inv) : 0.55f;
+                float side = args.Length >= 3 ? float.Parse(args[2], inv) : 0.45f;
+                Vector3 into = t.parent.TransformDirection(_facing).normalized;
+                Vector3 along = t.parent.TransformDirection(Vector3.right).normalized;
+                Vector3 eye = t.position + into * off + along * side + Vector3.up * 0.1f;
+                pc.OverrideTransform(eye, Quaternion.LookRotation(t.position - eye), 0f, false);
+                Core.Log.Msg("[Debug] rvsave look: eye=" + eye + " at " + t.position);
+                return;
+            }
             var sp = t.GetComponent<SavePoint>();
             if (args.Length >= 1 && args[0].ToLower() == "use")
             {
@@ -205,6 +231,45 @@ namespace RVRepairVan.Base
                 + " sinceSave=" + Il2CppScheduleOne.DevUtilities.Singleton<SaveManager>.Instance.SecondsSinceLastSave.ToString("0.0") + " redrawn=" + _parts.Count + " drawing=" + (_draw != null));
             foreach (Part p in _parts)
                 Core.Log.Msg("[Debug]   " + p.Clone.name + " mesh='" + p.Mesh.name + "' sub " + p.FirstSubMesh + "+" + p.Materials.Length);
+        }
+
+        // Distances along 'back' (out of the face, into the wall), measured from the pivot: how far the intercom's
+        // colliders and visible parts reach, and where the first surface behind it is.
+        internal static void ProbeWall(string label, Transform t, Vector3 back)
+        {
+            back = back.normalized;
+            float colMax = float.NegativeInfinity, colMin = float.PositiveInfinity;
+            foreach (Collider c in t.GetComponentsInChildren<Collider>(true))
+                Reach(c.bounds, t.position, back, ref colMin, ref colMax);
+            float renMax = float.NegativeInfinity, renMin = float.PositiveInfinity;
+            foreach (Renderer r in t.GetComponentsInChildren<Renderer>(true))
+                if (!r.isPartOfStaticBatch) Reach(r.bounds, t.position, back, ref renMin, ref renMax);
+            Core.Log.Msg("[Debug] rvsave probe " + label + ": pivot=" + t.position + " back=" + back
+                + " colliders " + colMin.ToString("0.000") + ".." + colMax.ToString("0.000")
+                + " renderers " + renMin.ToString("0.000") + ".." + renMax.ToString("0.000"));
+            const float behind = 0.3f;
+            var hits = new List<RaycastHit>(Physics.RaycastAll(t.position - back * behind, back, 1.5f, ~0, QueryTriggerInteraction.Ignore));
+            hits.Sort((a, b) => a.distance.CompareTo(b.distance));
+            int shown = 0;
+            foreach (RaycastHit h in hits)
+            {
+                if (h.collider.transform.IsChildOf(t)) continue;
+                Core.Log.Msg("[Debug]   surface at " + (h.distance - behind).ToString("0.000") + ": " + Path(h.collider.transform)
+                    + " normal=" + h.normal);
+                if (++shown == 3) break;
+            }
+            if (shown == 0) Core.Log.Warning("[Debug]   no surface within 1.2 m behind " + label + ".");
+        }
+
+        private static void Reach(Bounds b, Vector3 pivot, Vector3 dir, ref float min, ref float max)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = new Vector3((i & 1) == 0 ? b.min.x : b.max.x, (i & 2) == 0 ? b.min.y : b.max.y, (i & 4) == 0 ? b.min.z : b.max.z);
+                float d = Vector3.Dot(corner - pivot, dir);
+                if (d < min) min = d;
+                if (d > max) max = d;
+            }
         }
 #endif
     }
