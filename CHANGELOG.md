@@ -4,6 +4,12 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.5.4] - 2026-10-15
+
+### Fixed
+- Co-op: the second player sees the RV drive and gets "Drive" on its seat. On saves past the intro they saw the stock
+  vehicle instead.
+
 ## [3.5.3] - 2026-10-15
 
 ### Fixed
