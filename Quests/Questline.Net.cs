@@ -295,6 +295,7 @@ namespace RVRepairVan.Quests
         private static void ApplyRepair()
         {
             if (NetworkBus.IsServer) return;   // the host already did the real repair
+            RVManager.MarkRepairedByHost();    // first: the visual swap builds the wheel, which asks whether the RV is wrecked
             RVManager.RepairVisualOnly();
             RepairStateStore.SetRepaired(true);
             RepairQuest.CompleteIfActive();

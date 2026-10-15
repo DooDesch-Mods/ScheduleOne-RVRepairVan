@@ -20,6 +20,11 @@ namespace RVRepairVan.Managers
         private static Transform _destroyed;    // child "Destroyed RV"
         private static Transform _cartelNote;   // Destroyed RV/CartelNote
 
+        // Co-op client: the host said the RV is repaired. The game never tells a client about a repair: the intro quest
+        // marks the RV destroyed on every player, and RV.OnSpawnServer only ever pushes the destroyed state, so the
+        // client's own RV.IsDestroyed stays true for the whole session.
+        private static bool _repairedByHost;
+
         internal static bool IsReady => _root != null && _rv != null;
 
         /// <summary>The RV root transform (@Properties/RV), or null. Locates on demand.</summary>
@@ -58,6 +63,24 @@ namespace RVRepairVan.Managers
             _model = null;
             _destroyed = null;
             _cartelNote = null;
+            _repairedByHost = false;
+        }
+
+        /// <summary>Co-op client: the host repaired the RV, so it counts as intact here whatever the game's flag says.</summary>
+        internal static void MarkRepairedByHost()
+        {
+            if (_repairedByHost) return;
+            _repairedByHost = true;
+            Core.Log.Msg("[RVManager] the host repaired the RV - it counts as intact on this client.");
+
+            // The game's own checks on this client (respawning inside the RV) read the flag directly.
+            if (!TryLocate())
+            {
+                Core.Log.Warning("[RVManager] RV not found - its destroyed flag stays as the game set it on this client.");
+                return;
+            }
+            try { _rv.IsDestroyed = false; }
+            catch (Exception e) { Core.Log.Warning("[RVManager] clear IsDestroyed on the client failed: " + e.Message); }
         }
 
         /// <summary>Diagnostic: dump EVERY RV component (path + destroyed flags + children) so we can
@@ -164,6 +187,11 @@ namespace RVRepairVan.Managers
             try
             {
                 if (!TryLocate())
+                {
+                    return false;
+                }
+
+                if (_repairedByHost)
                 {
                     return false;
                 }
