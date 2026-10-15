@@ -11,7 +11,7 @@
 ![MelonLoader](https://img.shields.io/badge/MelonLoader-0.7.3+-green)
 ![S1API](https://img.shields.io/badge/S1API-required-orange)
 
-[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_Cr_5tdB4h9RF9zQp5gWGIBzG/badge.svg)](https://mlvscan.com/attestations/att_Cr_5tdB4h9RF9zQp5gWGIBzG)
+[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_vW8Ll9CHuvSf0lSpJ0MZm6g-/badge.svg)](https://mlvscan.com/attestations/att_vW8Ll9CHuvSf0lSpJ0MZm6g-)
 
 ![The RV driving through town at dusk](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
 
