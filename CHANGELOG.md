@@ -4,6 +4,11 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.2.0] - 2026-10-15
+
+### Added
+- The RV has a save intercom on the wall behind the door, like every other property.
+
 ## [3.1.1] - 2026-10-15
 
 ### Fixed
