@@ -243,7 +243,7 @@ namespace RVRepairVan.Patches
                         break;
                     case "rvcrew":   RvDevTools.Crew(); break;
                     case "rvassign": RvDevTools.Assign(); break;
-                    case "rvgrid":   RvDevTools.GridExtent(); break;
+                    case "rvgrid":   if (parts.Length > 1 && parts[1] == "scan") RvDevTools.ScanCabin(); else RvDevTools.GridExtent(); break;
                     case "rvghost":  RvDevTools.Ghost(parts); break;   // 'rvghost aim <x> <z>' looks at a floor point, 'rvghost' explains the build ghost
                     case "rvstock":  RvDevTools.Stock(); break;
                     case "rvdoor":   RvDevTools.DoorInfo(parts.Length > 1 ? parts[1] : ""); break;

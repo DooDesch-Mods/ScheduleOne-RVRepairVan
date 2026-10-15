@@ -196,6 +196,50 @@ namespace RVRepairVan.Patches
             }
         }
 
+        /// <summary>rvgrid scan: where the cabin's walls and floor stand in the RV root frame, by raycasts from the grid.</summary>
+        internal static void ScanCabin()
+        {
+            Property rv = RvProperty();
+            Transform root = RVManager.Root;
+            if (rv == null || root == null || rv.Grids == null || rv.Grids.Count == 0 || rv.Grids[0] == null || rv.Grids[0].Tiles.Count == 0)
+            { Core.Log.Warning("[Debug] rvgrid scan: RV property, root or grid not found."); return; }
+            float floorY = root.InverseTransformPoint(rv.Grids[0].Tiles[0].transform.position).y;
+            foreach (float h in new[] { 0.3f, 1.2f })
+            {
+                float y = floorY + h;
+                var sb = new System.Text.StringBuilder("[Debug] rvgrid scan h=" + h + " x walls per z:");
+                for (float z = -7f; z <= 7.01f; z += 0.5f)
+                    sb.Append(" z" + z.ToString("0.0") + "[" + Hit(root, new Vector3(0f, y, z), Vector3.left, 4f) + "|" + Hit(root, new Vector3(0f, y, z), Vector3.right, 4f) + "]");
+                Core.Log.Msg(sb.ToString());
+                sb = new System.Text.StringBuilder("[Debug] rvgrid scan h=" + h + " z walls per x:");
+                for (float x = -1.5f; x <= 1.51f; x += 0.5f)
+                    sb.Append(" x" + x.ToString("0.0") + "[" + Hit(root, new Vector3(x, y, 0f), Vector3.back, 9f) + "|" + Hit(root, new Vector3(x, y, 0f), Vector3.forward, 9f) + "]");
+                Core.Log.Msg(sb.ToString());
+            }
+            var fl = new System.Text.StringBuilder("[Debug] rvgrid scan floor y per z (x=0):");
+            for (float z = -7f; z <= 7.01f; z += 0.5f)
+                fl.Append(" z" + z.ToString("0.0") + "=" + Hit(root, new Vector3(0f, floorY + 1.5f, z), Vector3.down, 3f));
+            Core.Log.Msg(fl.ToString());
+        }
+
+        // First solid hit along a root-frame ray, as the root-frame coordinate on the ray's axis plus the collider name.
+        private static string Hit(Transform root, Vector3 localFrom, Vector3 localDir, float max)
+        {
+            Vector3 from = root.TransformPoint(localFrom), dir = root.TransformDirection(localDir);
+            var hits = Physics.RaycastAll(from, dir, max, ~0, QueryTriggerInteraction.Ignore);
+            RaycastHit best = default; bool any = false;
+            foreach (RaycastHit hit in hits)
+            {
+                Collider c = hit.collider;
+                if (c == null || c.GetComponentInParent<Tile>() != null || c.GetComponentInParent<Player>() != null) continue;
+                if (!any || hit.distance < best.distance) { best = hit; any = true; }
+            }
+            if (!any) return "-";
+            Vector3 p = root.InverseTransformPoint(best.point);
+            float v = localDir.x != 0f ? p.x : localDir.z != 0f ? p.z : p.y;
+            return v.ToString("0.00") + " " + best.collider.name;
+        }
+
         internal static void Reach()
         {
             Property rv = RvProperty();
@@ -584,7 +628,8 @@ namespace RVRepairVan.Patches
             // Stand on the cabin's centre line, toward the target from there, so the look never crosses a wall.
             Vector3 target = new Vector3(x, floorY, z);
             Vector3 toCentre = new Vector3(-x, 0f, 0f);
-            Vector3 dir = toCentre.sqrMagnitude > 0.01f ? toCentre.normalized : Vector3.forward;
+            // On the centre line itself, stand toward the cab: the rear wall is close behind the back rows.
+            Vector3 dir = toCentre.sqrMagnitude > 0.01f ? toCentre.normalized : Vector3.back;
             Vector3 stand = target + dir * distance + Vector3.up * 1f;
             pm.Teleport(root.TransformPoint(stand), true);
             MelonLoader.MelonCoroutines.Start(LookAtFloorLater(pc, root.TransformPoint(target)));
