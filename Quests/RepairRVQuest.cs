@@ -25,13 +25,19 @@ namespace RVRepairVan.Quests
         protected override bool AutoBegin => true;
 
         // A wrench icon (a PNG embedded in this DLL) instead of S1API's default phone-contacts icon.
+        // Unity destroys runtime sprites when a save is left for the menu, and a destroyed sprite shows as a white
+        // square in the HUD. Unity's '== null' is true for a destroyed object, so the next load builds a fresh one.
         private static Sprite _icon;
-        private static bool _iconTried;
+        private static bool _iconAbsent;
         protected override Sprite QuestIcon
         {
             get
             {
-                if (!_iconTried) { _iconTried = true; _icon = LoadIcon(); }
+                if (_icon != null) return _icon;
+                if (_iconAbsent) return null;
+                if (!ReferenceEquals(_icon, null)) Core.Log.Msg("[Quest] icon was destroyed with the last save, loading it again.");
+                _icon = LoadIcon();
+                if (_icon == null) _iconAbsent = true;
                 return _icon;
             }
         }
@@ -52,8 +58,17 @@ namespace RVRepairVan.Quests
                         read += n;
                     }
                     Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear };
-                    ImageConversion.LoadImage(tex, (Il2CppStructArray<byte>)bytes, false);
-                    return Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+                    tex.hideFlags = HideFlags.DontUnloadUnusedAsset;
+                    if (!ImageConversion.LoadImage(tex, (Il2CppStructArray<byte>)bytes, false))
+                    {
+                        Core.Log.Error("[Quest] icon PNG could not be decoded (" + read + " bytes), the quest uses the default icon.");
+                        UnityEngine.Object.Destroy(tex);
+                        return null;
+                    }
+                    Sprite sprite = Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+                    sprite.hideFlags = HideFlags.DontUnloadUnusedAsset;
+                    Core.Log.Msg("[Quest] icon loaded: " + tex.width + "x" + tex.height + ".");
+                    return sprite;
                 }
             }
             catch (Exception e) { Core.Log.Warning("[Quest] icon load failed: " + e.Message); return null; }
