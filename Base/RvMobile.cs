@@ -26,7 +26,7 @@ namespace RVRepairVan.Base
     internal static class RvMobile
     {
         private const string ChassisCode = "veeper";
-        // Leaving the wheel this close to the spot, roughly aligned, puts the RV back home.
+        // Leaving the wheel this close to the spot, lined up either way round, puts the RV back home.
         private const float HomeRadius = 8f, HomeMaxAngle = 35f, HomeMaxSpeedKmh = 3f;
         // The host waits this long after a spawn or after the last occupant before it snaps home, so a client that
         // asked for the chassis has time to get in, and the driver who just left has been placed inside.
@@ -609,8 +609,10 @@ namespace RVRepairVan.Base
         {
             if (!_homeKnown || _chassis == null) return false;
             float d = Vector3.Distance(_chassis.transform.position, _homePos);
+            // Either way round: a driver who left forwards comes back nose-first, and the RV snaps to its own pose anyway.
             float a = Vector3.Angle(_chassis.transform.forward, _homeRot * Vector3.forward);
-            return d <= HomeRadius && a <= HomeMaxAngle && Mathf.Abs(_chassis.Speed_Kmh) < HomeMaxSpeedKmh;
+            bool aligned = a <= HomeMaxAngle || a >= 180f - HomeMaxAngle;
+            return d <= HomeRadius && aligned && Mathf.Abs(_chassis.Speed_Kmh) < HomeMaxSpeedKmh;
         }
 
         // --- parked / driving -----------------------------------------------------------------------------
@@ -1056,6 +1058,7 @@ namespace RVRepairVan.Base
         internal static string DebugState() =>
             "away=" + Away + " id=" + _chassisId + " driving=" + _driving + " homeKnown=" + _homeKnown
             + (_chassis != null ? " pos=" + _chassis.transform.position + " fromHome=" + Vector3.Distance(_chassis.transform.position, _homePos).ToString("0.0")
+                + " angleToHome=" + Vector3.Angle(_chassis.transform.forward, _homeRot * Vector3.forward).ToString("0")
                 + " occupants=" + _chassis.CurrentPlayerOccupancy + " speed=" + _chassis.Speed_Kmh.ToString("0.0")
                 + " constraints=" + (_chassis.Rb != null ? _chassis.Rb.constraints.ToString() : "no rb") : "")
             + (_wheel != null ? " wheel=" + _wheel.transform.position : " no wheel");
