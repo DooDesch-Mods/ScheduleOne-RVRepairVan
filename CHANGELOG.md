@@ -4,6 +4,11 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.2.2] - 2026-10-15
+
+### Fixed
+- Parking the RV back on its spot works facing either way, so building and the crew come back after a drive.
+
 ## [3.2.1] - 2026-10-15
 
 ### Fixed
