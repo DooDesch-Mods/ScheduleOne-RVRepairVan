@@ -4,6 +4,16 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.5.0] - 2026-10-15
+
+### Added
+- Nods to a certain chemistry teacher's RV: new lines from Marco and Mrs. Ming, and props in and on the RV to find.
+- The RV battery can go flat after 3 in-game days unused. Hold a battery at the wheel to swap it; `BatteryBreakdowns`
+  turns this off.
+
+### Changed
+- The RV's save intercom sits next to the light switch by the door.
+
 ## [3.4.0] - 2026-10-15
 
 ### Added
