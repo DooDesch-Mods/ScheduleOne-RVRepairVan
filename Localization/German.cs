@@ -113,6 +113,7 @@ namespace RVRepairVan.Localization
                 ["She runs. Don't wreck her."] = "Sie läuft. Fahr sie nicht zu Schrott.",
                 ["Drive"] = "Fahren",
                 ["Seats taken"] = "Alle Plätze belegt",
+                ["Missing engine"] = "Motor fehlt",
                 ["The RV is away."] = "Das Wohnmobil ist unterwegs.",
                 ["Drive it back to its spot."] = "Fahr es zurück an seinen Platz.",
 

@@ -253,6 +253,7 @@ namespace RVRepairVan.Managers
 
             Base.RvLiner.Ensure();
             Base.RvSavePoint.Ensure();
+            Base.RvMobile.EnsureWheel();
             Core.Log.Msg("[RVManager] RV repaired (visual).");
             return true;
         }

@@ -104,6 +104,7 @@ namespace RVRepairVan
             _sceneGeneration++;
             MelonCoroutines.Start(RestoreRepairCoroutine(_sceneGeneration));
             MelonCoroutines.Start(RVRepairVan.Base.RvRepairJob.InstantRepairCoroutine());
+            MelonCoroutines.Start(RVRepairVan.Compat.ScheduleMaintenance.Watch(_sceneGeneration));
         }
 
         /// <summary>
@@ -169,6 +170,7 @@ namespace RVRepairVan
 
         // Counts loads of the Main scene; a watcher from an earlier load sees the number change and stops.
         private static int _sceneGeneration;
+        internal static int SceneGeneration => _sceneGeneration;
 
         private const float GameLoadTimeout = 300f, RestoreWatchInterval = 3f;
 
