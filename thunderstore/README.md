@@ -10,6 +10,7 @@
 ![Game](https://img.shields.io/badge/game-Schedule%20I-purple)
 ![MelonLoader](https://img.shields.io/badge/MelonLoader-0.7.3+-green)
 ![S1API](https://img.shields.io/badge/S1API-required-orange)
+[![Polyfill](https://polyfill.doomods.com/badge/rvrepairvan.svg)](https://polyfill.doomods.com/mod/rvrepairvan)
 
 [![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_qBAla6UTZOLUH-86HyfXNx1G/badge.svg)](https://mlvscan.com/attestations/att_qBAla6UTZOLUH-86HyfXNx1G)
 
