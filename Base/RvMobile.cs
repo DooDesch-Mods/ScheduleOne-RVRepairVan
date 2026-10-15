@@ -3,6 +3,7 @@ using DooDesch.Localization;
 using MelonLoader;
 using Il2CppScheduleOne.Interaction;
 using Il2CppScheduleOne.Vehicles;
+using RVRepairVan.Config;
 using RVRepairVan.Managers;
 using RVRepairVan.Net;
 using RVRepairVan.Persistence;
@@ -109,10 +110,36 @@ namespace RVRepairVan.Base
         // Model-local fallback when the cab has no object named like a steering wheel.
         private static readonly Vector3 WheelFallbackLocal = new Vector3(-4.74f, 1.92f, -0.84f);
 
+        /// <summary>
+        /// A repaired RV gets its wheel before the engine is bought, so looking at it says the engine is missing and
+        /// points the player to Marco. Without build-outs there is no engine to buy, so there is no wheel either.
+        /// </summary>
+        internal static void EnsureWheel()
+        {
+            if (_wheel != null) return;
+            if (!RVRepairVanPreferences.UpgradesEnabled) return;
+            if (RVManager.IsDestroyed()) return;
+            Transform model = RVManager.Model;
+            if (model == null) { Core.LogDebug("[Mobile] wheel: RV model not found yet - retrying on the next apply."); return; }
+            _wheel = MakeWheel(model);
+        }
+
+        private const string WheelName = "RVRepairVan_SteeringWheel";
+
         private static InteractableObject MakeWheel(Transform model)
         {
             try
             {
+                // A scene reset forgets the reference, not the object: a wheel already on this model is reused.
+                Transform existing = model.Find(WheelName);
+                if (existing != null)
+                {
+                    var old = existing.GetComponent<InteractableObject>();
+                    if (old != null) { Core.Log.Msg("[Mobile] drive point already on the model - reusing it."); return old; }
+                    Core.Log.Warning("[Mobile] drive point object without its interactable - building a new one.");
+                    UnityEngine.Object.Destroy(existing.gameObject);
+                }
+
                 Vector3 local = WheelFallbackLocal;
                 Transform found = null;
                 foreach (Transform t in model.GetComponentsInChildren<Transform>(true))
@@ -123,7 +150,7 @@ namespace RVRepairVan.Base
                 if (found != null) local = model.InverseTransformPoint(found.position);
                 Core.Log.Msg("[Mobile] drive point at model-local " + local + (found != null ? " (" + found.name + ")" : " (fallback)") + ".");
 
-                var go = new GameObject("RVRepairVan_SteeringWheel");
+                var go = new GameObject(WheelName);
                 go.transform.SetParent(model, false);
                 go.transform.localPosition = local;
                 go.layer = InteractionLayer();
@@ -153,16 +180,17 @@ namespace RVRepairVan.Base
         private static void OnWheelHovered()
         {
             if (_wheel == null) return;
+            bool engine = RvUpgrades.Owned(RvUpgrade.Engine);
             bool full = _chassis != null && _chassis.GetFirstFreeSeat() == null;
-            _wheel.SetMessage(full ? L10n.T("Seats taken") : L10n.T("Drive"));
-            _wheel.SetInteractableState(full ? InteractableObject.EInteractableState.Invalid : InteractableObject.EInteractableState.Default);
+            _wheel.SetMessage(!engine ? L10n.T("Missing engine") : full ? L10n.T("Seats taken") : L10n.T("Drive"));
+            _wheel.SetInteractableState(!engine || full ? InteractableObject.EInteractableState.Invalid : InteractableObject.EInteractableState.Default);
         }
 
         private static void OnWheel()
         {
             try
             {
-                if (!RvUpgrades.Owned(RvUpgrade.Engine)) { Core.Log.Warning("[Mobile] wheel used without the engine upgrade."); return; }
+                if (!RvUpgrades.Owned(RvUpgrade.Engine)) { Core.Log.Msg("[Mobile] wheel used without the engine upgrade - it shows Missing engine."); return; }
                 if (_chassis != null) { EnterChassis(); return; }
                 _pendingEnter = true;
                 _pendingSince = Time.time;
@@ -1050,6 +1078,38 @@ namespace RVRepairVan.Base
 
         /// <summary>rvdrive: the same as using the wheel.</summary>
         internal static void DebugDrive() => OnWheel();
+
+        /// <summary>rvdrive wheel: stand the player in the cab and look at the wheel, so the real hover prompt shows.</summary>
+        internal static void DebugWheelView()
+        {
+            var pc = PlayerSingleton<PlayerCamera>.Instance;
+            var pm = PlayerSingleton<PlayerMovement>.Instance;
+            if (pc == null || pm == null) { Core.Log.Warning("[Mobile] wheel view: no local player."); return; }
+            Transform model = _model != null ? _model : RVManager.Model;
+            if (_wheel == null || model == null) { Core.Log.Warning("[Mobile] wheel view: no wheel on the RV."); return; }
+            pm.Teleport(model.TransformPoint(CabStandLocal), true);
+            MelonCoroutines.Start(LookAtWheelLater(pc));
+        }
+
+        // The look direction is taken from the player's position, which the teleport only moves on a later frame.
+        private static IEnumerator LookAtWheelLater(PlayerCamera pc)
+        {
+            yield return new WaitForSeconds(0.5f);
+            if (_wheel == null || pc == null) { Core.Log.Warning("[Mobile] wheel view: wheel or camera gone before the look."); yield break; }
+            Vector3 at = _wheel.transform.position;
+            pc.LookAt(at, 0.1f);
+            OnWheelHovered();
+            Core.Log.Msg("[Mobile] wheel view: player in the cab, looking at " + at + " engine=" + RvUpgrades.Owned(RvUpgrade.Engine)
+                + " message='" + _wheel.message + "' state=" + _wheel.interactionState);
+        }
+
+        /// <summary>rvdrive hovered: what the game's interaction manager is hovering right now.</summary>
+        internal static void DebugHovered()
+        {
+            var im = Singleton<InteractionManager>.Instance;
+            InteractableObject h = im != null ? im.HoveredInteractableObject : null;
+            Core.Log.Msg("[Mobile] hovered: " + (h == null ? "nothing" : "'" + h.gameObject.name + "' message='" + h.message + "' state=" + h.interactionState));
+        }
 
         /// <summary>rvdrive home: put the RV back on its spot now, wherever it is. Host only.</summary>
         internal static void DebugHome()
