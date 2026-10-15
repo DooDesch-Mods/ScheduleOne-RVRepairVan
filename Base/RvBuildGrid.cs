@@ -150,6 +150,8 @@ namespace RVRepairVan.Base
                 catch (Exception e) { Core.Swallowed("RvBuildGrid.ExpandGrid", e); }
 
                 Bounds? cabin = CabinFloorBounds();
+                Transform root = RVManager.Root;
+                Bounds? rear = root != null ? RearFloorLocal(root) : null;
                 int added = 0, skippedOutside = 0;
                 for (int cx = template.x - reach; cx <= template.x + reach && added < extra; cx++)
                     for (int cz = template.y - reach; cz <= template.y + reach && added < extra; cz++)
@@ -164,6 +166,11 @@ namespace RVRepairVan.Base
                         bool inside = cabin.HasValue
                             ? cabin.Value.Contains(new Vector3(world.x, cabin.Value.center.y, world.z))
                             : SafeInBounds(prop, world);
+                        if (!inside && rear.HasValue)
+                        {
+                            Vector3 local = root.InverseTransformPoint(world);
+                            inside = rear.Value.Contains(new Vector3(local.x, rear.Value.center.y, local.z));
+                        }
                         if (!inside) { skippedOutside++; continue; }
 
                         if (CloneTile(grid, template, cx, cz, size, offset)) added++;
@@ -389,6 +396,50 @@ namespace RVRepairVan.Base
                 return b;
             }
             catch (Exception e) { Core.Swallowed("RvBuildGrid.CabinFloorBounds", e); return null; }
+        }
+
+        // Inner face of the RV's rear wall (Collider_Rear) in the root frame. The side walls stand at x +-1.57.
+        private const float RearWallZ = 5.65f;
+
+        /// <summary>
+        /// The back of the cabin, where the bed stood before the gut. The vanilla tiles end at z 3.09, so the
+        /// rectangle above leaves 2.5 m of empty floor up to the rear wall. This one takes the same width and runs
+        /// from the vanilla tiles to the rear wall, in the root frame, with a tile's half width kept clear of the wall.
+        /// Only ever adds to the area above: a saved machine on a tile that is no longer laid would be destroyed.
+        /// Must be read BEFORE anything is cloned, like <see cref="CabinFloorBounds"/>.
+        /// </summary>
+        private static Bounds? RearFloorLocal(Transform root)
+        {
+            try
+            {
+                Property prop = PropertyOf();
+                var grids = prop != null ? prop.Grids : null;
+                if (grids == null) return null;
+                bool any = false;
+                Vector3 min = Vector3.zero, max = Vector3.zero;
+                for (int i = 0; i < grids.Count; i++)
+                {
+                    Grid g = grids[i];
+                    if (g == null || g.Tiles == null) continue;
+                    for (int k = 0; k < g.Tiles.Count; k++)
+                    {
+                        Tile t = g.Tiles[k];
+                        if (t == null) continue;
+                        Vector3 p = root.InverseTransformPoint(t.transform.position);
+                        if (!any) { min = max = p; any = true; } else { min = Vector3.Min(min, p); max = Vector3.Max(max, p); }
+                    }
+                }
+                if (!any) { Core.Log.Warning("[Grid] no vanilla tiles to measure the rear floor from - the back stays bare."); return null; }
+                float half = Grid.TileSize * 0.5f;
+                float back = RearWallZ - half;
+                if (back <= max.z) return null;
+                var b = new Bounds();
+                b.SetMinMax(new Vector3(min.x - half, min.y - 10f, max.z), new Vector3(max.x + half, max.y + 10f, back));
+                Core.LogDebug("[Grid] rear floor: x " + b.min.x.ToString("F2") + ".." + b.max.x.ToString("F2")
+                    + " z " + b.min.z.ToString("F2") + ".." + b.max.z.ToString("F2") + " (root frame).");
+                return b;
+            }
+            catch (Exception e) { Core.Log.Error("[Grid] measuring the rear floor failed - the back stays bare: " + e); return null; }
         }
 
         private static bool SafeInBounds(Property prop, Vector3 world)
