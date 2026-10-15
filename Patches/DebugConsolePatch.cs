@@ -165,7 +165,7 @@ namespace RVRepairVan.Patches
                     case "rvreinject":   // 'rvreinject degraded' exercises the no-container fallback (adds duplicates)
                         RVRepairVan.Quests.Questline.DebugReinject(parts.Length > 1 && parts[1].ToLower() == "degraded");
                         break;
-                    case "rvdrive":   // 'rvdrive' = use the wheel, 'home' snaps back, 'info' dumps, 'look', 'exit', 'gas'
+                    case "rvdrive":   // 'rvdrive' = use the wheel, 'home' snaps back, 'info' dumps, 'look', 'exit', 'gas', 'wheel', 'hovered'
                         if (parts.Length > 1 && parts[1].ToLower() == "home") Base.RvMobile.DebugHome();
                         else if (parts.Length > 1 && parts[1].ToLower() == "info") Base.RvDrive.Info();
                         else if (parts.Length > 1 && parts[1].ToLower() == "lights") Base.RvDrive.Lights();
@@ -178,6 +178,8 @@ namespace RVRepairVan.Patches
                         else if (parts.Length > 3 && parts[1].ToLower() == "lamps" && parts[2].ToLower() == "inside") Base.RvLights.SwitchInside(parts[3].ToLower() == "on");
                         else if (parts.Length > 2 && parts[1].ToLower() == "lamps") Base.RvLights.Force(parts[2].ToLower());
                         else if (parts.Length > 1 && parts[1].ToLower() == "exit") Base.RvDrive.Exit();
+                        else if (parts.Length > 1 && parts[1].ToLower() == "wheel") Base.RvMobile.DebugWheelView();
+                        else if (parts.Length > 1 && parts[1].ToLower() == "hovered") Base.RvMobile.DebugHovered();
                         else if (parts.Length > 1 && parts[1].ToLower() == "npc") Base.RvDrive.Npc(parts.Length > 2 ? parts[2].ToLower() : "");
                         else if (parts.Length > 2 && parts[1].ToLower() == "steps") Base.RvSteps.SetIn(parts[2].ToLower() == "in");
                         else if (parts.Length > 2 && parts[1].ToLower() == "gas") Base.RvDrive.Gas(parts[2].ToLower(), parts.Length > 3 ? parts[3] : "0");
