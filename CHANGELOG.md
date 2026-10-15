@@ -4,6 +4,11 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.1.1] - 2026-10-15
+
+### Fixed
+- The RV knocks people over when you drive into them, like any other car.
+
 ## [3.1.0] - 2026-10-15
 
 ### Added
