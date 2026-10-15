@@ -44,6 +44,22 @@ namespace RVRepairVan.Base
         private static float _armDrop = 84f;
         private static float _armShare = 0.08f;
 
+        // The empty suit: squeezed front to back (1 = as worn), its height in metres, how far its collar hangs
+        // below the peg on a wire hook, how much higher than the old spot it hangs so the hem swings clear of the
+        // floor, and its lean in degrees, top out on the hook, hem back against the wall.
+        private static float _suitFlat = 0.3f;
+        private static float _suitSize = 1.35f;
+        private static float _suitDrop = 0.06f;
+        private static float _suitLift = 0.15f;
+        private static float _suitTilt = 3f;
+
+        // Nobody stands inside it: the legs swing in at the hip until this share of the gap between the feet is
+        // closed, one sleeve hangs this many degrees steeper than the other, and the suit rolls this many degrees
+        // sideways on its hook.
+        private static float _legPull = 0.7f;
+        private static float _armSkew = 5f;
+        private static float _suitRoll = 2f;
+
         // World space: the garage roof beside the Wilkinson house. y is found by a ray from above, so only x/z and the turn matter.
         private static Vector3 _pizzaAt = new Vector3(65.5f, 0f, -126.8f);
         private static float _pizzaYaw = 35f;
@@ -192,13 +208,15 @@ namespace RVRepairVan.Base
         {
             Transform g = Group(root, Gear);
             Material steel = Paint(template, "steel", new Color(0.55f, 0.56f, 0.58f));
-            Box(g, "HookPlateA", new Vector3(0f, 0f, 0.004f), new Vector3(0.12f, 0.05f, 0.008f), steel);
-            Box(g, "PegA", new Vector3(0f, 0f, 0.03f), new Vector3(0.012f, 0.012f, 0.05f), steel);
+            Box(g, "HookPlateA", new Vector3(0f, _suitLift, 0.004f), new Vector3(0.12f, 0.05f, 0.008f), steel);
+            Box(g, "PegA", new Vector3(0f, _suitLift, 0.03f), new Vector3(0.012f, 0.012f, 0.05f), steel);
             Box(g, "HookPlateB", new Vector3(0.7f, -0.25f, 0.004f), new Vector3(0.12f, 0.05f, 0.008f), steel);
             Box(g, "PegB", new Vector3(0.7f, -0.25f, 0.03f), new Vector3(0.012f, 0.012f, 0.05f), steel);
 
             int hung = 0;
-            if (Hang(g, "HazmatSuit", "avatar/accessories/waist/hazmatsuit/HazmatSuit", new Vector3(0f, -0.01f, 0.08f), 1.45f, true)) hung++;
+            if (Hang(g, "HazmatSuit", "avatar/accessories/waist/hazmatsuit/HazmatSuit", new Vector3(0f, _suitLift - _suitDrop, 0.08f), _suitSize, true)) hung++;
+            else Core.Log.Warning("[Eggs] no suit, so no wire hook either.");
+            Box(g, "WireHook", new Vector3(0f, _suitLift - 0.5f * _suitDrop, 0.05f), new Vector3(0.006f, _suitDrop + 0.01f, 0.006f), steel);
             if (Hang(g, "Respirator", "avatar/accessories/head/respirator/Respirator", new Vector3(0.7f, -0.26f, 0.07f), 0.24f, false)) hung++;
             Core.Log.Msg("[Eggs] cook gear: " + hung + " of 2 accessories hung.");
             return hung > 0;
@@ -248,6 +266,16 @@ namespace RVRepairVan.Base
                 top = Mathf.Max(top, (turn * corner).y);
             }
             go.transform.localPosition = -new Vector3(mid.x, top, mid.z);
+            if (lowerArms)
+            {
+                Flatten(holder.transform, go.transform, b, turn, peg.z);
+                if (Mathf.Abs(_suitTilt) > 0.01f)
+                {
+                    Vector3 hp = holder.transform.localPosition;
+                    holder.transform.localPosition = new Vector3(hp.x, hp.y, hp.z + size * Mathf.Sin(_suitTilt * Mathf.Deg2Rad));
+                }
+                holder.transform.localRotation = Quaternion.Euler(_suitTilt, 0f, _suitRoll);
+            }
             if (!(lowerArms && PoseArms(go, pick)))
             {
                 go.AddComponent<MeshFilter>().sharedMesh = mesh;
@@ -255,6 +283,23 @@ namespace RVRepairVan.Base
             }
             Core.Log.Msg("[Eggs] " + name + " from '" + pick.name + "': mesh " + mesh.name + " size " + b.size + ", scale " + scale.ToString("0.###") + ".");
             return true;
+        }
+
+        // An empty suit hangs flat against the wall: the mesh is squeezed along its front-to-back axis by _suitFlat,
+        // and the holder moves so the squeezed back sits just off the wall.
+        private static void Flatten(Transform holder, Transform go, Bounds b, Quaternion turn, float pegZ)
+        {
+            if (_suitFlat >= 0.999f) return;
+            bool latX = b.size.x >= b.size.y;
+            Vector3 squeeze = latX ? new Vector3(1f, _suitFlat, 1f) : new Vector3(_suitFlat, 1f, 1f);
+            go.localScale = squeeze;
+            Vector3 c = turn * Vector3.Scale(b.center, squeeze);
+            Vector3 lp = go.localPosition;
+            go.localPosition = new Vector3(lp.x, lp.y, -c.z);
+            float half = Mathf.Abs((turn * Vector3.Scale(b.extents, squeeze)).z) * holder.localScale.z;
+            Vector3 hp = holder.localPosition;
+            holder.localPosition = new Vector3(hp.x, hp.y, Mathf.Min(pegZ, half + 0.02f));
+            Core.Log.Msg("[Eggs] suit flattened to " + _suitFlat.ToString("0.00") + ", " + (2f * half).ToString("0.000") + " m deep.");
         }
 
         // The suit is modelled in a T-pose and its mesh cannot be read back, so it is skinned live: one bone per bind
@@ -295,15 +340,46 @@ namespace RVRepairVan.Base
                 return false;
             }
 
-            float c = Mathf.Cos(_armDrop * Mathf.Deg2Rad), sn = Mathf.Sin(_armDrop * Mathf.Deg2Rad);
-            var swing = new Matrix4x4[3];
+            var swing = new Matrix4x4[5];   // by side, and 3/4 for the +lat/-lat leg
             swing[0] = Matrix4x4.identity;
             for (int sd = 1; sd <= 2; sd++)
             {
+                float drop = (_armDrop + (sd == 2 ? _armSkew : 0f)) * Mathf.Deg2Rad;
                 Vector3 outward = sd == 1 ? lat : -lat;
-                Quaternion turn = Quaternion.FromToRotation(outward, (outward * c - up * sn).normalized);
+                Quaternion turn = Quaternion.FromToRotation(outward, (outward * Mathf.Cos(drop) - up * Mathf.Sin(drop)).normalized);
                 swing[sd] = Matrix4x4.Translate(shoulder[sd]) * Matrix4x4.Rotate(turn) * Matrix4x4.Translate(-shoulder[sd]);
             }
+
+            // The legs: every bone in the lower half off the middle. Each leg turns about its highest bone (the hip)
+            // so its lowest bone (the foot) moves _legPull of the way to the middle.
+            float waist = b.min.z + 0.5f * b.size.z, legGap = 0.02f * b.size.z;
+            var hip = new Vector3[5];
+            var foot = new Vector3[5];
+            var found = new bool[5];
+            int legs = 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (side[i] != 0) continue;
+                Vector3 at = bind[i].GetColumn(3);
+                float off = Vector3.Dot(at, lat) - mid;
+                if (at.z > waist || Mathf.Abs(off) < legGap) continue;
+                int lg = off > 0f ? 3 : 4;
+                side[i] = lg;
+                legs++;
+                if (!found[lg]) { hip[lg] = at; foot[lg] = at; found[lg] = true; }
+                if (at.z > hip[lg].z) hip[lg] = at;
+                if (at.z < foot[lg].z) foot[lg] = at;
+            }
+            for (int lg = 3; lg <= 4; lg++)
+            {
+                swing[lg] = Matrix4x4.identity;
+                if (!found[lg] || hip[lg].z - foot[lg].z < 0.01f) continue;
+                Vector3 hang = foot[lg] - hip[lg];
+                float footOff = Vector3.Dot(foot[lg], lat) - mid;
+                Quaternion turn = Quaternion.FromToRotation(hang, hang - lat * footOff * _legPull);
+                swing[lg] = Matrix4x4.Translate(hip[lg]) * Matrix4x4.Rotate(turn) * Matrix4x4.Translate(-hip[lg]);
+            }
+            if (!found[3] || !found[4]) Core.Log.Warning("[Eggs] no leg bones on both sides of '" + mesh.name + "' - the legs keep their stance.");
 
             var bones = new Transform[n];
             for (int i = 0; i < n; i++)
@@ -322,7 +398,8 @@ namespace RVRepairVan.Base
             smr.rootBone = go.transform;
             smr.sharedMaterials = pick.sharedMaterials;
             smr.updateWhenOffscreen = true;
-            Core.Log.Msg("[Eggs] suit arms lowered " + _armDrop.ToString("0") + " degrees: " + n + " bones, arm bones" + arms + ".");
+            Core.Log.Msg("[Eggs] suit arms lowered " + _armDrop.ToString("0") + "/" + (_armDrop + _armSkew).ToString("0") + " degrees, legs pulled in "
+                + _legPull.ToString("0.00") + ": " + n + " bones, " + legs + " leg bones, arm bones" + arms + ".");
             return true;
         }
 
@@ -597,6 +674,21 @@ namespace RVRepairVan.Base
                 GameObject old = GameObject.Find(PizzaName);
                 if (old != null) UnityEngine.Object.DestroyImmediate(old);
                 EnsurePizza(main);
+            }
+            else if (a == "suit" && args.Length >= 2 && main != null)
+            {
+                // rvegg suit <flat> [size] [drop] [lift] [tilt] [legpull] [armskew] [roll]
+                _suitFlat = float.Parse(args[1], ci);
+                if (args.Length >= 3) _suitSize = float.Parse(args[2], ci);
+                if (args.Length >= 4) _suitDrop = float.Parse(args[3], ci);
+                if (args.Length >= 5) _suitLift = float.Parse(args[4], ci);
+                if (args.Length >= 6) _suitTilt = float.Parse(args[5], ci);
+                if (args.Length >= 7) _legPull = float.Parse(args[6], ci);
+                if (args.Length >= 8) _armSkew = float.Parse(args[7], ci);
+                if (args.Length >= 9) _suitRoll = float.Parse(args[8], ci);
+                if (root != null) UnityEngine.Object.DestroyImmediate(root.gameObject);
+                Ensure();
+                root = main.Find(RootName);
             }
             else if (a == "arms" && args.Length >= 2 && main != null)
             {
