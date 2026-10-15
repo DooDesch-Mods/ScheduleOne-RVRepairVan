@@ -24,8 +24,8 @@ namespace RVRepairVan.Base
     {
         private const string Name = "RVRepairVan_SavePoint";
 
-        // Door-side wall, behind the window next to the door: free of windows and furniture, gutted or not.
-        private static Vector3 _local = new Vector3(-1.6f, 1.38f, 0.25f);
+        // Door-side wall, beside the light switch next to the door, under the window: free of furniture, gutted or not.
+        private static Vector3 _local = new Vector3(0.98f, 1.38f, 0.12f);
         // Into the room from that wall.
         private static Vector3 _facing = new Vector3(0f, -1f, 0f);
 

@@ -114,11 +114,11 @@ namespace RVRepairVan.Base
                 case RvUpgrade.WorkshopFloor:
                     return L10n.T("Floor's in. You can set up shop in there now.");
                 case RvUpgrade.CrewQuarters:
-                    return L10n.T("Room for {0} now. Hire 'em through the Fixer, and put a locker in there so they get paid.", RVRepairVanPreferences.CrewSize);
+                    return L10n.T("Room for {0} now. Hire 'em through the Fixer, and put a locker in there so they get paid. Yeah, science.", RVRepairVanPreferences.CrewSize);
                 case RvUpgrade.LoadingDock:
                     return L10n.T("Dock's done. Deliveries can come straight to the RV now.");
                 case RvUpgrade.Engine:
-                    return L10n.T("She runs. Don't wreck her.");
+                    return L10n.T("She runs. Just don't leave the keys in.");
                 default: return "";
             }
         }
@@ -236,6 +236,7 @@ namespace RVRepairVan.Base
             if (!RVRepairVanPreferences.UpgradesEnabled) return;
             foreach (RvUpgrade up in Order)
                 if (Owned(up)) Apply(up);
+            RvEasterEggs.Ensure();   // after the gut, so the cook gear shows with it
         }
 
         private static void Apply(RvUpgrade up)
@@ -262,6 +263,7 @@ namespace RVRepairVan.Base
             RvCrew.Reset();
             RvDeliveryDock.Reset();
             RvMobile.Reset();
+            RvEasterEggs.Reset();
         }
 
 #if DEBUG

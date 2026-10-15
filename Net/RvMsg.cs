@@ -26,6 +26,7 @@ namespace RVRepairVan.Net
         ErrandItemPicked = 13,   // client now HOLDS the current errand item (Ming's crate / Marco's package)
         BuyUpgrade = 14,   // A = RvUpgrade bit the client wants to buy (host validates prerequisites)
         DriveRequest = 15,   // client used the RV's wheel while the RV is home - the host spawns the chassis
+        BatterySwap = 16,    // client used up a battery at the wheel - the RV's flat battery is fixed
         // Paid intents (PayRepair, MingPayLoss, MarcoPayLoss, BuyUpgrade) also carry B = ticket, C = amount paid.
 
         // host -> all clients state (absolute values, idempotent on re-receive)
@@ -35,6 +36,7 @@ namespace RVRepairVan.Net
         UpgradeSync = 103,    // A = the full owned-upgrade bitmask (absolute, so a re-send just re-applies)
         PaymentSettled = 104, // A = ticket, B = 1 refund / 0 keep - only the client holding the ticket acts
         MobileSync = 105,     // A = ObjectId of the chassis the RV rides on, -1 = the RV is home
+        BatterySync = 106,    // A = 1 the RV's battery is flat, 0 it starts
         Ping = 200,   // connectivity / latency ping
 #if DEBUG
         DebugGiveItems = 201,   // DEBUG: host -> clients, spawn packaged test products into each client's inventory

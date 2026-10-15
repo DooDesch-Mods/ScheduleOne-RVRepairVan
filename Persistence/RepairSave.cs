@@ -51,6 +51,9 @@ namespace RVRepairVan.Persistence
         [SaveableField("rv_away_ry")] private float _awayRy;
         [SaveableField("rv_away_rz")] private float _awayRz;
         [SaveableField("rv_away_rw")] private float _awayRw;
+        // In-game minute stamp of the last drive (Engine upgrade), and whether the battery went flat after standing.
+        [SaveableField("rv_last_driven")] private int _lastDriven;
+        [SaveableField("rv_battery_dead")] private bool _batteryDead;
 
         public RepairSave() { Instance = this; }
 
@@ -60,6 +63,8 @@ namespace RVRepairVan.Persistence
         internal int Discount { get => _discount; set => _discount = value; }
         internal int Upgrades { get => _upgrades; set => _upgrades = value; }
         internal int RepairStartedAt { get => _repairStartedAt; set => _repairStartedAt = value; }
+        internal int LastDriven { get => _lastDriven; set => _lastDriven = value; }
+        internal bool BatteryDead { get => _batteryDead; set => _batteryDead = value; }
 
         internal bool Away => _away;
         internal Vector3 AwayPos => new Vector3(_awayPx, _awayPy, _awayPz);
@@ -104,6 +109,8 @@ namespace RVRepairVan.Persistence
                 Instance._discount = 0;
                 Instance._upgrades = 0;
                 Instance._repairStartedAt = 0;
+                Instance._lastDriven = 0;
+                Instance._batteryDead = false;
                 Instance.SetAwayFields(false);
             }
         }
@@ -114,7 +121,7 @@ namespace RVRepairVan.Persistence
             Instance = this;
             Loaded = true;
             _stage = Quests.Questline.StageForLoad(_repaired, _stage);
-            Core.Log.Msg($"[State] loaded: repaired={_repaired} stage={_stage} samples={_samples} discount={_discount} upgrades={_upgrades} away={_away}");
+            Core.Log.Msg($"[State] loaded: repaired={_repaired} stage={_stage} samples={_samples} discount={_discount} upgrades={_upgrades} away={_away} lastDriven={_lastDriven} batteryDead={_batteryDead}");
         }
 
         // No mod data for this save yet (fresh save / first time / a save from before the mod) -> clean defaults.
@@ -128,6 +135,8 @@ namespace RVRepairVan.Persistence
             _discount = 0;
             _upgrades = 0;
             _repairStartedAt = 0;
+            _lastDriven = 0;
+            _batteryDead = false;
             SetAwayFields(false);
             Loaded = true;
             Core.Log.Msg("[State] created (fresh save) - defaults applied.");

@@ -57,6 +57,8 @@ namespace RVRepairVan.Base
         private static readonly Dictionary<string, bool> _original = new Dictionary<string, bool>();
         private static bool _applied;
 
+        internal static bool Applied => _applied;
+
         internal static void Reset() { _original.Clear(); _applied = false; }
 
         internal static void Apply()
@@ -104,6 +106,7 @@ namespace RVRepairVan.Base
 
                 _applied = true;
                 Core.Log.Msg("[Interior] gutted - " + hidden + " object(s) hidden.");
+                RvEasterEggs.Ensure();
             }
             catch (Exception e) { Core.Log.Warning("[Interior] apply failed: " + e.Message); }
         }
@@ -134,6 +137,7 @@ namespace RVRepairVan.Base
                 }
                 _applied = false;
                 Core.Log.Msg("[Interior] restored to its original state.");
+                RvEasterEggs.Ensure();
             }
             catch (Exception e) { Core.Log.Warning("[Interior] revert failed: " + e.Message); }
         }

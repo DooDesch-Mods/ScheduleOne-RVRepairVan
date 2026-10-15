@@ -168,7 +168,7 @@ namespace RVRepairVan.Base
             catch (Exception e) { Core.Log.Error("[Mobile] drive point failed: " + e); return null; }
         }
 
-        private static int InteractionLayer()
+        internal static int InteractionLayer()
         {
             var im = Singleton<InteractionManager>.Instance;
             int mask = im != null ? im.Interaction_SearchMask.value : 1;
@@ -182,6 +182,13 @@ namespace RVRepairVan.Base
             if (_wheel == null) return;
             bool engine = RvUpgrades.Owned(RvUpgrade.Engine);
             bool full = _chassis != null && _chassis.GetFirstFreeSeat() == null;
+            if (engine && RvBattery.Dead)
+            {
+                bool battery = RvBattery.HoldsBattery(out _);
+                _wheel.SetMessage(battery ? L10n.T("Swap battery") : L10n.T("Battery dead"));
+                _wheel.SetInteractableState(battery ? InteractableObject.EInteractableState.Default : InteractableObject.EInteractableState.Invalid);
+                return;
+            }
             _wheel.SetMessage(!engine ? L10n.T("Missing engine") : full ? L10n.T("Seats taken") : L10n.T("Drive"));
             _wheel.SetInteractableState(!engine || full ? InteractableObject.EInteractableState.Invalid : InteractableObject.EInteractableState.Default);
         }
@@ -191,6 +198,8 @@ namespace RVRepairVan.Base
             try
             {
                 if (!RvUpgrades.Owned(RvUpgrade.Engine)) { Core.Log.Msg("[Mobile] wheel used without the engine upgrade - it shows Missing engine."); return; }
+                if (RvBattery.Dead && !RvBattery.TrySwap()) return;
+                if (RvBattery.HostBlocksStart()) { RvBattery.TellLocalPlayer(); OnWheelHovered(); return; }
                 if (_chassis != null) { EnterChassis(); return; }
                 _pendingEnter = true;
                 _pendingSince = Time.time;
@@ -210,7 +219,16 @@ namespace RVRepairVan.Base
         {
             if (!RvUpgrades.Owned(RvUpgrade.Engine)) { Core.Log.Warning("[Mobile] drive request refused - the engine upgrade is not owned."); return; }
             if (_chassis != null) { Core.Log.Msg("[Mobile] drive request - chassis already out, re-sending it."); Broadcast(); return; }
+            if (RvBattery.HostBlocksStart()) { Core.Log.Msg("[Mobile] drive request refused - flat battery."); return; }
             HostStartAtHome();
+        }
+
+        /// <summary>Client: the host refused the start, so stop waiting for the chassis. True if a start was pending.</summary>
+        internal static bool CancelPendingEnter()
+        {
+            bool was = _pendingEnter;
+            _pendingEnter = false;
+            return was;
         }
 
         private static bool HostStartAtHome()
@@ -596,7 +614,7 @@ namespace RVRepairVan.Base
 
             bool localIn = _chassis.LocalPlayerIsInVehicle;
             bool occupied = localIn || _chassis.CurrentPlayerOccupancy > 0;
-            if (occupied) _lastOccupiedAt = Time.time;
+            if (occupied) { _lastOccupiedAt = Time.time; RvBattery.HostStamp(); }
             if (occupied != _driving)
             {
                 SetDriving(occupied);

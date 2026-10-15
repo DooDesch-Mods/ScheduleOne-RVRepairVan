@@ -98,7 +98,7 @@ namespace RVRepairVan.Base
                 RepairStateStore.SetRepairStartedAt(0);
                 if (NetworkBus.Online && NetworkBus.IsServer) NetworkBus.BroadcastToAll(RvOp.RepairApplied);
                 Quests.RepairQuest.CompleteIfActive();
-                TextFromMarco(L10n.T("Your RV's all done, buddy. Good as new."));
+                TextFromMarco(L10n.T("Your RV's all done, buddy. Good as new. Next time, better call Marco."));
                 Core.Log.Msg("[Job] Marco finished the RV.");
             }
             catch (Exception e) { Core.Log.Warning("[Job] finish failed: " + e.Message); }
