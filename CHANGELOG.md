@@ -4,6 +4,17 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.4.0] - 2026-10-15
+
+### Added
+- The steering wheel says "Missing engine" until Marco gets the engine running.
+
+### Fixed
+- The quest icon no longer turns into a white square after loading a save.
+- With Schedule Maintenance installed, the RV door opens again: its Krystal Ship switches off once your RV is repaired.
+- Driving the RV: the camera no longer jerks in and out past poles and power lines.
+- Workshop floor: equipment placed before the upgrade no longer leaves a second raster that turns free spots red.
+
 ## [3.3.0] - 2026-10-15
 
 ### Added
