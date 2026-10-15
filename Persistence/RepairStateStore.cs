@@ -46,6 +46,12 @@ namespace RVRepairVan.Persistence
         internal static int GetRepairStartedAt() => S != null ? S.RepairStartedAt : 0;
         internal static void SetRepairStartedAt(int minSum) { if (S != null) S.RepairStartedAt = minSum; }
 
+        // Host/offline only: the flat-battery state (RvBattery). A client mirrors the flag in RvBattery itself.
+        internal static int GetLastDriven() => S != null ? S.LastDriven : 0;
+        internal static void SetLastDriven(int minSum) { if (!ClientMode && S != null) S.LastDriven = minSum; }
+        internal static bool GetBatteryDead() => S != null && S.BatteryDead;
+        internal static void SetBatteryDead(bool dead) { if (!ClientMode && S != null) S.BatteryDead = dead; }
+
         // Host/offline only: where the RV was driven to (RvMobile). A client never saves the world.
         internal static bool TryGetAwayPose(out Vector3 pos, out Quaternion rot)
         {

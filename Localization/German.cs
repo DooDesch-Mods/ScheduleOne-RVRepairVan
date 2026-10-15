@@ -47,8 +47,8 @@ namespace RVRepairVan.Localization
                 ["Very good! And do not open, yes?"] = "Sehr gut! Und nicht aufmachen, ja?",
                 ["Okay. You come back when ready."] = "Okay. Du kommst wieder, wenn du bereit bist.",
                 ["Here's your crate."] = "Hier ist deine Kiste.",
-                ["Very good! I call Marco now. Go see him at the docks, tell him Ming sends you."] =
-                    "Sehr gut! Ich rufe Marco an. Geh zu ihm an den Hafen, sag ihm, Ming schickt dich.",
+                ["Very good! You are careful. I like careful. I call Marco now. Go see him at the docks, tell him Ming sends you."] =
+                    "Sehr gut! Du bist vorsichtig. Ich mag vorsichtig. Ich rufe Marco an. Geh zu ihm an den Hafen, sag ihm, Ming schickt dich.",
                 ["I lost your crate."] = "Ich habe deine Kiste verloren.",
                 ["You lose my crate? Not very good. Five hundred, then we are okay, yes?"] =
                     "Du verlierst meine Kiste? Nicht sehr gut. Fünfhundert, dann sind wir okay, ja?",
@@ -58,8 +58,8 @@ namespace RVRepairVan.Localization
 
                 // Marco
                 ["Mrs. Ming sent me. Can you fix my RV?"] = "Mrs. Ming schickt mich. Kannst du mein Wohnmobil reparieren?",
-                ["Ming sent ya? Well, any friend of hers. That RV's a burnt-out shell, buddy. Normally that's {0}. For you, {1}."] =
-                    "Ming schickt dich? Na, ihre Freunde sind auch meine Freunde. Das Ding ist ein ausgebranntes Wrack, Kumpel. Normal kostet das {0}. Für dich {1}.",
+                ["Ming sent ya? Well, any friend of hers. That RV's a burnt-out shell, buddy - another week and she'd have gone to the crusher. Normally that's {0}. For you, {1}."] =
+                    "Ming schickt dich? Na, ihre Freunde sind auch meine Freunde. Das Ding ist ein ausgebranntes Wrack, Kumpel - noch eine Woche und es wär in der Schrottpresse gelandet. Normal kostet das {0}. Für dich {1}.",
                 ["Repair my RV ({0})"] = "Mein Wohnmobil reparieren ({0})",
                 ["Can you go any lower?"] = "Geht's noch billiger?",
                 ["Tell ya what. There's a package of mine in a dead drop. Bring it here and we'll talk."] =
@@ -90,6 +90,8 @@ namespace RVRepairVan.Localization
                 ["product"] = "Ware",
                 ["That ain't packaged, buddy. Bring it sealed."] = "Das ist nicht verpackt, Kumpel. Bring's versiegelt.",
                 ["Thanks, buddy. That's {0} off."] = "Danke, Kumpel. Das sind {0} weniger.",
+                ["Ninety-nine percent pure? Where'd you learn chemistry, buddy? That's {0} off."] =
+                    "Neunundneunzig Prozent rein? Wo hast du Chemie gelernt, Kumpel? Das sind {0} weniger.",
 
                 // Loss-fee sub-choices
                 ["Pay ${0}"] = "{0} $ zahlen",
@@ -106,27 +108,31 @@ namespace RVRepairVan.Localization
                 ["All cleared out. Want to build in there? You'll need a proper floor."] =
                     "Alles raus. Willst du da drin was bauen? Dann brauchst du einen richtigen Boden.",
                 ["Floor's in. You can set up shop in there now."] = "Boden ist drin. Jetzt kannst du da drin aufbauen.",
-                ["Room for {0} now. Hire 'em through the Fixer, and put a locker in there so they get paid."] =
-                    "Jetzt ist Platz für {0}. Stell sie über den Fixer ein und stell einen Spind rein, damit sie bezahlt werden.",
+                ["Room for {0} now. Hire 'em through the Fixer, and put a locker in there so they get paid. Yeah, science."] =
+                    "Jetzt ist Platz für {0}. Stell sie über den Fixer ein und stell einen Spind rein, damit sie bezahlt werden. Yeah, Wissenschaft.",
                 ["Dock's done. Deliveries can come straight to the RV now."] =
                     "Rampe steht. Lieferungen kommen jetzt direkt zum Wohnmobil.",
-                ["She runs. Don't wreck her."] = "Sie läuft. Fahr sie nicht zu Schrott.",
+                ["She runs. Just don't leave the keys in."] = "Sie läuft. Lass bloß den Schlüssel nicht stecken.",
                 ["Drive"] = "Fahren",
                 ["Seats taken"] = "Alle Plätze belegt",
                 ["Missing engine"] = "Motor fehlt",
+                ["Battery dead"] = "Batterie leer",
+                ["Swap battery"] = "Batterie tauschen",
+                ["Left the keys in again? Battery's dead, bring a new one to the wheel."] = "Schon wieder den Schlüssel stecken lassen? Die Batterie ist leer, bring eine neue ans Steuer.",
+                ["Leaves of Grass. Signed 'W.W.'"] = "Grashalme. Signiert 'W.W.'",
                 ["The RV is away."] = "Das Wohnmobil ist unterwegs.",
                 ["Drive it back to its spot."] = "Fahr es zurück an seinen Platz.",
 
                 // Repair-takes-a-day option
                 ["Alright, I'll send the boys over to your RV. Give me a day - I'll text ya when she's done."] =
                     "Alles klar, ich schick die Jungs zu deinem Wohnmobil. Gib mir einen Tag - ich schreib dir, wenn sie fertig ist.",
-                ["Your RV's all done, buddy. Good as new."] = "Dein Wohnmobil ist fertig, Kumpel. Wie neu.",
+                ["Your RV's all done, buddy. Good as new. Next time, better call Marco."] = "Dein Wohnmobil ist fertig, Kumpel. Wie neu. Nächstes Mal: Better call Marco.",
 
                 // Quest items
                 ["Mrs. Ming's Crate"] = "Mrs. Mings Kiste",
-                ["A sealed crate for Mrs. Ming. Don't open it."] = "Eine versiegelte Kiste für Mrs. Ming. Nicht öffnen.",
+                ["A sealed crate for Mrs. Ming, stamped 'Golden Moth Chemical'. Don't open it."] = "Eine versiegelte Kiste für Mrs. Ming, gestempelt 'Golden Moth Chemical'. Nicht öffnen.",
                 ["Marco's Package"] = "Marcos Paket",
-                ["Marco's package. Bring it to him at the docks."] = "Marcos Paket. Bring es zu ihm an den Hafen.",
+                ["Marco's package. Smells like fried chicken. Bring it to him at the docks."] = "Marcos Paket. Riecht nach Brathähnchen. Bring es zu ihm an den Hafen.",
             });
         }
     }

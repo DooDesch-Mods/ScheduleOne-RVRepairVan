@@ -84,6 +84,9 @@ namespace RVRepairVan.Patches
             new[] { "rvbed", "list the RV bed's parts, colliders and every Bed script in the scene; 'use' presses it", "rvbed" },
             new[] { "rvsow","drop a seed into the first RV pot and log where it lands; 'elsewhere' uses a pot of another property", "rvsow" },
             new[] { "rvsave","where the RV's save intercom hangs; 'rvsave at x y z' moves it, 'rvsave use' presses it", "rvsave" },
+            new[] { "rvegg", "the easter-egg props; 'look <prop>' parks the camera, 'at <prop> x y z' moves one, 'pizza x z' drops the pizza, 'garages' lists roofs", "rvegg look Book" },
+            new[] { "rvbattery", "the RV's flat battery; 'dead' / 'fix' set it, 'age 4' makes the RV stand 4 days", "rvbattery age 4" },
+            new[] { "rvthanks", "the line Marco says for the product in hand", "rvthanks" },
             new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
         };
 
@@ -95,7 +98,8 @@ namespace RVRepairVan.Patches
                 && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvreinject" && cmd != "rvprobe"
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach"
-                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost")
+                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost"
+                && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks")
                 return false;   // not ours - let the game handle it
 
             // Both overloads can fire for a single submission (the string body calls the List body), so run the
@@ -186,6 +190,15 @@ namespace RVRepairVan.Patches
                         else if (parts.Length > 2 && parts[1].ToLower() == "steps") Base.RvSteps.SetIn(parts[2].ToLower() == "in");
                         else if (parts.Length > 2 && parts[1].ToLower() == "gas") Base.RvDrive.Gas(parts[2].ToLower(), parts.Length > 3 ? parts[3] : "0");
                         else Base.RvMobile.DebugDrive();
+                        break;
+                    case "rvthanks":  // the line Marco says for the product in hand
+                        RVRepairVan.Quests.Questline.DebugThanks();
+                        break;
+                    case "rvbattery": // flat battery: report; 'dead' / 'fix'; 'age N' = the RV stood N days
+                        Base.RvBattery.DebugCmd(parts.Length > 1 ? parts[1..] : Array.Empty<string>());
+                        break;
+                    case "rvegg":     // the easter-egg props: report; 'at <prop> x y z [ox oy oz ux uy uz]'; 'pizza x z [yaw]'; 'probe'; 'rebuild'
+                        Base.RvEasterEggs.DebugCmd(parts.Length > 1 ? parts[1..] : Array.Empty<string>());
                         break;
                     case "rvsave":    // report the save intercom; 'rvsave at x y z [fx fy fz]' moves it (rv/Main space)
                         Base.RvSavePoint.DebugCmd(parts.Length > 1 ? parts[1..] : Array.Empty<string>());

@@ -30,6 +30,7 @@ namespace RVRepairVan.Config
         private static MelonPreferences_Entry<int> _buildGridExtraTiles;
         private static MelonPreferences_Entry<bool> _instantRepair;
         private static MelonPreferences_Entry<bool> _repairTakesADay;
+        private static MelonPreferences_Entry<bool> _batteryBreakdowns;
 #if DEBUG
         private static MelonPreferences_Entry<bool> _destroyRvDebug;
         private static MelonPreferences_Entry<bool> _addCashDebug;
@@ -80,6 +81,8 @@ namespace RVRepairVan.Config
                 "Repairs the RV free of charge as soon as it is wrecked - no Marco, no questline. The upgrades still cost money.");
             _repairTakesADay = CreateEntry("RepairTakesADay", false, "Repair takes a day",
                 "Marco takes the job and the RV is ready 24 in-game hours later; he texts you when it is done. Off = repaired on the spot.");
+            _batteryBreakdowns = CreateEntry("BatteryBreakdowns", true, "Flat battery after standing",
+                "After 3 in-game days without a drive, the RV has a 1 in 4 chance not to start. Hold a battery at the wheel to fix it.");
 #if DEBUG
             _destroyRvDebug = CreateEntry("DestroyRvDebug", false, "Destroy RV (debug, one-shot)",
                 "Toggle ON to manually wreck the RV so you can test the repair. Auto-resets to OFF.");
@@ -125,6 +128,7 @@ namespace RVRepairVan.Config
 
         internal static bool InstantRepair => _instantRepair?.Value ?? false;
         internal static bool RepairTakesADay => _repairTakesADay?.Value ?? false;
+        internal static bool BatteryBreakdowns => _batteryBreakdowns?.Value ?? true;
 
 #if DEBUG
         /// <summary>

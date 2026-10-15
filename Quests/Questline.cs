@@ -186,6 +186,7 @@ namespace RVRepairVan.Quests
             System.Array.Clear(_sampleChoices, 0, _sampleChoices.Length);
             _sampleSlots.Clear();
             RepairStateStore.ResetClient();   // co-op client mirror starts clean each scene load (host re-sends snapshot)
+            Base.RvBattery.ResetClient();
         }
 
         internal static void Start()
@@ -432,7 +433,7 @@ namespace RVRepairVan.Quests
                 .AddNode("MING_DEFERRED", L10n.T("Okay. You come back when ready.")));
 
             var deliver = S1Container(npc, "rv_ming_deliver", b => b
-                .AddNode("ENTRY", L10n.T("Very good! I call Marco now. Go see him at the docks, tell him Ming sends you.")));
+                .AddNode("ENTRY", L10n.T("Very good! You are careful. I like careful. I call Marco now. Go see him at the docks, tell him Ming sends you.")));
 
             // Loss fallback: collected the drop but no longer holding the crate -> admit it, pay the fee or defer.
             var lost = S1Container(npc, "rv_ming_lost", b => b
@@ -814,7 +815,7 @@ namespace RVRepairVan.Quests
             }
             Stage = ReadyToPay;          // ReferralUsed -> the referral price applies
             RefreshRepairChoice();
-            WorldSay(_marcoT, L10n.T("Ming sent ya? Well, any friend of hers. That RV's a burnt-out shell, buddy. Normally that's {0}. For you, {1}.",
+            WorldSay(_marcoT, L10n.T("Ming sent ya? Well, any friend of hers. That RV's a burnt-out shell, buddy - another week and she'd have gone to the crusher. Normally that's {0}. For you, {1}.",
                 MoneyManager.FormatAmount(RVRepairVanPreferences.BasePriceNoReferral), MoneyManager.FormatAmount(CurrentPrice())));
             SyncEntry();
         }
@@ -968,6 +969,7 @@ namespace RVRepairVan.Quests
                     return;
                 }
                 int discount = SampleUnitDiscount(product);
+                string thanks = ThanksLine(product, discount);
 
                 // Marco actually consumes it: NPCBehaviour.ConsumeProduct_Server (the ServerRpc the vanilla sample flow uses)
                 // both sets the product AND enables the consume behaviour, so he plays the smoke/snort/eat animation,
@@ -987,10 +989,10 @@ namespace RVRepairVan.Quests
                 // send the discount it computed and let the host apply + replicate the new price.
                 if (RouteIntent(RvOp.GiveSample, discount))
                 {
-                    WorldSay(_marcoT, L10n.T("Thanks, buddy. That's {0} off.", MoneyManager.FormatAmount(discount)));
+                    WorldSay(_marcoT, thanks);
                     return;
                 }
-                HostGiveSample(discount);   // host or offline
+                HostGiveSample(discount, thanks);   // host or offline
             }
             catch (Exception e) { Core.Log.Warning("[Questline] give sample failed: " + e.Message); }
         }
@@ -1053,13 +1055,41 @@ namespace RVRepairVan.Quests
 
         // Host-only (or offline): apply a sample's discount to the shared price. Safe when the host is processing a
         // client's GiveSample intent (the client already consumed its own product) - no inventory touch here.
-        private static void HostGiveSample(int discount)
+        private static void HostGiveSample(int discount, string thanks = null)
         {
             Samples = Samples + 1;
             DiscountTotal = DiscountTotal + discount;   // setter broadcasts the new price (StageSync) to all clients
             RefreshRepairChoice();
-            WorldSay(_marcoT, L10n.T("Thanks, buddy. That's {0} off.", MoneyManager.FormatAmount(discount)));
+            WorldSay(_marcoT, thanks ?? L10n.T("Thanks, buddy. That's {0} off.", MoneyManager.FormatAmount(discount)));
         }
+
+        // Premium or better meth gets Marco's chemistry line instead of the plain thanks.
+        private static string ThanksLine(ProductItemInstance p, int discount)
+        {
+            string off = MoneyManager.FormatAmount(discount);
+            try
+            {
+                ProductDefinition def = p.Definition != null ? p.Definition.TryCast<ProductDefinition>() : null;
+                if (def != null && def.DrugType == EDrugType.Methamphetamine && p.Quality >= EQuality.Premium)
+                {
+                    Core.LogDebug("[Questline] Marco got " + p.Quality + " meth - chemistry line.");
+                    return L10n.T("Ninety-nine percent pure? Where'd you learn chemistry, buddy? That's {0} off.", off);
+                }
+            }
+            catch (Exception e) { Core.Swallowed("Questline.ThanksLine", e); }
+            return L10n.T("Thanks, buddy. That's {0} off.", off);
+        }
+
+#if DEBUG
+        /// <summary>Debug (rvthanks): the line Marco would say for the product in hand.</summary>
+        internal static void DebugThanks()
+        {
+            PlayerInventory inv = PlayerSingleton<PlayerInventory>.Instance;
+            ProductItemInstance p = inv?.equippedSlot?.ItemInstance?.TryCast<ProductItemInstance>();
+            if (p == null) { Core.Log.Warning("[Debug] rvthanks: no product in hand."); return; }
+            Core.Log.Msg("[Debug] rvthanks " + ((BaseItemInstance)p).ID + " " + p.Quality + ": " + ThanksLine(p, 250));
+        }
+#endif
 
         // Reserve a real (preferably empty) dead drop for a pickup step. Normally the FARTHEST drop from the
         // origin (a proper errand); in DEBUG the CLOSEST (fast testing).
@@ -1111,9 +1141,9 @@ namespace RVRepairVan.Quests
                 DumpItemsOnce();   // DEBUG only: list every item id/name (clone-base reference)
                 // Carry-only bases (a sack / a bag), NOT furniture - inherits a real icon + in-hand model.
                 // Tried in order; first that clones wins. grainbag/trashbag are StorableItemDefinition subclasses.
-                RegisterItem(CrateId, L10n.T("Mrs. Ming's Crate"), L10n.T("A sealed crate for Mrs. Ming. Don't open it."),
+                RegisterItem(CrateId, L10n.T("Mrs. Ming's Crate"), L10n.T("A sealed crate for Mrs. Ming, stamped 'Golden Moth Chemical'. Don't open it."),
                     new[] { "grainbag", "trashbag", "flashlight" });
-                RegisterItem(PackageId, L10n.T("Marco's Package"), L10n.T("Marco's package. Bring it to him at the docks."),
+                RegisterItem(PackageId, L10n.T("Marco's Package"), L10n.T("Marco's package. Smells like fried chicken. Bring it to him at the docks."),
                     new[] { "trashbag", "grainbag", "flashlight" });
                 _itemsRegistered = true;
                 Core.LogDebug("[Questline] quest items registered (host+client).");
