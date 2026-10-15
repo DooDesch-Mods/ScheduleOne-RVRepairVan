@@ -43,13 +43,14 @@ namespace RVRepairVan.Base
         private static bool _driving, _localWasIn, _pendingEnter, _restored;
         private static float _pendingSince, _spawnedAt, _lastOccupiedAt, _lastSaveAt, _lastDockAt;
         private static int _attachFrame;
-        private static object _loop;
+        private static object _loop, _hitLoop;
         private static PropertyContentsContainer _contents;
 
         /// <summary>True while the RV is on its chassis, wherever that is - including parked right at home.</summary>
         internal static bool Away => _chassis != null;
         internal static LandVehicle Chassis => _chassis;
         internal static BoxCollider Hull => _hull;
+        internal static BoxCollider HitBox => _hitBox;
 
         // --- upgrade hook ---------------------------------------------------------------------------------
 
@@ -65,6 +66,7 @@ namespace RVRepairVan.Base
 
             if (_wheel == null) _wheel = MakeWheel(model);
             if (_loop == null) _loop = MelonCoroutines.Start(Loop());
+            if (_hitLoop == null) _hitLoop = MelonCoroutines.Start(HitLoop());
 
             if (!_restored && _chassis == null && (!NetworkBus.Online || NetworkBus.IsServer))
             {
@@ -80,6 +82,7 @@ namespace RVRepairVan.Base
         internal static void Reset()
         {
             if (_loop != null) { MelonCoroutines.Stop(_loop); _loop = null; }
+            if (_hitLoop != null) { MelonCoroutines.Stop(_hitLoop); _hitLoop = null; }
             _chassis = null;
             _chassisId = -1;
             _wheel = null;
@@ -92,6 +95,7 @@ namespace RVRepairVan.Base
             _static.Clear();
             if (_draw != null) { MelonCoroutines.Stop(_draw); _draw = null; }
             _hull = null;
+            _hitBox = null;
             _contents = null;
             RvWheels.Reset();
             RvSteps.Reset();
@@ -396,6 +400,7 @@ namespace RVRepairVan.Base
             RvLights.Unbind();
             ReleaseStaticParts();
             if (_hull != null) { UnityEngine.Object.Destroy(_hull.gameObject); _hull = null; }
+            if (_hitBox != null) { UnityEngine.Object.Destroy(_hitBox.gameObject); _hitBox = null; }
             _chassisColliders.Clear();
             _chassis = null;
             _chassisId = -1;
@@ -510,6 +515,16 @@ namespace RVRepairVan.Base
             }
         }
 
+        // Every frame: at speed the RV covers more than a metre between two watch ticks and would hit the person first.
+        private static IEnumerator HitLoop()
+        {
+            while (true)
+            {
+                yield return null;
+                if (_driving && _chassis != null) HitPeople();
+            }
+        }
+
         private static void Tick()
         {
             if (_pendingEnter)
@@ -580,6 +595,10 @@ namespace RVRepairVan.Base
         private static readonly List<Collider> _muted = new List<Collider>();
         private static readonly List<Collider> _chassisColliders = new List<Collider>();
         private static BoxCollider _hull;
+        private static BoxCollider _hitBox;
+        private const float HitBoxClearance = 0.2f;   // its bottom above the road
+        private const float HitBoxReach = 1.0f;       // past the hull's front and back, so a person counts as hit before the hull stops at them
+        private const float HitBoxSide = 0.3f;        // past the hull's sides
         private const float HullHalfWidth = 1.5f, HullClearance = 1.0f, HullTop = 3.4f;
 
         private static float _sleepThreshold = -1f;   // the chassis' own, read before driving overrides it
@@ -664,6 +683,7 @@ namespace RVRepairVan.Base
         {
             foreach (Collider c in _chassisColliders) if (c != null) c.enabled = on;
             if (_hull != null) _hull.enabled = on;
+            if (_hitBox != null) _hitBox.enabled = on;
         }
 
         // The veeper is half the RV's size. While driving, a box the size of the RV body (lifted off the ground so it
@@ -707,8 +727,68 @@ namespace RVRepairVan.Base
                 else Core.Log.Warning("[Mobile] no TransparentFX layer - the RV may snag on sound zones.");
                 Core.Log.Msg("[Mobile] hull " + _hull.size + " at " + _hull.center + ", " + (min.y - ground).ToString("0.00")
                     + " to " + (max.y - ground).ToString("0.00") + " m above the road.");
+                BuildHitBox(chassis, new Vector3(min.x - HitBoxSide, ground + HitBoxClearance, min.z - HitBoxReach),
+                    new Vector3(max.x + HitBoxSide, max.y, max.z + HitBoxReach));
             }
             catch (Exception e) { Core.Log.Warning("[Mobile] hull failed - the RV body can clip while driving: " + e.Message); }
+        }
+
+        // NPCs fall over through NPCMovement.CheckHit: a collider on the Ignore Raycast layer that names a LandVehicle,
+        // above 10 km/h. The physics never delivers that call for the RV - the NPC layer ignores both Ignore Raycast and
+        // Vehicle, and the NPC root carries no rigidbody - so HitPeople asks the physics who stands inside this box and
+        // hands each one to CheckHit itself. The box covers the whole body down to just above the road, reaches a metre
+        // past the hull's ends so it finds a person before the hull stops at them, and follows the chassis through the
+        // vanilla VehicleHumanoidCollider, which also names the chassis as the vehicle.
+        private static void BuildHitBox(LandVehicle chassis, Vector3 min, Vector3 max)
+        {
+            try
+            {
+                var go = new GameObject("RVRepairVan_HitBox");
+                go.transform.SetPositionAndRotation(chassis.transform.position, chassis.transform.rotation);
+                go.layer = LayerMask.NameToLayer("Ignore Raycast");
+                _hitBox = go.AddComponent<BoxCollider>();
+                _hitBox.isTrigger = true;
+                _hitBox.center = (min + max) * 0.5f;
+                _hitBox.size = max - min;
+                _hitBox.enabled = false;
+                go.AddComponent<VehicleHumanoidCollider>().Vehicle = chassis;
+                Core.Log.Msg("[Mobile] hit box " + _hitBox.size + " at " + _hitBox.center + " knocks people over while driving.");
+            }
+            catch (Exception e) { Core.Log.Warning("[Mobile] hit box failed - the RV cannot knock people over: " + e.Message); }
+        }
+
+        private const float HitMinKmh = 10f;   // CheckHit's own threshold; below it the call does nothing
+        private static int _npcMask = -1;
+        private static readonly HashSet<IntPtr> _hitThisTick = new HashSet<IntPtr>();
+        private static int _hitFailures;
+
+        private static void HitPeople()
+        {
+            if (_hitBox == null || !_hitBox.enabled || Mathf.Abs(_chassis.Speed_Kmh) <= HitMinKmh) return;
+            if (_npcMask < 0)
+            {
+                int npc = LayerMask.NameToLayer("NPC");
+                if (npc < 0) { Core.Log.Warning("[Mobile] no NPC layer - the RV cannot knock people over."); _npcMask = 0; return; }
+                _npcMask = 1 << npc;
+            }
+            if (_npcMask == 0) return;
+            try
+            {
+                Transform t = _hitBox.transform;
+                _hitThisTick.Clear();
+                foreach (Collider c in Physics.OverlapBox(t.TransformPoint(_hitBox.center), _hitBox.size * 0.5f, t.rotation, _npcMask, QueryTriggerInteraction.Ignore))
+                {
+                    var npc = c.GetComponentInParent<Il2CppScheduleOne.NPCs.NPC>();
+                    if (npc == null || npc.Movement == null || !_hitThisTick.Add(npc.Pointer)) continue;
+                    if (npc.Avatar.Ragdolled) continue;
+                    npc.Movement.CheckHit(_hitBox, c, false, t.position);
+                    // CheckHit stamps the hit time when it counts a hit; a bump too slow to count only knocks the person down.
+                    if (npc.Movement.TimeSinceHitByCar < 0.01f)
+                        Core.Log.Msg("[Mobile] knocked over " + npc.ID + " at " + Mathf.Abs(_chassis.Speed_Kmh).ToString("0") + " km/h.");
+                }
+                _hitFailures = 0;
+            }
+            catch (Exception e) { if (_hitFailures++ == 0) Core.Log.Error("[Mobile] knocking people over failed: " + e); }
         }
 
         // Chassis-local height of the road under the wheels at rest.

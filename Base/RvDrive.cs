@@ -111,6 +111,63 @@ namespace RVRepairVan.Base
                 + (_chassis.Rb != null ? " com=" + _chassis.Rb.centerOfMass.ToString("F2") + " inertia=" + _chassis.Rb.inertiaTensor.ToString("F0") : ""));
         }
 
+        private static Il2CppScheduleOne.NPCs.NPC _target;
+
+        private static Vector3 _pinAt;
+
+        // Holds the NPC on its spot until something knocks it over or 20 s pass, so it does not walk off the road.
+        private static IEnumerator Pin(Il2CppScheduleOne.NPCs.NPC npc)
+        {
+            float until = Time.time + 20f;
+            while (npc != null && Time.time < until && !npc.Avatar.Ragdolled && _target == npc)
+            {
+                npc.Movement.Warp(_pinAt);
+                yield return null;
+            }
+            Core.Log.Msg("[Drive] npc pin released (" + (npc != null && npc.Avatar.Ragdolled ? "knocked over" : "timeout") + ").");
+        }
+
+        /// <summary>rvdrive npc [metres] puts the nearest free NPC that far ahead of the chassis; rvdrive npc stat reports on it.</summary>
+        internal static void Npc(string arg)
+        {
+            if (_chassis == null) { Core.Log.Warning("[Drive] npc: no chassis out."); return; }
+            if (arg == "stat")
+            {
+                if (_target == null) { Core.Log.Warning("[Drive] npc stat: no NPC placed - 'rvdrive npc' first."); return; }
+                CapsuleCollider cap = _target.Movement._capsuleCollider;
+                BoxCollider box = RvMobile.HitBox;
+                string capInfo = cap == null ? "no capsule" : "capsule active=" + cap.gameObject.activeInHierarchy + " enabled=" + cap.enabled
+                    + " trigger=" + cap.isTrigger + " layer=" + LayerMask.LayerToName(cap.gameObject.layer)
+                    + " rb=" + (cap.attachedRigidbody != null ? (cap.attachedRigidbody.isKinematic ? "kinematic" : "dynamic") : "none")
+                    + " ignoresIR=" + Physics.GetIgnoreLayerCollision(cap.gameObject.layer, LayerMask.NameToLayer("Ignore Raycast"));
+                string boxInfo = box == null ? "no box" : "box enabled=" + box.enabled + " at " + box.bounds.center.ToString("F1")
+                    + " size " + box.bounds.size.ToString("F1") + " holdsNpc=" + box.bounds.Contains(_target.transform.position + Vector3.up);
+                Core.Log.Msg("[Drive] npc " + _target.ID + " at " + _target.transform.position.ToString("F1") + " ragdolled=" + _target.Avatar.Ragdolled
+                    + " sinceHit=" + _target.Movement.TimeSinceHitByCar.ToString("0.0") + " s | " + capInfo + " | " + boxInfo);
+                return;
+            }
+            float ahead = float.TryParse(arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float m) ? m : 20f;
+            var reg = Il2CppScheduleOne.NPCs.NPCManager.NPCRegistry;
+            if (reg == null) { Core.Log.Warning("[Drive] npc: no NPC registry."); return; }
+            Il2CppScheduleOne.NPCs.NPC best = null;
+            float bestD = float.MaxValue;
+            for (int i = 0; i < reg.Count; i++)
+            {
+                var n = reg[i];
+                if (n == null || !n.isActiveAndEnabled || !n.isVisible || n.CurrentVehicle != null || !n.IsConscious) continue;
+                float d = Vector3.Distance(n.transform.position, _chassis.transform.position);
+                if (d < bestD) { bestD = d; best = n; }
+            }
+            if (best == null) { Core.Log.Warning("[Drive] npc: no free NPC found."); return; }
+            Vector3 at = _chassis.transform.position + _chassis.transform.forward * ahead;
+            best.Movement.Stop();
+            best.Movement.Warp(at);
+            _target = best;
+            _pinAt = at;
+            MelonCoroutines.Start(Pin(best));
+            Core.Log.Msg("[Drive] npc " + best.ID + " placed " + ahead.ToString("0") + " m ahead at " + at.ToString("F1") + " (was " + bestD.ToString("0") + " m away).");
+        }
+
         /// <summary>rvdrive tp [x z heading]: set the parked chassis down 10 m ahead of the player, or at x/z facing a compass heading (0 = +z).</summary>
         internal static void Tp(string[] args)
         {
