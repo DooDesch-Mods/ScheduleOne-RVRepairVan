@@ -79,6 +79,7 @@ namespace RVRepairVan.Patches
             new[] { "rvreach", "for every RV pot and rack: is each access point in bounds and reachable by the crew", "rvreach" },
             new[] { "rvpay", "put cash in every RV locker, the way a player pays the crew", "rvpay 500" },
             new[] { "rvpayrepair", "pay Marco for the repair the way his dialogue choice does", "rvpayrepair" },
+            new[] { "rvsave", "where the RV's save intercom hangs; 'rvsave at x y z' moves it, 'rvsave use' presses it", "rvsave" },
             new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
         };
 
@@ -90,7 +91,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvreinject" && cmd != "rvprobe"
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach"
-                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive")
+                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave")
                 return false;   // not ours - let the game handle it
 
             // Both overloads can fire for a single submission (the string body calls the List body), so run the
@@ -178,6 +179,9 @@ namespace RVRepairVan.Patches
                         else if (parts.Length > 2 && parts[1].ToLower() == "steps") Base.RvSteps.SetIn(parts[2].ToLower() == "in");
                         else if (parts.Length > 2 && parts[1].ToLower() == "gas") Base.RvDrive.Gas(parts[2].ToLower(), parts.Length > 3 ? parts[3] : "0");
                         else Base.RvMobile.DebugDrive();
+                        break;
+                    case "rvsave":    // report the save intercom; 'rvsave at x y z [fx fy fz]' moves it (rv/Main space)
+                        Base.RvSavePoint.DebugCmd(parts.Length > 1 ? parts[1..] : Array.Empty<string>());
                         break;
                     case "rvcam":     // fixed camera views around and inside the RV, for screenshot rounds
                         if (parts.Length > 7 && parts[1].ToLower() == "at") RvCamAt(parts);

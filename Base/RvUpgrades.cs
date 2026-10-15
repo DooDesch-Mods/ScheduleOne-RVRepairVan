@@ -231,6 +231,7 @@ namespace RVRepairVan.Base
         internal static void ApplyOwned()
         {
             RvLiner.Ensure();   // not an upgrade: the stock model has holes whether or not anything was bought
+            RvSavePoint.Ensure();
             if (!RVRepairVanPreferences.UpgradesEnabled) return;
             foreach (RvUpgrade up in Order)
                 if (Owned(up)) Apply(up);
