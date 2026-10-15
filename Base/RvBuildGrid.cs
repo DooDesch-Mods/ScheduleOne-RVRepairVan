@@ -1,8 +1,12 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using Il2CppScheduleOne.EntityFramework;
 using Il2CppScheduleOne.Property;
 using Il2CppScheduleOne.Tiles;
 using RVRepairVan.Config;
 using RVRepairVan.Managers;
+using MelonLoader;
 
 namespace RVRepairVan.Base
 {
@@ -23,8 +27,16 @@ namespace RVRepairVan.Base
     {
         private static bool _applied;
         private static int _clonedTiles;
+        private static object _sweep;
+        private static Dictionary<int, Shadow> _shadows = new Dictionary<int, Shadow>();
 
-        internal static void Reset() { _applied = false; _clonedTiles = 0; }
+        internal static void Reset()
+        {
+            _applied = false;
+            _clonedTiles = 0;
+            if (_sweep != null) { MelonCoroutines.Stop(_sweep); _sweep = null; }
+            ReleaseShadows();
+        }
 
         /// <summary>
         /// Rebuild the added tiles while the property is loading, before the game restores the objects placed on
@@ -77,7 +89,8 @@ namespace RVRepairVan.Base
                 if (extra > 0)
                 {
                     ExpandGrid(prop, extra);
-                    RetireSecondGrid(prop);
+                    Sweep();
+                    if (_sweep == null) _sweep = MelonCoroutines.Start(SweepLoop());
                     tiles = 0;
                     for (int i = 0; grids != null && i < grids.Count; i++)
                         if (grids[i] != null && grids[i].gameObject.activeSelf && grids[i].Tiles != null) tiles += grids[i].Tiles.Count;
@@ -168,36 +181,172 @@ namespace RVRepairVan.Base
         }
 
         /// <summary>
-        /// The RV ships two grid objects at different origins. Once grid 0 covers the whole cabin they overlap,
-        /// and two rasters over one floor is both confusing to look at and a source of placement conflicts.
-        /// Retire the second one - but only while nothing is standing on it, so this can never delete a player's
-        /// equipment.
+        /// The RV ships two grid objects at different origins. Once grid 0 covers the whole cabin they overlap: the
+        /// second grid's tiles sit 0.09 m across and half a tile along from the new ones. Build mode snaps to the
+        /// nearest tile of ANY active grid and then judges the whole footprint on that tile's grid alone, so two
+        /// rasters over one floor make the ghost jump between them and turn red where the other grid has no tile.
+        ///
+        /// A grid with nothing on it is switched off. Equipment placed on it before the floor was bought stays where
+        /// it is: that grid stays on (its tiles also carry light and temperature for whatever stands there), but its
+        /// tile colliders go off so build mode only sees grid 0, and the grid-0 tiles under the equipment count as
+        /// occupied so nothing can be built into it. The sweep repeats every second, which frees those tiles and
+        /// switches the grid off once the last item is picked up, and catches items the save restores onto it.
         /// </summary>
-        private static void RetireSecondGrid(Property prop)
+        private static void Sweep()
         {
-            try
+            Property prop = PropertyOf();
+            var grids = prop != null ? prop.Grids : null;
+            if (grids == null || grids.Count < 2) return;
+            Grid floor = grids[0];
+            if (floor == null || floor.Tiles == null) return;
+
+            float size = Grid.TileSize;
+            float reach = size - 0.05f;   // tiles overlap unless they only touch at an edge
+            var wanted = new Dictionary<int, Shadow>();
+
+            for (int i = 1; i < grids.Count; i++)
             {
-                var grids = prop.Grids;
-                if (grids == null || grids.Count < 2) return;
-                for (int i = 1; i < grids.Count; i++)
+                Grid g = grids[i];
+                if (g == null || g.Tiles == null) continue;
+
+                int items = 0;
+                var seen = new HashSet<IntPtr>();
+                for (int k = 0; k < g.Tiles.Count; k++)
                 {
-                    Grid g = grids[i];
-                    if (g == null || !g.gameObject.activeSelf) continue;
-
-                    bool occupied = false;
-                    if (g.Tiles != null)
-                        for (int k = 0; k < g.Tiles.Count && !occupied; k++)
+                    Tile t = g.Tiles[k];
+                    if (t == null || t.BuildableOccupants == null || t.BuildableOccupants.Count == 0) continue;
+                    Vector3 local = floor.transform.InverseTransformPoint(t.transform.position);
+                    for (int f = 0; f < floor.Tiles.Count; f++)
+                    {
+                        Tile ft = floor.Tiles[f];
+                        if (ft == null) continue;
+                        Vector3 d = floor.transform.InverseTransformPoint(ft.transform.position) - local;
+                        if (Mathf.Abs(d.x) >= reach || Mathf.Abs(d.z) >= reach) continue;
+                        int id = ft.GetInstanceID();
+                        if (!wanted.TryGetValue(id, out Shadow sh)) wanted[id] = sh = new Shadow(ft);
+                        for (int o = 0; o < t.BuildableOccupants.Count; o++)
                         {
-                            Tile t = g.Tiles[k];
-                            if (t != null && t.BuildableOccupants != null && t.BuildableOccupants.Count > 0) occupied = true;
+                            GridItem item = t.BuildableOccupants[o];
+                            if (item != null && !sh.Items.ContainsKey(item.Pointer)) sh.Items[item.Pointer] = item;
                         }
+                    }
+                    for (int o = 0; o < t.BuildableOccupants.Count; o++)
+                        if (t.BuildableOccupants[o] != null && seen.Add(t.BuildableOccupants[o].Pointer)) items++;
+                }
 
-                    if (occupied) { Core.LogDebug("[Grid] '" + g.name + "' still has items on it - leaving it alone."); continue; }
-                    g.gameObject.SetActive(false);
-                    Core.Log.Msg("[Grid] retired the RV's second grid '" + g.name + "' - one continuous floor now.");
+                bool active = g.gameObject.activeSelf;
+                if (items > 0)
+                {
+                    if (!active) g.gameObject.SetActive(true);
+                    int switched = SetTileColliders(g, false);
+                    if (!active || switched > 0)
+                        Core.Log.Msg("[Grid] '" + g.name + "' carries " + items + " item(s) from before the workshop floor - they stay, "
+                            + "its raster is hidden from build mode.");
+                }
+                else
+                {
+                    SetTileColliders(g, true);
+                    if (active)
+                    {
+                        g.gameObject.SetActive(false);
+                        Core.Log.Msg("[Grid] retired the RV's second grid '" + g.name + "' - one continuous floor now.");
+                    }
                 }
             }
-            catch (Exception e) { Core.Log.Warning("[Grid] retiring the second grid failed: " + e.Message); }
+
+            int added = 0, removed = 0;
+            foreach (var kv in _shadows)
+            {
+                Tile ft = kv.Value.Tile;
+                wanted.TryGetValue(kv.Key, out Shadow keep);
+                foreach (var it in kv.Value.Items)
+                    if ((keep == null || !keep.Items.ContainsKey(it.Key)) && ft != null && RemoveOccupant(ft, it.Key)) removed++;
+            }
+            foreach (var kv in wanted)
+            {
+                _shadows.TryGetValue(kv.Key, out Shadow had);
+                foreach (var it in kv.Value.Items)
+                    if (had == null || !had.Items.ContainsKey(it.Key))
+                    {
+                        if (!HasOccupant(kv.Value.Tile, it.Key)) kv.Value.Tile.BuildableOccupants.Add(it.Value);
+                        added++;
+                    }
+            }
+            _shadows = wanted;
+            if (added > 0 || removed > 0)
+                Core.Log.Msg("[Grid] floor tiles under items on the second grid: " + wanted.Count + " held ("
+                    + added + " taken, " + removed + " freed).");
+        }
+
+        /// <summary>Hand every held floor tile back. Tiles of a scene that is already gone are skipped.</summary>
+        private static void ReleaseShadows()
+        {
+            int freed = 0;
+            foreach (var kv in _shadows)
+                foreach (var it in kv.Value.Items)
+                    if (kv.Value.Tile != null && RemoveOccupant(kv.Value.Tile, it.Key)) freed++;
+            if (freed > 0) Core.Log.Msg("[Grid] freed " + freed + " held floor tile entr(ies).");
+            _shadows = new Dictionary<int, Shadow>();
+        }
+
+        private static IEnumerator SweepLoop()
+        {
+            int failures = 0;
+            while (true)
+            {
+                yield return new WaitForSeconds(1f);
+                try { Sweep(); failures = 0; }
+                catch (Exception e)
+                {
+                    if (failures++ == 0) Core.Log.Error("[Grid] second-grid sweep failed: " + e);
+                }
+            }
+        }
+
+        // Il2Cpp wrappers are not unique per object, so occupants are matched on the native pointer. ReferenceEquals,
+        // not Unity's ==: a picked-up item is already destroyed when its held tiles are handed back, and Unity's
+        // null check would hide it.
+        private static bool HasOccupant(Tile tile, IntPtr item) => IndexOf(tile, item) >= 0;
+
+        private static bool RemoveOccupant(Tile tile, IntPtr item)
+        {
+            int i = IndexOf(tile, item);
+            if (i < 0) return false;
+            tile.BuildableOccupants.RemoveAt(i);
+            return true;
+        }
+
+        private static int IndexOf(Tile tile, IntPtr item)
+        {
+            var list = tile.BuildableOccupants;
+            for (int i = 0; list != null && i < list.Count; i++)
+            {
+                GridItem o = list[i];
+                if (!ReferenceEquals(o, null) && o.Pointer == item) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>Build mode finds tiles through their colliders. Returns how many colliders changed state.</summary>
+        private static int SetTileColliders(Grid g, bool on)
+        {
+            int changed = 0;
+            for (int k = 0; k < g.Tiles.Count; k++)
+            {
+                Tile t = g.Tiles[k];
+                if (t == null) continue;
+                var cols = t.GetComponentsInChildren<Collider>(true);
+                for (int c = 0; c < cols.Length; c++)
+                    if (cols[c] != null && cols[c].enabled != on) { cols[c].enabled = on; changed++; }
+            }
+            return changed;
+        }
+
+        private sealed class Shadow
+        {
+            internal readonly Tile Tile;
+            internal readonly Dictionary<IntPtr, GridItem> Items = new Dictionary<IntPtr, GridItem>();
+            internal Shadow(Tile tile) { Tile = tile; }
         }
 
         /// <summary>

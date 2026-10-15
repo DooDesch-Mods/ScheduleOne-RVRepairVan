@@ -55,7 +55,7 @@ namespace RVRepairVan.Patches
             Core.Log.Msg("[Debug] rvtoggle " + path + " -> " + (on ? "on" : "off"));
         }
 
-        internal static void Place(string itemId, int rotation)
+        internal static void Place(string itemId, int rotation, int onlyGrid = -1)
         {
             Property rv = RvProperty();
             if (rv == null) { Core.Log.Warning("[Debug] rvplace: RV property not found."); return; }
@@ -71,6 +71,7 @@ namespace RVRepairVan.Patches
 
             for (int g = 0; rv.Grids != null && g < rv.Grids.Count; g++)
             {
+                if (onlyGrid >= 0 && g != onlyGrid) continue;
                 Grid grid = rv.Grids[g];
                 if (grid == null || !grid.gameObject.activeInHierarchy || grid.Tiles == null) continue;
                 for (int t = 0; t < grid.Tiles.Count; t++)
@@ -163,16 +164,18 @@ namespace RVRepairVan.Patches
             {
                 Grid grid = rv.Grids[g];
                 if (grid == null) continue;
-                int n = grid.Tiles != null ? grid.Tiles.Count : 0;
+                int n = grid.Tiles != null ? grid.Tiles.Count : 0, occupied = 0, colliders = 0, collidersOn = 0;
                 Vector3 min = Vector3.positiveInfinity, max = Vector3.negativeInfinity;
                 for (int t = 0; t < n; t++)
                 {
                     Tile tile = grid.Tiles[t];
                     if (tile == null) continue;
+                    if (tile.BuildableOccupants != null && tile.BuildableOccupants.Count > 0) occupied++;
+                    foreach (Collider c in tile.GetComponentsInChildren<Collider>(true)) { colliders++; if (c.enabled) collidersOn++; }
                     Vector3 p = root.InverseTransformPoint(tile.transform.position);
                     min = Vector3.Min(min, p); max = Vector3.Max(max, p);
                 }
-                Core.Log.Msg("[Debug] rvgrid '" + grid.name + "' active=" + grid.gameObject.activeInHierarchy + " tiles=" + n
+                Core.Log.Msg("[Debug] rvgrid '" + grid.name + "' active=" + grid.gameObject.activeInHierarchy + " tiles=" + n + " occupied=" + occupied + " colliders on=" + collidersOn + "/" + colliders
                     + (n > 0 ? " x " + min.x.ToString("F2") + ".." + max.x.ToString("F2") + " z " + min.z.ToString("F2") + ".." + max.z.ToString("F2") : ""));
             }
             Transform model = RVManager.Model ?? root;
@@ -512,6 +515,163 @@ namespace RVRepairVan.Patches
             string p = t.name;
             for (Transform up = t.parent; up != null; up = up.parent) p = up.name + "/" + p;
             return p;
+        }
+
+        /// <summary>
+        /// <c>rvghost aim &lt;x&gt; &lt;z&gt; [distance]</c> stands the player a short way from a floor point (RV frame, as
+        /// <c>rvgrid</c> prints it) and looks at it, so a held buildable item shows its ghost there.
+        /// <c>rvghost</c> then logs which grid the ghost snapped to and, per footprint tile, the check
+        /// BuildUpdate_Grid.CheckIntersections fails: no tile, a corner obstacle, an occupant, or the offset.
+        /// </summary>
+        internal static void Ghost(string[] parts)
+        {
+            if (parts.Length >= 4 && parts[1].ToLower() == "aim"
+                && float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float x)
+                && float.TryParse(parts[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float z))
+            {
+                float d = parts.Length > 4 && float.TryParse(parts[4], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float dd) ? dd : 1.2f;
+                AimAtFloor(x, z, d);
+                return;
+            }
+            if (parts.Length >= 3 && parts[1].ToLower() == "rot" && float.TryParse(parts[2], out float deg)) { RotateGhost(deg); return; }
+            if (parts.Length >= 2 && parts[1].ToLower() == "place") { PlaceGhost(); return; }
+            if (parts.Length >= 2 && parts[1].ToLower() == "pickup") { PickupSecondGrid(); return; }
+            LogGhost();
+        }
+
+        /// <summary>Pick up every item standing on the RV's second grid, the way the player's hands do.</summary>
+        private static void PickupSecondGrid()
+        {
+            Property rv = RvProperty();
+            if (rv == null || rv.Grids == null || rv.Grids.Count < 2) { Core.Log.Warning("[Debug] rvghost pickup: the RV has no second grid."); return; }
+            var done = new System.Collections.Generic.HashSet<System.IntPtr>();
+            for (int g = 1; g < rv.Grids.Count; g++)
+            {
+                var grid = rv.Grids[g];
+                if (grid == null || grid.Tiles == null) continue;
+                for (int k = 0; k < grid.Tiles.Count; k++)
+                {
+                    var t = grid.Tiles[k];
+                    if (t == null || t.BuildableOccupants == null) continue;
+                    for (int o = t.BuildableOccupants.Count - 1; o >= 0; o--)
+                    {
+                        var item = t.BuildableOccupants[o];
+                        if (item == null || !done.Add(item.Pointer)) continue;
+                        Core.Log.Msg("[Debug] rvghost pickup: '" + item.name + "' from '" + grid.name + "'.");
+                        item.PickupItem();
+                    }
+                }
+            }
+            if (done.Count == 0) Core.Log.Msg("[Debug] rvghost pickup: nothing stands on the second grid.");
+        }
+
+        private static void AimAtFloor(float x, float z, float distance)
+        {
+            Property rv = RvProperty();
+            Transform root = RVManager.Root;
+            var pm = PlayerSingleton<PlayerMovement>.Instance;
+            var pc = PlayerSingleton<PlayerCamera>.Instance;
+            if (rv == null || root == null) { Core.Log.Warning("[Debug] rvghost aim: RV property or root not found."); return; }
+            if (pm == null || pc == null) { Core.Log.Warning("[Debug] rvghost aim: no local player."); return; }
+
+            float floorY = 0f;
+            for (int g = 0; rv.Grids != null && g < rv.Grids.Count; g++)
+                if (rv.Grids[g] != null && rv.Grids[g].Tiles != null && rv.Grids[g].Tiles.Count > 0)
+                { floorY = root.InverseTransformPoint(rv.Grids[g].Tiles[0].transform.position).y; break; }
+
+            // Stand on the cabin's centre line, toward the target from there, so the look never crosses a wall.
+            Vector3 target = new Vector3(x, floorY, z);
+            Vector3 toCentre = new Vector3(-x, 0f, 0f);
+            Vector3 dir = toCentre.sqrMagnitude > 0.01f ? toCentre.normalized : Vector3.forward;
+            Vector3 stand = target + dir * distance + Vector3.up * 1f;
+            pm.Teleport(root.TransformPoint(stand), true);
+            MelonLoader.MelonCoroutines.Start(LookAtFloorLater(pc, root.TransformPoint(target)));
+        }
+
+        // The look direction is taken from the player's position, which the teleport only moves on a later frame.
+        private static System.Collections.IEnumerator LookAtFloorLater(PlayerCamera pc, Vector3 at)
+        {
+            yield return new WaitForSeconds(0.5f);
+            if (pc == null) { Core.Log.Warning("[Debug] rvghost aim: camera gone before the look."); yield break; }
+            pc.LookAt(at, 0.1f);
+            Core.Log.Msg("[Debug] rvghost aim: looking at " + at.ToString("F2") + ".");
+        }
+
+        private static BuildUpdate_Grid CurrentGhost(string what)
+        {
+            var bm = NetworkSingleton<BuildManager>.Instance;
+            if (bm == null || !bm.isBuilding || bm.currentBuildHandler == null) { Core.Log.Warning("[Debug] rvghost " + what + ": not in build mode - hold a buildable item."); return null; }
+            BuildUpdate_Grid bu = bm.currentBuildHandler.GetComponent<BuildUpdate_Grid>();
+            if (bu == null) Core.Log.Warning("[Debug] rvghost " + what + ": the build handler '" + bm.currentBuildHandler.name + "' is not a grid build.");
+            return bu;
+        }
+
+        /// <summary><c>rvghost rot &lt;degrees&gt;</c>: turn the ghost the way Q/E does.</summary>
+        private static void RotateGhost(float degrees)
+        {
+            BuildUpdate_Grid bu = CurrentGhost("rot");
+            if (bu == null) return;
+            bu._rotation = degrees;
+            Core.Log.Msg("[Debug] rvghost rot: ghost turned to " + degrees + " degrees.");
+        }
+
+        /// <summary><c>rvghost place</c>: place the ghost where it stands, through the same Place() a click calls.</summary>
+        private static void PlaceGhost()
+        {
+            BuildUpdate_Grid bu = CurrentGhost("place");
+            if (bu == null) return;
+            if (!bu._validPosition) { Core.Log.Warning("[Debug] rvghost place: the ghost is red here - nothing placed."); return; }
+            GridItem placed = bu.Place();
+            if (placed == null) { Core.Log.Warning("[Debug] rvghost place: Place() returned null."); return; }
+            Core.Log.Msg("[Debug] rvghost place: '" + placed.name + "' on grid '" + (placed.OwnerGrid != null ? placed.OwnerGrid.name : "null") + "'.");
+        }
+
+        private static void LogGhost()
+        {
+            var bm = NetworkSingleton<BuildManager>.Instance;
+            if (bm == null || !bm.isBuilding || bm.currentBuildHandler == null) { Core.Log.Warning("[Debug] rvghost: not in build mode - hold a buildable item."); return; }
+            BuildUpdate_Grid bu = bm.currentBuildHandler.GetComponent<BuildUpdate_Grid>();
+            if (bu == null) { Core.Log.Warning("[Debug] rvghost: the build handler '" + bm.currentBuildHandler.name + "' is not a grid build."); return; }
+            GridItem item = bu.BuildableItemClass;
+            TileIntersection hit = bu.closestIntersection;
+            if (item == null) { Core.Log.Warning("[Debug] rvghost: the ghost has no GridItem."); return; }
+            if (hit == null || hit.tile == null) { Core.Log.Msg("[Debug] rvghost: the ghost touches no tile."); return; }
+
+            Grid grid = hit.tile.OwnerGrid;
+            Transform root = RVManager.Root;
+            Vector3 ghostAt = bu.GhostModel != null ? bu.GhostModel.transform.position : Vector3.zero;
+            Core.Log.Msg("[Debug] rvghost: valid=" + bu._validPosition + " grid='" + (grid != null ? grid.name : "null") + "' snapped tile ("
+                + hit.tile.x + "," + hit.tile.y + ") ghost at " + (root != null ? root.InverseTransformPoint(ghostAt) : ghostAt).ToString("F2"));
+            if (grid == null) return;
+
+            for (int i = 0; item.CoordinateFootprintTilePairs != null && i < item.CoordinateFootprintTilePairs.Count; i++)
+            {
+                FootprintTile ft = item.CoordinateFootprintTilePairs[i].footprintTile;
+                if (ft == null) { Core.Log.Warning("[Debug] rvghost   footprint " + i + " is null."); continue; }
+                Coordinate c = grid.GetMatchedCoordinate(ft);
+                Tile t = grid.GetTile(c);
+                string why;
+                if (t == null) why = "no tile on this grid";
+                else if (ft.AreCornerObstaclesBlocked(t)) why = "corner obstacle";
+                else if (!grid.IsTileValidAtCoordinate(c, ft, item))
+                {
+                    if (t.BuildableOccupants != null && t.BuildableOccupants.Count > 0)
+                    {
+                        why = "occupied by";
+                        for (int k = 0; k < t.BuildableOccupants.Count; k++) why += " '" + (t.BuildableOccupants[k] != null ? t.BuildableOccupants[k].name : "null") + "'";
+                    }
+                    else why = "offset " + t.AvailableOffset.ToString("F2") + " < required " + ft.RequiredOffset.ToString("F2") + ", or the property is not owned";
+                }
+                else why = "ok";
+
+                string seen = "";
+                var detected = ft.tileDetector != null ? ft.tileDetector.intersectedTiles : null;
+                for (int k = 0; detected != null && k < detected.Count; k++)
+                    if (detected[k] != null) seen += " " + (detected[k].OwnerGrid != null ? detected[k].OwnerGrid.name : "?") + "(" + detected[k].x + "," + detected[k].y + ")";
+                Core.Log.Msg("[Debug] rvghost   footprint " + i + " -> (" + c.x + "," + c.y + ") " + why
+                    + " at " + (root != null ? root.InverseTransformPoint(ft.transform.position) : ft.transform.position).ToString("F2")
+                    + " | touches:" + (seen.Length > 0 ? seen : " nothing"));
+            }
         }
 
         private static Property RvProperty()

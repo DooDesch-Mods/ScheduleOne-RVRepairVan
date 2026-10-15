@@ -61,6 +61,7 @@ namespace RVRepairVan.Patches
             new[] { "rvgiveclient", "hand the client its half of a co-op errand", "rvgiveclient" },
             new[] { "rvdiag", "what the questline thinks is going on", "rvdiag" },
             new[] { "rvpick", "fire one dialogue choice by its rvdiag index", "rvpick marco 3" },
+            new[] { "rvghost", "aim at a floor point in the RV, then log why each build tile is red; 'pickup' lifts what stands on the second grid", "rvghost aim 0.5 -1" },
             new[] { "rvhold", "equip a hotbar slot, 'talk' locks equipping the way a conversation does", "rvhold 2 talk" },
             new[] { "rvreinject", "rebuild the quest objects after a reload", "rvreinject" },
             new[] { "rvprobe", "poke one step of the questline", "rvprobe" },
@@ -94,7 +95,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvreinject" && cmd != "rvprobe"
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach"
-                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor")
+                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost")
                 return false;   // not ours - let the game handle it
 
             // Both overloads can fire for a single submission (the string body calls the List body), so run the
@@ -223,12 +224,14 @@ namespace RVRepairVan.Patches
                         else Core.Log.Warning("[Debug] rvtoggle <path under the RV model> [on|off]");
                         break;
                     case "rvplace":
-                        if (parts.Length > 1) RvDevTools.Place(parts[1].ToLower(), parts.Length > 2 && int.TryParse(parts[2], out int rot) ? rot : 0);
-                        else Core.Log.Warning("[Debug] rvplace <itemId> [rotation]");
+                        if (parts.Length > 1) RvDevTools.Place(parts[1].ToLower(), parts.Length > 2 && int.TryParse(parts[2], out int rot) ? rot : 0,
+                            parts.Length > 3 && int.TryParse(parts[3], out int onGrid) ? onGrid : -1);
+                        else Core.Log.Warning("[Debug] rvplace <itemId> [rotation] [grid index]");
                         break;
                     case "rvcrew":   RvDevTools.Crew(); break;
                     case "rvassign": RvDevTools.Assign(); break;
                     case "rvgrid":   RvDevTools.GridExtent(); break;
+                    case "rvghost":  RvDevTools.Ghost(parts); break;   // 'rvghost aim <x> <z>' looks at a floor point, 'rvghost' explains the build ghost
                     case "rvstock":  RvDevTools.Stock(); break;
                     case "rvdoor":   RvDevTools.DoorInfo(parts.Length > 1 ? parts[1] : ""); break;
                     case "rvbed":    RvDevTools.BedInfo(parts.Length > 1 ? parts[1] : ""); break;
