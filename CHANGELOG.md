@@ -4,6 +4,17 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.5.5] - 2026-10-16
+
+### Added
+- Ride along while a friend drives: walk around in the back or take the new passenger seat next to the wheel.
+- Stations work on the road. The view moves with the RV, and the bags on a packaging station stay on the table.
+- The workshop floor reaches the rear wall, so the space where the bed stood takes racks and machines too.
+
+### Fixed
+- The RV no longer tips onto its side on the first drive after loading a save.
+- Taking the wheel no longer throws the other player out of the RV.
+
 ## [3.5.4] - 2026-10-15
 
 ### Fixed
