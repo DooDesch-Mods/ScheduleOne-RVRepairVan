@@ -42,6 +42,8 @@
     away, it keeps its stations; the crew and deliveries wait until it is back on its spot.
 
   The first three build on each other. The dock and the engine stand alone.
+- **Save intercom.** The repaired RV has the wall intercom every property has. Press E on it
+  to save.
 - **Save-bound progress.** Quest progress and the repaired RV live in the game save. Quit
   without saving and they go back with the world.
 - **Simple mode** (`QuestMode = Simple`): skip the story, talk to Marco, pay the flat price.

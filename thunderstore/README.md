@@ -28,6 +28,7 @@
 - **Marco's build-outs** once the RV stands again: clear out the inside ($2,500), a work
   floor with 24 more build tiles ($7,500), room for a crew of three ($15,000), a loading
   dock for your supplier ($25,000), and an engine to drive the RV anywhere ($10,000).
+- **Save intercom** on the RV wall, like in every other property.
 - **Save-bound progress** - quest and repair live in the game save.
 - **Simple mode** (`QuestMode = Simple`): skip the story, just pay Marco the flat price.
 

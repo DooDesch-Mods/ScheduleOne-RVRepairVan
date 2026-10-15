@@ -252,6 +252,7 @@ namespace RVRepairVan.Managers
             catch (Exception e) { Core.Swallowed("RVManager.RepairVisualOnly.FXContainer", e); /* FXContainer optional */ }
 
             Base.RvLiner.Ensure();
+            Base.RvSavePoint.Ensure();
             Core.Log.Msg("[RVManager] RV repaired (visual).");
             return true;
         }
