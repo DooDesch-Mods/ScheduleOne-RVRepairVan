@@ -90,6 +90,7 @@ namespace RVRepairVan.Base
             _homeKnown = _homeLevelled = false;
             _driving = _localWasIn = _pendingEnter = _restored = false;
             Carried.Clear();
+            _bodies.Clear();
             _muted.Clear();
             _chassisColliders.Clear();
             _static.Clear();
@@ -334,6 +335,7 @@ namespace RVRepairVan.Base
                 p.T.SetParent(chassis.transform, false);
                 p.T.localPosition = invHome * (worldPos - _homePos);
                 p.T.localRotation = invHome * worldRot;
+                OwnBody(p.T);
             }
 
             RaiseCamera(chassis);
@@ -366,6 +368,26 @@ namespace RVRepairVan.Base
             Carried.Add(new CarriedPart { T = t, Parent = t.parent, LocalPos = t.localPosition, LocalRot = t.localRotation });
         }
 
+        // A carried part rides as its own kinematic body. Without one its colliders join the chassis' dynamic body, and
+        // there a non-convex mesh collider collides with nothing: the soil in a pot is one, and a seed fell through it.
+        private static readonly List<Rigidbody> _bodies = new List<Rigidbody>();
+
+        private static void OwnBody(Transform t)
+        {
+            if (t.GetComponent<Rigidbody>() != null) return;
+            Rigidbody rb = t.gameObject.AddComponent<Rigidbody>();
+            if (rb == null) { Core.Log.Error("[Mobile] could not give '" + t.name + "' its own body - its mesh colliders stay dead away from home."); return; }
+            rb.isKinematic = true;
+            rb.useGravity = false;
+            _bodies.Add(rb);
+        }
+
+        private static void DropBodies()
+        {
+            foreach (Rigidbody rb in _bodies) if (rb != null) UnityEngine.Object.Destroy(rb);
+            _bodies.Clear();
+        }
+
         /// <summary>Put everything back on its spot. Host: then despawn the chassis.</summary>
         private static void Detach()
         {
@@ -394,6 +416,7 @@ namespace RVRepairVan.Base
                 p.T.localRotation = p.LocalRot;
             }
             Carried.Clear();
+            DropBodies();
             if (_contents != null) { UnityEngine.Object.Destroy(_contents); _contents = null; }
             RvWheels.Release();
             RvSteps.Release();
