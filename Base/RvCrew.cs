@@ -293,9 +293,11 @@ namespace RVRepairVan.Base
         // --- navmesh --------------------------------------------------------------------------------------
 
         /// <summary>
-        /// Bake a small surface over the cabin floor plus a ramp down to the door, for every agent type the RV's
-        /// employees actually use. Idempotent: the surface object is reused, and the "baked" flag is only set
-        /// after a bake really succeeded, so a failure can be retried instead of being locked out.
+        /// Bake a small surface over the cabin floor plus a ramp down to the door, for every agent type the game
+        /// defines. The crew quarters are usually built before anyone is hired, and an employee's agent type is
+        /// not Humanoid, so baking only for the employees present would leave every later hire without a path in.
+        /// Idempotent: the surface object is reused, and the "baked" flag is only set after a bake really
+        /// succeeded, so a failure can be retried instead of being locked out.
         /// </summary>
         private static void BakeNavMesh(Transform root, Property prop)
         {
@@ -305,6 +307,12 @@ namespace RVRepairVan.Base
 
                 var agents = new HashSet<int>();
                 try { agents.Add(Il2CppScheduleOne.DevUtilities.NavMeshUtility.GetNavMeshAgentID("Humanoid")); } catch (Exception e) { Core.Swallowed("RvCrew.BakeNavMesh.HumanoidAgentId", e); agents.Add(0); }
+                try
+                {
+                    int count = NavMesh.GetSettingsCount();
+                    for (int i = 0; i < count; i++) agents.Add(NavMesh.GetSettingsByIndex(i).agentTypeID);
+                }
+                catch (Exception e) { Core.Log.Warning("[Crew] could not list the agent types - baking only for the crew present: " + e.Message); }
                 if (prop.Employees != null)
                     for (int i = 0; i < prop.Employees.Count; i++)
                     {
