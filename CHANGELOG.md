@@ -4,6 +4,12 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.5.6] - 2026-10-16
+
+### Changed
+- The RV steers like a big vehicle: full lock up to 20 km/h for parking, less lock above that, and the wheel turns
+  slower.
+
 ## [3.5.5] - 2026-10-16
 
 ### Added
