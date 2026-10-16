@@ -14,7 +14,7 @@ namespace RVRepairVan
 {
     /// <summary>
     /// MelonLoader entry point. Mirrors the Mimesis-InventoryExpansion template:
-    /// initialize preferences, patch Harmony, log status. Per-scene setup runs the
+    /// initialize preferences, wire the co-op bus, log status. Per-scene setup runs the
     /// Marco dialogue injection and the post-load repair-state restore.
     /// </summary>
     public sealed class Core : MelonMod
@@ -46,7 +46,8 @@ namespace RVRepairVan
 
             RVRepairVanPreferences.Initialize();
             Localization.German.Register();   // before any L10n.T use (quest title, dialogue, items)
-            HarmonyInstance.PatchAll();
+            // MelonLoader has applied every [HarmonyPatch] class of this assembly before this method runs. A PatchAll
+            // here would apply each a second time, and every prefix and postfix would then run twice per call.
 
 #if DEBUG
             // The debug words are answered in a SubmitCommand prefix and registered nowhere, so nothing that lists
