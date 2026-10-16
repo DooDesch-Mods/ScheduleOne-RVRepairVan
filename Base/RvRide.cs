@@ -13,7 +13,9 @@ namespace RVRepairVan.Base
     /// network shows the others where they stand.
     ///
     /// A station sets the camera to a fixed world pose (<c>PlayerCamera.OverrideTransform</c>) and nothing moves it
-    /// after that. On board, that pose is kept in chassis space instead, so the view rides along with the station.
+    /// after that. On board, the camera hangs on the chassis for as long as the station holds it, so the view rides
+    /// along with the station. Where another player drives, the chassis moves later in the frame than the player's own
+    /// update; a pose set there alone lagged a frame behind, and the view shook against the station.
     ///
     /// The chassis' own colliders and the hull box sit inside the RV body. Near or in the RV, the local player's
     /// colliders ignore them, so the hull neither pushes the player out of the cabin nor gets pushed by the player.
@@ -56,6 +58,7 @@ namespace RVRepairVan.Base
             if (chassis == null)
             {
                 if (_onBoard) Core.Log.Msg("[Ride] the RV is home - the player is no longer carried.");
+                if (_cam) Core.Log.Msg("[Ride] the RV is home - station camera released.");
                 _have = _onBoard = _cam = false;
                 _chassisPtr = IntPtr.Zero;
                 return;
@@ -136,7 +139,11 @@ namespace RVRepairVan.Base
             _cam = false;
             LandVehicle chassis = RvMobile.Chassis;
             Player local = Player.Local;
-            if (keepParented || chassis == null || pc == null || !_onBoard || (local != null && local.CurrentVehicle != null)) return;
+            if (chassis == null || pc == null) return;
+            // Each skip says why, or a camera that shakes on board cannot be told from one that was never pinned.
+            if (keepParented) { Core.Log.Msg("[Ride] camera override keeps its parent - not pinned to the RV."); return; }
+            if (!_onBoard) { Core.Log.Msg("[Ride] camera override while not on board - not pinned to the RV."); return; }
+            if (local != null && local.CurrentVehicle != null) { Core.Log.Msg("[Ride] camera override in a seat - not pinned to the RV."); return; }
             Transform ct = chassis.transform;
             Quaternion inv = Quaternion.Inverse(ct.rotation);
             _camFrom = ct.InverseTransformPoint(pc.transform.position);
@@ -149,22 +156,58 @@ namespace RVRepairVan.Base
             Core.Log.Msg("[Ride] station camera pinned to the RV at chassis-local " + _camTo.ToString("F2") + ".");
         }
 
-        // The game's own lerp writes the world pose at the end of the frame, after rendering; this runs before the
-        // frame renders, so the view shows the pose that rides with the RV.
+        /// <summary>After the game took the camera off the player: hang it on the chassis, so it moves with the RV.</summary>
+        internal static void AfterCameraOverride(PlayerCamera pc)
+        {
+            if (!_cam) return;
+            LandVehicle chassis = RvMobile.Chassis;
+            if (chassis == null || pc == null) { _cam = false; Core.Log.Warning("[Ride] station camera: chassis or camera gone before pinning."); return; }
+#if DEBUG
+            if (DebugCameraLoose) return;
+#endif
+            pc.transform.SetParent(chassis.transform, true);
+        }
+
+        // The game's own lerp writes the world pose at the end of the frame, after rendering. This writes the pose in
+        // chassis space before the frame renders, and the parent carries it along with any later move of the chassis.
         private static void PinCamera(Transform ct)
         {
             var pc = PlayerSingleton<PlayerCamera>.Instance;
             Player local = Player.Local;
-            // Taking a seat moves the camera to the vehicle's own view; that one is not a station's.
-            if (pc == null || !pc.transformOverriden || pc.transform.parent != null || (local != null && local.CurrentVehicle != null))
+            // Leaving the station puts the camera back on the player. Taking a seat moves it to the vehicle's own view;
+            // that one is not a station's.
+            Transform parent = pc != null ? pc.transform.parent : null;
+            bool loose = false;
+#if DEBUG
+            loose = DebugCameraLoose;
+#endif
+            bool held = loose ? parent == null : parent != null && parent.Pointer == ct.Pointer;
+            if (pc == null || !pc.transformOverriden || !held || (local != null && local.CurrentVehicle != null))
             {
                 _cam = false;
+                ReleaseCamera(ct);
                 Core.Log.Msg("[Ride] station camera released.");
                 return;
             }
             float t = _camLerp > 0f ? Mathf.Clamp01((Time.time - _camStart) / _camLerp) : 1f;
-            pc.transform.SetPositionAndRotation(ct.TransformPoint(Vector3.Lerp(_camFrom, _camTo, t)),
-                ct.rotation * Quaternion.Lerp(_camFromRot, _camToRot, t));
+            if (loose)
+            {
+                pc.transform.SetPositionAndRotation(ct.TransformPoint(Vector3.Lerp(_camFrom, _camTo, t)), ct.rotation * Quaternion.Lerp(_camFromRot, _camToRot, t));
+                return;
+            }
+            pc.transform.localPosition = Vector3.Lerp(_camFrom, _camTo, t);
+            pc.transform.localRotation = Quaternion.Lerp(_camFromRot, _camToRot, t);
+        }
+
+        /// <summary>A camera still hanging on the chassis comes off it and stays where the game left it: in no parent.</summary>
+        internal static void ReleaseCamera(Transform chassis)
+        {
+            var pc = PlayerSingleton<PlayerCamera>.Instance;
+            if (pc == null || chassis == null) return;
+            Transform parent = pc.transform.parent;
+            if (parent == null || parent.Pointer != chassis.Pointer) return;
+            pc.transform.SetParent(null, true);
+            Core.Log.Msg("[Ride] station camera taken off the chassis.");
         }
 
         // --- collisions with the chassis -----------------------------------------------------------------
@@ -235,10 +278,50 @@ namespace RVRepairVan.Base
         /// <summary>rvdrive ride oldbody: remote players' controllers collide with the chassis again, as before the fix.</summary>
         internal static bool DebugRemoteBodyCollides;
 
+        /// <summary>rvdrive ride oldcam: the station camera is set in chassis space but no longer hangs on the chassis, as before the fix.</summary>
+        internal static bool DebugCameraLoose;
+
+        // How far the view moves against the RV from one rendered frame to the next. Measured after each frame has
+        // rendered, so it is the pose that was on screen.
+        private static System.Collections.IEnumerator Shake(float seconds)
+        {
+            float until = Time.time + seconds;
+            Vector3 last = Vector3.zero;
+            bool have = false;
+            float worst = 0f, sum = 0f;
+            int n = 0;
+            while (Time.time < until)
+            {
+                yield return new WaitForEndOfFrame();
+                LandVehicle chassis = RvMobile.Chassis;
+                var pc = PlayerSingleton<PlayerCamera>.Instance;
+                if (chassis == null || pc == null) { have = false; continue; }
+                Vector3 now = chassis.transform.InverseTransformPoint(pc.transform.position);
+                if (have) { float d = (now - last).magnitude; worst = Mathf.Max(worst, d); sum += d; n++; }
+                last = now;
+                have = true;
+            }
+            Core.Log.Msg("[Ride] shake: " + n + " frame(s), view moved " + (n > 0 ? (sum / n * 1000f).ToString("0.0") : "-") + " mm per frame on average, "
+                + (worst * 1000f).ToString("0.0") + " mm at most, against the RV. cameraPinned=" + _cam + " loose=" + DebugCameraLoose
+                + (RvMobile.Chassis != null ? " speed=" + RvMobile.Chassis.Speed_Kmh.ToString("0.0") : ""));
+        }
+
         /// <summary>rvdrive ride [seconds]: log where the player and the camera stand in chassis space, twice a second.</summary>
         internal static void DebugWatch(string arg)
         {
             float seconds = float.TryParse(arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float s) ? s : 0f;
+            if (arg == "oldcam")
+            {
+                DebugCameraLoose = !DebugCameraLoose;
+                Core.Log.Msg("[Ride] station camera " + (DebugCameraLoose ? "set in chassis space only" : "hangs on the chassis") + " (debug).");
+                return;
+            }
+            if (arg.StartsWith("shake"))
+            {
+                float secs = float.TryParse(arg.Substring(5), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float ss) && ss > 0f ? ss : 5f;
+                MelonLoader.MelonCoroutines.Start(Shake(secs));
+                return;
+            }
             if (arg == "oldbody")
             {
                 DebugRemoteBodyCollides = !DebugRemoteBodyCollides;
@@ -302,6 +385,12 @@ namespace RVRepairVan.Base
         {
             try { RvRide.OnCameraOverride(__instance, worldPos, rot, lerpTime, keepParented); }
             catch (Exception e) { Core.Log.Error("[Ride] pinning the station camera failed: " + e); }
+        }
+
+        private static void Postfix(PlayerCamera __instance)
+        {
+            try { RvRide.AfterCameraOverride(__instance); }
+            catch (Exception e) { Core.Log.Error("[Ride] hanging the station camera on the RV failed - it may shake while the RV moves: " + e); }
         }
     }
 }

@@ -655,6 +655,8 @@ namespace RVRepairVan.Base
             }
 
             SetDriving(false);
+            // A station camera hangs on the chassis, and the despawn would take it along.
+            RvRide.ReleaseCamera(chassis.transform);
             Rigidbody rb = chassis.Rb;
             if (rb != null) rb.constraints = RigidbodyConstraints.None;
             foreach (CarriedPart p in Carried)
