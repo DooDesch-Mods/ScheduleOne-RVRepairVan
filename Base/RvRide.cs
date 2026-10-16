@@ -151,6 +151,10 @@ namespace RVRepairVan.Base
         /// avatar into a seat while the player's root stays where they got in, and on a seat in the chassis itself.
         /// Re-applied on every watch tick, because switching a collider on or off, or leaving a vehicle, drops the
         /// ignores again. A capsule left colliding inside the chassis shoves it sideways and throws the RV over.
+        ///
+        /// Two colliders per player: the capsule and the root's CharacterController. On a remote player the capsule is
+        /// a trigger and the controller is the solid one, so where a client drives, the controller of a player
+        /// standing in the cabin is what the chassis would push against.
         /// </summary>
         internal static void KeepClear(bool force = false)
         {
@@ -164,17 +168,21 @@ namespace RVRepairVan.Base
                 if (p == null) continue;
                 bool local = p.IsLocalPlayer;
                 Collider cap = p.CapCol;
+                Collider body = local && pm != null ? pm.Controller : p.GetComponent<CharacterController>();
+#if DEBUG
+                if (DebugRemoteBodyCollides && !local) body = null;
+#endif
                 bool seated = chassisObj != IntPtr.Zero && p.CurrentVehicle != null && p.CurrentVehicle.Pointer == chassisObj;
                 bool near = chassis != null && (seated
                     || (cap != null && RvMobile.Inside(cap.transform.position, NearMargin))
-                    || (local && pm != null && RvMobile.Inside(pm.transform.position, NearMargin)));
+                    || (body != null && RvMobile.Inside(body.transform.position, NearMargin)));
                 bool was = _ignoringPlayers.Contains(p.Pointer);
                 if (!near && !was && !force) continue;
                 int pairs = 0;
                 foreach (Collider c in RvMobile.SolidChassisColliders())
                 {
                     if (c == null || !c.enabled || !c.gameObject.activeInHierarchy) continue;
-                    pairs += Ignore(cap, c, near) + (local && pm != null ? Ignore(pm.Controller, c, near) : 0);
+                    pairs += Ignore(cap, c, near) + Ignore(body, c, near);
                 }
                 if (near == was) continue;
                 if (near) _ignoringPlayers.Add(p.Pointer); else _ignoringPlayers.Remove(p.Pointer);
@@ -200,10 +208,19 @@ namespace RVRepairVan.Base
             return "onBoard=" + _onBoard + " ignoring=" + _ignoring + " cameraPinned=" + _cam + where;
         }
 
+        /// <summary>rvdrive ride oldbody: remote players' controllers collide with the chassis again, as before the fix.</summary>
+        internal static bool DebugRemoteBodyCollides;
+
         /// <summary>rvdrive ride [seconds]: log where the player and the camera stand in chassis space, twice a second.</summary>
         internal static void DebugWatch(string arg)
         {
             float seconds = float.TryParse(arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float s) ? s : 0f;
+            if (arg == "oldbody")
+            {
+                DebugRemoteBodyCollides = !DebugRemoteBodyCollides;
+                Core.Log.Msg("[Ride] remote players' controllers " + (DebugRemoteBodyCollides ? "collide with" : "ignore") + " the chassis (debug).");
+                return;
+            }
             if (seconds <= 0f) { Core.Log.Msg("[Ride] " + RvMobile.DebugState()); return; }
             MelonLoader.MelonCoroutines.Start(Watch(seconds));
         }

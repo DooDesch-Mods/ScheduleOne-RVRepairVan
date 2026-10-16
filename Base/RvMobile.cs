@@ -447,6 +447,7 @@ namespace RVRepairVan.Base
             ComputeHome(root, _model);
 
             _chassis = chassis;
+            ChassisPtr = chassis.Pointer;
             _chassisId = chassis.NetworkObject != null ? chassis.NetworkObject.ObjectId : -1;
             _attachFrame = Time.frameCount;
             _lastOccupiedAt = Time.time;
@@ -834,7 +835,8 @@ namespace RVRepairVan.Base
                 if (_chassis != null && Time.frameCount - _attachFrame >= 2) { _pendingEnter = false; EnterChassis(_pendingPassenger); }
                 else if (Time.time - _pendingSince > 10f) { _pendingEnter = false; Core.Log.Warning("[Mobile] no chassis 10 s after the wheel was used - gave up."); }
             }
-            if (_chassis == null) return;
+            if (_chassis == null) { ChassisPtr = IntPtr.Zero; return; }
+            ChassisPtr = _chassis.Pointer;
 
             bool alive;
             try { alive = _chassis.transform != null; } catch (Exception e) { Core.Log.Warning("[Mobile] chassis check: " + e.Message); alive = false; }
@@ -850,7 +852,7 @@ namespace RVRepairVan.Base
             if (occupied) { _lastOccupiedAt = Time.time; RvBattery.HostStamp(); }
             bool driven = HasDriver(_chassis);
             if (driven != _driving) SetDriving(driven);
-            if (_driving) IgnoreChassis(false);
+            if (_driving) { IgnoreChassis(false); ReIgnoreOnWheelSwap(); }
             RvRide.KeepClear();
             if (Time.time - _lastBodyScan > BodyScanInterval) { _lastBodyScan = Time.time; StopInterpolation(); }
             if (_localWasIn && !localIn) MelonCoroutines.Start(PlaceInCabin());
@@ -928,6 +930,7 @@ namespace RVRepairVan.Base
                 SetChassisColliders(true);
                 _ignored.Clear();
                 int ignored = IgnoreChassis(true);
+                _wheelsOn = WheelCollidersOn();
                 RvRide.KeepClear(true);
 #if DEBUG
                 DebugOverlap("before the body goes free");
@@ -958,6 +961,51 @@ namespace RVRepairVan.Base
         }
 
         private static int _ignoreFailures;
+
+        /// <summary>The chassis' native pointer, for the physics patch that runs on every vehicle each physics step.</summary>
+        internal static IntPtr ChassisPtr;
+
+        // On a client the chassis is kinematic until that client drives it. When it turns dynamic, the game starts it at
+        // the average speed it measured over the last 20 physics steps - from how far its transform moved, and the
+        // chassis is placed under the RV with a jump. A fresh chassis then shoots off on its own.
+        internal static void OnTurnedDynamic(LandVehicle v)
+        {
+            Rigidbody rb = v.Rb;
+            if (rb == null || rb.isKinematic) return;
+            float was = rb.velocity.magnitude;
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            Core.Log.Msg("[Mobile] the chassis turned dynamic here - its inherited " + (was * 3.6f).ToString("0.0") + " km/h set to rest.");
+            // The wheel colliders came on in this same call, after the last ignore pass. The next watch tick is several
+            // physics steps away, and one step with a suspension ray on the RV's floor already throws the RV.
+            _ignored.Clear();
+            int n = IgnoreChassis(true);
+            _wheelsOn = WheelCollidersOn();
+            RvRide.KeepClear(true);
+            Core.Log.Msg("[Mobile] " + _wheelsOn + " wheel collider(s) on - " + n + " RV collider(s) ignore the chassis in the same step.");
+        }
+
+        private static int _wheelsOn;
+
+        private static int WheelCollidersOn()
+        {
+            int n = 0;
+            foreach (Collider c in _wheelColliders) if (c != null && c.enabled && c.gameObject.activeInHierarchy) n++;
+            return n;
+        }
+
+        // Ignores set while a wheel collider was off do not hold once the vehicle switches it on: on a client that is when
+        // it takes over the chassis. A wheel whose suspension ray meets the RV's floor lifts the body off the road.
+        private static void ReIgnoreOnWheelSwap()
+        {
+            int on = WheelCollidersOn();
+            if (on == _wheelsOn) return;
+            _wheelsOn = on;
+            _ignored.Clear();
+            int n = IgnoreChassis(true);
+            RvRide.KeepClear(true);
+            Core.Log.Msg("[Mobile] " + on + " wheel collider(s) on now - " + n + " RV collider(s) ignore the chassis again.");
+        }
 
         /// <summary>
         /// Every RV collider ignores the chassis' colliders, its wheels and the hull. Runs on each watch tick while
@@ -1004,15 +1052,24 @@ namespace RVRepairVan.Base
         {
             _chassisColliders.Clear();
             _wheelColliders.Clear();
-            int skipped = 0;
+            // A wheel's static collider stands in for its suspension while the body is kinematic, and the vehicle swaps
+            // the two over when it starts simulating. On a client the chassis is kinematic when the RV attaches, so the
+            // static ones are on then; collected, driving would switch them on under the live suspension.
+            var wheelStatics = new HashSet<IntPtr>();
+            if (chassis.wheels != null)
+                foreach (Wheel w in chassis.wheels)
+                    if (w != null && w.staticCollider != null) wheelStatics.Add(w.staticCollider.Pointer);
+            int skipped = 0, statics = 0;
             foreach (Collider c in chassis.GetComponentsInChildren<Collider>(true))
             {
                 if (c.isTrigger) continue;
                 if (c.TryCast<WheelCollider>() != null) { _wheelColliders.Add(c); continue; }
+                if (wheelStatics.Contains(c.Pointer)) { statics++; continue; }
                 if (!c.enabled || !c.gameObject.activeInHierarchy) { skipped++; continue; }
                 _chassisColliders.Add(c);
             }
-            Core.Log.Msg("[Mobile] chassis colliders: " + _chassisColliders.Count + " solid, " + skipped + " switched off by the vehicle and left off.");
+            Core.Log.Msg("[Mobile] chassis colliders: " + _chassisColliders.Count + " solid, " + skipped + " switched off by the vehicle and left off, "
+                + statics + " wheel stand-in(s) left to the vehicle.");
         }
 
         private static void SetChassisColliders(bool on)
