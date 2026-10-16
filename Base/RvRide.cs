@@ -50,6 +50,8 @@ namespace RVRepairVan.Base
         /// <summary>Every frame, before the local player's own movement: carry them by the chassis' motion.</summary>
         internal static void Step(PlayerMovement pm)
         {
+            try { HealCameraOffset(pm); }
+            catch (Exception e) { if (_healFailures++ == 0) Core.Log.Error("[Ride] checking the camera's place failed: " + e); }
             LandVehicle chassis = RvMobile.Chassis;
             if (chassis == null)
             {
@@ -65,10 +67,13 @@ namespace RVRepairVan.Base
                 Matrix4x4 now = ct.localToWorldMatrix;
                 float yaw = Yaw(ct);
 
-                Transform pt = pm.transform;
                 Player local = Player.Local;
                 bool seated = local != null && local.CurrentVehicle != null;
                 CharacterController cc = pm.Controller;
+                // The game moves the player by the controller's transform. PlayerMovement sits on a child of it that
+                // carries the camera; moving that child alone leaves the body behind, and the camera then swings around
+                // the body whenever the player looks left or right.
+                Transform pt = cc != null ? cc.transform : pm.transform;
                 bool onBoard = !seated && cc != null && cc.enabled && RvMobile.Inside(pt.position, 0.3f);
                 if (onBoard != _onBoard)
                 {
@@ -96,6 +101,25 @@ namespace RVRepairVan.Base
                 if (_failures++ == 0) Core.Log.Error("[Ride] carrying the player failed: " + e);
                 _have = false;
             }
+        }
+
+        private static bool _healedOnce;
+        private static int _healFailures;
+
+        // Earlier versions carried only the camera's child, which leaves it off the body's centre for good: it survives
+        // a death and the switch to third person. Put it back once the player stands on their own.
+        private static void HealCameraOffset(PlayerMovement pm)
+        {
+            CharacterController cc = pm.Controller;
+            Player local = Player.Local;
+            if (cc == null || !cc.enabled || local == null || local.CurrentVehicle != null) return;
+            Transform child = pm.transform;
+            if (child.Pointer == cc.transform.Pointer || child.parent == null || child.parent.Pointer != cc.transform.Pointer) return;
+            Vector3 off = child.localPosition;
+            if (off.sqrMagnitude < 0.0025f) return;
+            child.localPosition = Vector3.zero;
+            if (!_healedOnce) { _healedOnce = true; Core.Log.Warning("[Ride] the camera stood " + off.ToString("F2") + " off the player's body - put back."); }
+            else Core.Log.Msg("[Ride] camera offset " + off.ToString("F2") + " put back.");
         }
 
         private static float Yaw(Transform t)
@@ -220,6 +244,30 @@ namespace RVRepairVan.Base
                 Core.Log.Msg("[Ride] watch " + DebugState() + cam + speed);
                 yield return new WaitForSeconds(0.5f);
             }
+        }
+
+        /// <summary>rvdrive pose: the local player's root and camera, to tell a tilted root from a moved camera.</summary>
+        internal static void DebugPose()
+        {
+            var pm = PlayerSingleton<PlayerMovement>.Instance;
+            var pc = PlayerSingleton<PlayerCamera>.Instance;
+            Player local = Player.Local;
+            if (pm == null || pc == null || local == null) { Core.Log.Warning("[Ride] pose: no local player or camera."); return; }
+            CharacterController cc = pm.Controller;
+            Transform ct = pc.transform;
+            Core.Log.Msg("[Ride] pose root=" + pm.transform.position.ToString("F2") + " euler=" + pm.transform.eulerAngles.ToString("F1")
+                + " playerRootSame=" + (local.transform.Pointer == pm.transform.Pointer)
+                + " controller=" + (cc != null ? cc.enabled + " h=" + cc.height.ToString("F2") + " c=" + cc.center.ToString("F2") : "none")
+                + " vehicle=" + (local.CurrentVehicle != null));
+            Core.Log.Msg("[Ride] pose camera parent=" + (ct.parent != null ? ct.parent.name : "none") + " local=" + ct.localPosition.ToString("F2")
+                + " localEuler=" + ct.localEulerAngles.ToString("F1") + " world=" + ct.position.ToString("F2") + " overridden=" + pc.transformOverriden
+                + " avatarParent=" + (local.Avatar != null && local.Avatar.transform.parent != null ? local.Avatar.transform.parent.name : "none")
+                + " avatarLocal=" + (local.Avatar != null ? local.Avatar.transform.localPosition.ToString("F2") : "-"));
+            Transform lt = local.transform, mt = pm.transform;
+            Core.Log.Msg("[Ride] pose player='" + lt.name + "' parent=" + (lt.parent != null ? lt.parent.name : "none") + " world=" + lt.position.ToString("F2")
+                + " euler=" + lt.eulerAngles.ToString("F1") + " | movement='" + mt.name + "' parent=" + (mt.parent != null ? mt.parent.name : "none")
+                + " local=" + mt.localPosition.ToString("F2") + " localEuler=" + mt.localEulerAngles.ToString("F1")
+                + " | controllerOn='" + (cc != null ? cc.transform.name : "-") + "'");
         }
 #endif
     }
