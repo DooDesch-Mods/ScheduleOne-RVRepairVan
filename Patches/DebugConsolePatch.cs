@@ -75,7 +75,7 @@ namespace RVRepairVan.Patches
             new[] { "rvplace", "build an item on the RV floor", "rvplace plasticpot 0" },
             new[] { "rvcrew", "every RV employee: position, locker, pay, work issues", "rvcrew" },
             new[] { "rvassign", "give RV botanists a free RV locker and the RV pots", "rvassign" },
-            new[] { "rvgrid", "extent of every RV build grid in the RV's frame", "rvgrid" },
+            new[] { "rvgrid", "extent of every RV build grid in the RV's frame; 'plan' shows where a floor fill would lay tiles now and how many behind a wall", "rvgrid" },
             new[] { "rvstock", "fill the first RV storage rack with soil and seeds", "rvstock" },
             new[] { "rvreach", "for every RV pot and rack: is each access point in bounds and reachable by the crew", "rvreach" },
             new[] { "rvpay", "put cash in every RV locker, the way a player pays the crew", "rvpay 500" },
@@ -257,7 +257,7 @@ namespace RVRepairVan.Patches
                         break;
                     case "rvcrew":   RvDevTools.Crew(); break;
                     case "rvassign": RvDevTools.Assign(); break;
-                    case "rvgrid":   if (parts.Length > 1 && parts[1] == "scan") RvDevTools.ScanCabin(); else RvDevTools.GridExtent(); break;
+                    case "rvgrid":   if (parts.Length > 1 && parts[1] == "scan") RvDevTools.ScanCabin(); else if (parts.Length > 1 && parts[1] == "plan") Base.RvBuildGrid.DebugPlan(); else RvDevTools.GridExtent(); break;
                     case "rvghost":  RvDevTools.Ghost(parts); break;   // 'rvghost aim <x> <z>' looks at a floor point, 'rvghost' explains the build ghost
                     case "rvstock":  RvDevTools.Stock(); break;
                     case "rvdoor":   RvDevTools.DoorInfo(parts.Length > 1 ? parts[1] : ""); break;
