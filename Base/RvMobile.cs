@@ -91,6 +91,7 @@ namespace RVRepairVan.Base
             if (_hitLoop != null) { MelonCoroutines.Stop(_hitLoop); _hitLoop = null; }
             if (_find != null) { MelonCoroutines.Stop(_find); _find = null; }
             _wantedId = -1;
+            _provisional = null;
             _chassis = null;
             _chassisId = -1;
             _wheel = null;
@@ -453,8 +454,8 @@ namespace RVRepairVan.Base
             _lastOccupiedAt = Time.time;
 
             // The stock vehicle's own parts, before the RV is parented on and would be counted with them.
-            int hidden = 0;
-            foreach (Renderer r in chassis.GetComponentsInChildren<Renderer>(true)) { r.forceRenderingOff = true; hidden++; }
+            int hidden = HideChassisRenderers(chassis);
+            _provisional = null;
             HideChassisExtras(chassis);
             RvLights.MuteChassis(chassis);
             CollectChassisColliders(chassis);
@@ -830,6 +831,7 @@ namespace RVRepairVan.Base
 
         private static void Tick()
         {
+            CheckProvisional();
             if (_pendingEnter)
             {
                 if (_chassis != null && Time.frameCount - _attachFrame >= 2) { _pendingEnter = false; EnterChassis(_pendingPassenger); }
@@ -1197,6 +1199,81 @@ namespace RVRepairVan.Base
             }
             if (ground == float.MaxValue) { Core.Log.Warning("[Mobile] chassis has no wheels - hull height taken from the RV body only."); return 0f; }
             return ground;
+        }
+
+        // Player.EnterVehicle hangs a seated player's avatar under the vehicle's root, on every peer. Hiding the chassis
+        // while someone sits in it would hide that body too, and it stays hidden after they get out.
+        private static int HideChassisRenderers(LandVehicle chassis)
+        {
+            var avatars = new List<Transform>();
+            var players = Player.PlayerList;
+            if (players != null)
+                foreach (Player p in players)
+                    if (p != null && p.Avatar != null) avatars.Add(p.Avatar.transform);
+            int hidden = 0, riders = 0;
+            foreach (Renderer r in chassis.GetComponentsInChildren<Renderer>(true))
+            {
+                bool rider = false;
+                foreach (Transform a in avatars) if (r.transform.IsChildOf(a)) { rider = true; break; }
+                if (rider) { riders++; continue; }
+                r.forceRenderingOff = true;
+                hidden++;
+            }
+            if (riders > 0) Core.Log.Msg("[Mobile] " + riders + " renderer(s) of a seated player left visible on the chassis.");
+            return hidden;
+        }
+
+        // --- the stock vehicle before the RV is on it (client) ------------------------------------------------
+
+        // A client hears which vehicle is the chassis only after FishNet has spawned it, and finds it a few frames
+        // later still. Until then the stock vehicle stands in the RV for everyone to see. A veeper that spawns on the
+        // RV's spot is hidden right away; if the host never names it, it shows again.
+        private const float ProvisionalSpotRadius = 3f, ProvisionalPatience = 10f;
+        private static LandVehicle _provisional;
+        private static float _provisionalAt;
+
+        internal static void OnVehicleStartClient(LandVehicle v)
+        {
+            if (!NetworkBus.Online || NetworkBus.IsServer) return;   // the host puts the RV on in the call that spawns it
+            if (v == null || _chassis != null) return;
+            if (v.VehicleCode != ChassisCode || !RvUpgrades.Owned(RvUpgrade.Engine)) return;
+            bool named = v.NetworkObject != null && v.NetworkObject.ObjectId == _wantedId;
+            if (_model == null) Apply();
+            Transform root = RVManager.Root;
+            if (root == null || _model == null)
+            {
+                Core.Log.Warning("[Mobile] a veeper spawned, but the RV is not ready - it stays visible until the RV is on it.");
+                return;
+            }
+            ComputeHome(root, _model);
+            Vector3 d = v.transform.position - _homePos;
+            d.y = 0f;
+            if (!named && d.magnitude > ProvisionalSpotRadius) return;   // somebody's own van
+            int hidden = HideChassisRenderers(v);
+            _provisional = v;
+            _provisionalAt = Time.time;
+            Core.Log.Msg("[Mobile] a veeper spawned " + (named ? "as the named chassis" : "on the RV's spot") + " - " + hidden
+                + " renderer(s) hidden until the RV is on it (frame " + Time.frameCount + ").");
+        }
+
+        // Watch tick: a hidden veeper the host has not named in time was not the chassis.
+        private static void CheckProvisional()
+        {
+            if (_provisional == null || Time.time - _provisionalAt < ProvisionalPatience) return;
+            LandVehicle v = _provisional;
+            _provisional = null;
+            try
+            {
+                if (v == null || v.transform == null) { Core.Log.Msg("[Mobile] the hidden veeper on the RV's spot is gone."); return; }
+                if (v.NetworkObject != null && v.NetworkObject.ObjectId == _wantedId)
+                {
+                    Core.Log.Warning("[Mobile] the named chassis is still not under the RV after " + ProvisionalPatience + " s - it stays hidden.");
+                    return;
+                }
+                foreach (Renderer r in v.GetComponentsInChildren<Renderer>(true)) r.forceRenderingOff = false;
+                Core.Log.Warning("[Mobile] the veeper on the RV's spot was not the chassis - shown again.");
+            }
+            catch (Exception e) { Core.Log.Error("[Mobile] showing a veeper again failed: " + e); }
         }
 
         private static void HideChassisExtras(LandVehicle chassis)
@@ -1571,5 +1648,15 @@ namespace RVRepairVan.Base
             + (_seat != null ? " seat=" + _seat.transform.position : " no seat")
             + " | " + RvRide.DebugState();
 #endif
+    }
+
+    [HarmonyLib.HarmonyPatch(typeof(LandVehicle), nameof(LandVehicle.OnStartClient))]
+    internal static class RvMobileSpawnPatch
+    {
+        private static void Postfix(LandVehicle __instance)
+        {
+            try { RvMobile.OnVehicleStartClient(__instance); }
+            catch (Exception e) { Core.Log.Error("[Mobile] hiding a freshly spawned veeper failed: " + e); }
+        }
     }
 }
