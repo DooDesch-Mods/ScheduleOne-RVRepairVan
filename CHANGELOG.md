@@ -4,6 +4,16 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.5.7] - 2026-10-16
+
+### Fixed
+- Co-op: the RV no longer flies up and flips when a friend takes the wheel.
+- Co-op: whoever drove the RV stays visible for the others after getting out.
+- Co-op: the stock Veeper no longer flashes up for a moment when someone starts to drive.
+- The camera no longer drifts off your body after a ride in the moving RV. A camera that already sits off snaps
+  back once you stand on your own.
+- The mod does half the work per frame: each of its checks ran twice.
+
 ## [3.5.6] - 2026-10-16
 
 ### Changed
