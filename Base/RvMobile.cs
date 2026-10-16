@@ -54,6 +54,9 @@ namespace RVRepairVan.Base
         /// <summary>True while the RV is on its chassis, wherever that is - including parked right at home.</summary>
         internal static bool Away => _chassis != null;
         internal static LandVehicle Chassis => _chassis;
+
+        /// <summary>How the RV is turned and tilted against its pose at home. Identity at home.</summary>
+        internal static Quaternion AwayRotation => _chassis != null ? _chassis.transform.rotation * Quaternion.Inverse(_homeRot) : Quaternion.identity;
         internal static BoxCollider Hull => _hull;
         internal static BoxCollider HitBox => _hitBox;
 
