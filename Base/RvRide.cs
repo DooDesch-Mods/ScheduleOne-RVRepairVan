@@ -139,7 +139,11 @@ namespace RVRepairVan.Base
             _cam = false;
             LandVehicle chassis = RvMobile.Chassis;
             Player local = Player.Local;
-            if (keepParented || chassis == null || pc == null || !_onBoard || (local != null && local.CurrentVehicle != null)) return;
+            if (chassis == null || pc == null) return;
+            // Each skip says why, or a camera that shakes on board cannot be told from one that was never pinned.
+            if (keepParented) { Core.Log.Msg("[Ride] camera override keeps its parent - not pinned to the RV."); return; }
+            if (!_onBoard) { Core.Log.Msg("[Ride] camera override while not on board - not pinned to the RV."); return; }
+            if (local != null && local.CurrentVehicle != null) { Core.Log.Msg("[Ride] camera override in a seat - not pinned to the RV."); return; }
             Transform ct = chassis.transform;
             Quaternion inv = Quaternion.Inverse(ct.rotation);
             _camFrom = ct.InverseTransformPoint(pc.transform.position);
