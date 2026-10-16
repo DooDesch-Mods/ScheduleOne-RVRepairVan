@@ -2,6 +2,7 @@ using System.Collections;
 using DooDesch.Localization;
 using MelonLoader;
 using Il2CppScheduleOne.Interaction;
+using Il2CppScheduleOne.UI;
 using Il2CppScheduleOne.Vehicles;
 using RVRepairVan.Config;
 using RVRepairVan.Managers;
@@ -284,6 +285,43 @@ namespace RVRepairVan.Base
             if (_chassis != null) { Core.Log.Msg("[Mobile] drive request - chassis already out, re-sending it."); Broadcast(); return; }
             if (RvBattery.HostBlocksStart()) { Core.Log.Msg("[Mobile] drive request refused - flat battery."); return; }
             HostStartAtHome();
+        }
+
+        // An arrest takes the arrested player's last driven vehicle to the police impound, with no check that it fits
+        // there. The RV does not and ends up stuck in the fence, so it goes home instead. The arrest notice runs on the
+        // arrested player's own machine, so a client asks the host.
+        internal static void OnArrestImpound(ArrestNoticeScreen screen)
+        {
+            LandVehicle v = screen.vehicle;
+            if (v == null || ChassisPtr == IntPtr.Zero || v.Pointer != ChassisPtr) return;
+            screen.vehicle = null;
+            if (NetworkBus.Online && !NetworkBus.IsServer)
+            {
+                Core.Log.Msg("[Mobile] arrested: the RV stays out of the impound - asking the host to send it home.");
+                NetworkBus.SendToHost(RvOp.ArrestHome, _chassisId);
+                return;
+            }
+            SendHomeAfterArrest("the local player");
+        }
+
+        /// <summary>Host: a client was arrested after driving the RV.</summary>
+        internal static void HostOnArrestHome(int id)
+        {
+            if (_chassis != null && id != _chassisId)
+            {
+                Core.Log.Warning("[Mobile] a client was arrested after driving chassis " + id + ", the RV rides on " + _chassisId + " - it stays.");
+                return;
+            }
+            SendHomeAfterArrest("a client");
+        }
+
+        private static void SendHomeAfterArrest(string who)
+        {
+            if (_chassis == null) { Core.Log.Msg("[Mobile] " + who + " was arrested after driving the RV - it is home already."); return; }
+            // Vanilla leaves an occupied vehicle where it is, and so does the RV: someone else may be driving it.
+            if (_chassis.IsOccupied) { Core.Log.Msg("[Mobile] " + who + " was arrested after driving the RV - someone sits in it, it stays."); return; }
+            Core.Log.Msg("[Mobile] " + who + " was arrested after driving the RV - it goes home instead of to the impound.");
+            Detach();
         }
 
         /// <summary>Client: the host refused the start, so stop waiting for the chassis. True if a start was pending.</summary>
@@ -1657,6 +1695,16 @@ namespace RVRepairVan.Base
         {
             try { RvMobile.OnVehicleStartClient(__instance); }
             catch (Exception e) { Core.Log.Error("[Mobile] hiding a freshly spawned veeper failed: " + e); }
+        }
+    }
+
+    [HarmonyLib.HarmonyPatch(typeof(ArrestNoticeScreen), nameof(ArrestNoticeScreen.Open))]
+    internal static class RvArrestImpoundPatch
+    {
+        private static void Prefix(ArrestNoticeScreen __instance)
+        {
+            try { RvMobile.OnArrestImpound(__instance); }
+            catch (Exception e) { Core.Log.Error("[Mobile] keeping the RV out of the impound failed - it may get stuck there: " + e); }
         }
     }
 }

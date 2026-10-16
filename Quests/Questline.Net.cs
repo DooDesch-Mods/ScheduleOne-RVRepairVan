@@ -98,6 +98,7 @@ namespace RVRepairVan.Quests
                     case RvOp.DriveRequest: Base.RvMobile.HostOnDriveRequest(); break;
                     case RvOp.MobileReport: Base.RvMobile.HostOnClientReport(m.A, m.B); break;
                     case RvOp.BatterySwap: Base.RvBattery.HostOnSwap(); break;
+                    case RvOp.ArrestHome: Base.RvMobile.HostOnArrestHome(m.A); break;
 #if DEBUG
                     case RvOp.Ping: Core.Log.Msg("[Net] host <- Ping " + m.A); break;
 #endif

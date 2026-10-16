@@ -87,7 +87,7 @@ namespace RVRepairVan.Patches
             new[] { "rvegg", "the easter-egg props; 'look <prop>' parks the camera, 'at <prop> x y z' moves one, 'pizza x z' drops the pizza, 'wall' measures the wall gaps, 'garages' lists roofs", "rvegg look Book" },
             new[] { "rvbattery", "the RV's flat battery; 'dead' / 'fix' set it, 'age 4' makes the RV stand 4 days", "rvbattery age 4" },
             new[] { "rvthanks", "the line Marco says for the product in hand", "rvthanks" },
-            new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
+            new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'arrest' arrests you, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
             new[] { "rvharmony", "every method this mod patches; warns for a patch that is applied more than once", "rvharmony" },
         };
 
@@ -189,6 +189,13 @@ namespace RVRepairVan.Patches
                         else if (parts.Length > 1 && parts[1].ToLower() == "wheel") Base.RvMobile.DebugWheelView();
                         else if (parts.Length > 1 && parts[1].ToLower() == "hovered") Base.RvMobile.DebugHovered();
                         else if (parts.Length > 1 && parts[1].ToLower() == "seat") Base.RvMobile.DebugSeat();
+                        else if (parts.Length > 1 && parts[1].ToLower() == "arrest")
+                        {
+                            // The police arrest, without a chase: the arrest notice then takes the last driven vehicle to the impound.
+                            var me = Il2CppScheduleOne.PlayerScripts.Player.Local;
+                            if (me == null) Core.Log.Warning("[Debug] arrest: no local player.");
+                            else { me.Arrest_Server(); Core.Log.Msg("[Debug] arrest: the local player is arrested."); }
+                        }
                         else if (parts.Length > 1 && parts[1].ToLower() == "creator")
                         {
                             // A joining test client without saved looks starts in the character creator; finish it with the defaults.
