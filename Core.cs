@@ -59,6 +59,18 @@ namespace RVRepairVan
             Log.Msg($"RVRepairVan initialized. Enabled={RVRepairVanPreferences.Enabled}, Questline={RVRepairVanPreferences.QuestlineEnabled}, RepairPrice={RVRepairVanPreferences.RepairPrice}");
         }
 
+        public override void OnFixedUpdate()
+        {
+            try { Base.RvCargo.FixedStep(); }
+            catch (Exception e) { Swallowed("cargo physics step", e); }
+        }
+
+        public override void OnLateUpdate()
+        {
+            try { Base.RvCargo.LateStep(); }
+            catch (Exception e) { Swallowed("cargo frame", e); }
+        }
+
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
             // Back at the menu: clear the save-bound state so the next save starts from a clean slate. This has to
