@@ -75,7 +75,7 @@ namespace RVRepairVan.Patches
             new[] { "rvplace", "build an item on the RV floor", "rvplace plasticpot 0" },
             new[] { "rvcrew", "every RV employee: position, locker, pay, work issues", "rvcrew" },
             new[] { "rvassign", "give RV botanists a free RV locker and the RV pots", "rvassign" },
-            new[] { "rvgrid", "extent of every RV build grid in the RV's frame", "rvgrid" },
+            new[] { "rvgrid", "extent of every RV build grid in the RV's frame; 'plan' shows where a floor fill would lay tiles now and how many behind a wall", "rvgrid" },
             new[] { "rvstock", "fill the first RV storage rack with soil and seeds", "rvstock" },
             new[] { "rvreach", "for every RV pot and rack: is each access point in bounds and reachable by the crew", "rvreach" },
             new[] { "rvpay", "put cash in every RV locker, the way a player pays the crew", "rvpay 500" },
@@ -87,7 +87,7 @@ namespace RVRepairVan.Patches
             new[] { "rvegg", "the easter-egg props; 'look <prop>' parks the camera, 'at <prop> x y z' moves one, 'pizza x z' drops the pizza, 'wall' measures the wall gaps, 'garages' lists roofs", "rvegg look Book" },
             new[] { "rvbattery", "the RV's flat battery; 'dead' / 'fix' set it, 'age 4' makes the RV stand 4 days", "rvbattery age 4" },
             new[] { "rvthanks", "the line Marco says for the product in hand", "rvthanks" },
-            new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
+            new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'arrest' arrests you, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
             new[] { "rvtilt", "how far each placed item in the RV leans against it; 'redo' sets every pose again, 'vanilla' toggles the fix, 'lean 8' rolls the parked RV", "rvtilt redo" },
             new[] { "rvharmony", "every method this mod patches; warns for a patch that is applied more than once", "rvharmony" },
         };
@@ -190,6 +190,13 @@ namespace RVRepairVan.Patches
                         else if (parts.Length > 1 && parts[1].ToLower() == "wheel") Base.RvMobile.DebugWheelView();
                         else if (parts.Length > 1 && parts[1].ToLower() == "hovered") Base.RvMobile.DebugHovered();
                         else if (parts.Length > 1 && parts[1].ToLower() == "seat") Base.RvMobile.DebugSeat();
+                        else if (parts.Length > 1 && parts[1].ToLower() == "arrest")
+                        {
+                            // The police arrest, without a chase: the arrest notice then takes the last driven vehicle to the impound.
+                            var me = Il2CppScheduleOne.PlayerScripts.Player.Local;
+                            if (me == null) Core.Log.Warning("[Debug] arrest: no local player.");
+                            else { me.Arrest_Server(); Core.Log.Msg("[Debug] arrest: the local player is arrested."); }
+                        }
                         else if (parts.Length > 1 && parts[1].ToLower() == "creator")
                         {
                             // A joining test client without saved looks starts in the character creator; finish it with the defaults.
@@ -258,7 +265,7 @@ namespace RVRepairVan.Patches
                         break;
                     case "rvcrew":   RvDevTools.Crew(); break;
                     case "rvassign": RvDevTools.Assign(); break;
-                    case "rvgrid":   if (parts.Length > 1 && parts[1] == "scan") RvDevTools.ScanCabin(); else RvDevTools.GridExtent(); break;
+                    case "rvgrid":   if (parts.Length > 1 && parts[1] == "scan") RvDevTools.ScanCabin(); else if (parts.Length > 1 && parts[1] == "plan") Base.RvBuildGrid.DebugPlan(); else RvDevTools.GridExtent(); break;
                     case "rvtilt":   // how far placed items lean against the RV floor; 'redo' sets every pose again, 'vanilla' toggles the fix
                         if (parts.Length > 1 && parts[1] == "vanilla")
                         {
