@@ -89,6 +89,7 @@ namespace RVRepairVan.Patches
             new[] { "rvthanks", "the line Marco says for the product in hand", "rvthanks" },
             new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'arrest' arrests you, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
             new[] { "rvtilt", "how far each placed item in the RV leans against it; 'redo' sets every pose again, 'vanilla' toggles the fix, 'lean 8' rolls the parked RV", "rvtilt redo" },
+            new[] { "rvcargo", "how the first loose body in the driving RV moves against it, per physics step and per frame; 'vanilla' toggles the fix, 'pin' holds it like a poured bag", "rvcargo probe 4" },
             new[] { "rvharmony", "every method this mod patches; warns for a patch that is applied more than once", "rvharmony" },
         };
 
@@ -100,7 +101,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvreinject" && cmd != "rvprobe"
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach"
-                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt"
+                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt" && cmd != "rvcargo"
                 && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony")
                 return false;   // not ours - let the game handle it
 
@@ -275,6 +276,11 @@ namespace RVRepairVan.Patches
                         else if (parts.Length > 2 && parts[1] == "lean" && float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float deg))
                             Base.RvItemTilt.Lean(deg);
                         else Base.RvItemTilt.Report(parts.Length > 1 && parts[1] == "redo");
+                        break;
+                    case "rvcargo":  // how a loose body in the driving RV moves against it; 'rvcargo probe 4'
+                        if (parts.Length > 1 && parts[1] == "vanilla") { Base.RvCargo.SetVanilla(!Base.RvCargo.DebugVanilla); break; }
+                        if (parts.Length > 1 && parts[1] == "pin") { Base.RvCargo.Pin(); break; }
+                        Base.RvCargo.Probe(parts.Length > 2 && float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float cs) ? cs : 4f);
                         break;
                     case "rvghost":  RvDevTools.Ghost(parts); break;   // 'rvghost aim <x> <z>' looks at a floor point, 'rvghost' explains the build ghost
                     case "rvstock":  RvDevTools.Stock(); break;
