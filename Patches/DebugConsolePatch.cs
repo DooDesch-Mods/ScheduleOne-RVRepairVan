@@ -88,6 +88,7 @@ namespace RVRepairVan.Patches
             new[] { "rvbattery", "the RV's flat battery; 'dead' / 'fix' set it, 'age 4' makes the RV stand 4 days", "rvbattery age 4" },
             new[] { "rvthanks", "the line Marco says for the product in hand", "rvthanks" },
             new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
+            new[] { "rvharmony", "every method this mod patches; warns for a patch that is applied more than once", "rvharmony" },
         };
 
         private static bool Dispatch(string[] parts)
@@ -99,7 +100,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach"
                 && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost"
-                && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks")
+                && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony")
                 return false;   // not ours - let the game handle it
 
             // Both overloads can fire for a single submission (the string body calls the List body), so run the
@@ -272,10 +273,39 @@ namespace RVRepairVan.Patches
                         RVRepairVan.Net.NetworkBus.BroadcastToAll(RVRepairVan.Net.RvOp.DebugGiveItems);
                         Core.Log.Msg("[Debug] rvgiveclient: broadcast DebugGiveItems to clients (run this on the HOST).");
                         break;
+                    case "rvharmony": HarmonyReport(); break;
                 }
             }
             catch (Exception e) { Core.Log.Warning("[Debug] console cmd failed: " + e.Message); }
             return true;   // ours - swallow it either way
+        }
+
+        // A patch method listed twice on one target runs twice per call: MelonLoader applies the mod's patch classes
+        // itself, and any further PatchAll applies them again without Harmony noticing.
+        private static void HarmonyReport()
+        {
+            System.Reflection.Assembly ours = typeof(DebugConsolePatch).Assembly;
+            int methods = 0, twice = 0;
+            foreach (System.Reflection.MethodBase target in HarmonyLib.Harmony.GetAllPatchedMethods())
+            {
+                var info = HarmonyLib.Harmony.GetPatchInfo(target);
+                if (info == null) continue;
+                var count = new System.Collections.Generic.Dictionary<System.Reflection.MethodInfo, int>();
+                foreach (var list in new[] { info.Prefixes, info.Postfixes, info.Transpilers, info.Finalizers })
+                    foreach (HarmonyLib.Patch p in list)
+                        if (p.PatchMethod != null && p.PatchMethod.DeclaringType?.Assembly == ours)
+                            count[p.PatchMethod] = count.TryGetValue(p.PatchMethod, out int n) ? n + 1 : 1;
+                if (count.Count == 0) continue;
+                methods++;
+                foreach (var kv in count)
+                {
+                    if (kv.Value < 2) continue;
+                    twice++;
+                    Core.Log.Warning("[Debug] rvharmony: " + kv.Key.DeclaringType?.Name + "." + kv.Key.Name + " runs " + kv.Value
+                        + "x on " + target.DeclaringType?.Name + "." + target.Name + ".");
+                }
+            }
+            Core.Log.Msg("[Debug] rvharmony: " + methods + " method(s) patched by RVRepairVan, " + twice + " patch(es) applied more than once.");
         }
 
         // Camera offsets from the RV root (world axes; the RV is static and lies along X). Eye height inside is the
