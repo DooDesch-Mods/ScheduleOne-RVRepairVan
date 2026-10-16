@@ -198,6 +198,7 @@ namespace RVRepairVan.Patches
                         else if (parts.Length > 1 && parts[1].ToLower() == "board") Base.RvMobile.DebugBoard(parts.Length > 2 ? parts[2..] : Array.Empty<string>());
                         else if (parts.Length > 1 && parts[1].ToLower() == "station") Base.RvMobile.DebugStation(parts.Length > 2 ? parts[2].ToLower() : "pack");
                         else if (parts.Length > 1 && parts[1].ToLower() == "ride") Base.RvRide.DebugWatch(parts.Length > 2 ? parts[2] : "");
+                        else if (parts.Length > 1 && parts[1].ToLower() == "pose") Base.RvRide.DebugPose();
                         else if (parts.Length > 1 && parts[1].ToLower() == "npc") Base.RvDrive.Npc(parts.Length > 2 ? parts[2].ToLower() : "");
                         else if (parts.Length > 2 && parts[1].ToLower() == "steps") Base.RvSteps.SetIn(parts[2].ToLower() == "in");
                         else if (parts.Length > 2 && parts[1].ToLower() == "gas") Base.RvDrive.Gas(parts[2].ToLower(), parts.Length > 3 ? parts[3] : "0");
