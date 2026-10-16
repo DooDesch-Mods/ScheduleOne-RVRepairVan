@@ -88,6 +88,7 @@ namespace RVRepairVan.Patches
             new[] { "rvbattery", "the RV's flat battery; 'dead' / 'fix' set it, 'age 4' makes the RV stand 4 days", "rvbattery age 4" },
             new[] { "rvthanks", "the line Marco says for the product in hand", "rvthanks" },
             new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
+            new[] { "rvtilt", "how far each placed item in the RV leans against its floor; 'redo' sets every pose again, 'vanilla' toggles the fix", "rvtilt redo" },
             new[] { "rvharmony", "every method this mod patches; warns for a patch that is applied more than once", "rvharmony" },
         };
 
@@ -99,7 +100,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvreinject" && cmd != "rvprobe"
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach"
-                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost"
+                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt"
                 && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony")
                 return false;   // not ours - let the game handle it
 
@@ -258,6 +259,14 @@ namespace RVRepairVan.Patches
                     case "rvcrew":   RvDevTools.Crew(); break;
                     case "rvassign": RvDevTools.Assign(); break;
                     case "rvgrid":   if (parts.Length > 1 && parts[1] == "scan") RvDevTools.ScanCabin(); else RvDevTools.GridExtent(); break;
+                    case "rvtilt":   // how far placed items lean against the RV floor; 'redo' sets every pose again, 'vanilla' toggles the fix
+                        if (parts.Length > 1 && parts[1] == "vanilla")
+                        {
+                            Base.RvItemTilt.DebugVanilla = !Base.RvItemTilt.DebugVanilla;
+                            Core.Log.Msg("[Tilt] fix " + (Base.RvItemTilt.DebugVanilla ? "off - the game's own pose stays" : "on") + ".");
+                        }
+                        else Base.RvItemTilt.Report(parts.Length > 1 && parts[1] == "redo");
+                        break;
                     case "rvghost":  RvDevTools.Ghost(parts); break;   // 'rvghost aim <x> <z>' looks at a floor point, 'rvghost' explains the build ghost
                     case "rvstock":  RvDevTools.Stock(); break;
                     case "rvdoor":   RvDevTools.DoorInfo(parts.Length > 1 ? parts[1] : ""); break;
