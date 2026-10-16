@@ -149,9 +149,13 @@ namespace RVRepairVan.Base
                 }
                 catch (Exception e) { Core.Swallowed("RvBuildGrid.ExpandGrid", e); }
 
-                Bounds? cabin = CabinFloorBounds();
+                // Measured in the RV's own frame at home. In world space the rectangle of a turned RV takes in the
+                // ground beside it: after a drive the RV can stand at any angle, and tiles were laid behind the walls.
                 Transform root = RVManager.Root;
-                Bounds? rear = root != null ? RearFloorLocal(root) : null;
+                Matrix4x4 frame = root != null ? RvMobile.WorldToHomeRoot(root) : Matrix4x4.identity;
+                if (root == null) Core.Log.Warning("[Grid] no RV root - the floor is measured in world space.");
+                Bounds? cabin = CabinFloorBounds(frame);
+                Bounds? rear = root != null ? RearFloorLocal(frame) : null;
                 int added = 0, skippedOutside = 0;
                 for (int cx = template.x - reach; cx <= template.x + reach && added < extra; cx++)
                     for (int cz = template.y - reach; cz <= template.y + reach && added < extra; cz++)
@@ -163,14 +167,12 @@ namespace RVRepairVan.Base
                         // still pushed tiles out through the wall (measured extent reached x 18.7 on a vehicle
                         // that ends near 16.2). The floor MESH is the honest boundary.
                         Vector3 world = grid.transform.TransformPoint(new Vector3(cx * size, 0f, cz * size));
+                        Vector3 local = frame.MultiplyPoint3x4(world);
                         bool inside = cabin.HasValue
-                            ? cabin.Value.Contains(new Vector3(world.x, cabin.Value.center.y, world.z))
+                            ? cabin.Value.Contains(new Vector3(local.x, cabin.Value.center.y, local.z))
                             : SafeInBounds(prop, world);
                         if (!inside && rear.HasValue)
-                        {
-                            Vector3 local = root.InverseTransformPoint(world);
                             inside = rear.Value.Contains(new Vector3(local.x, rear.Value.center.y, local.z));
-                        }
                         if (!inside) { skippedOutside++; continue; }
 
                         if (CloneTile(grid, template, cx, cz, size, offset)) added++;
@@ -364,9 +366,10 @@ namespace RVRepairVan.Base
         /// 32 tiles exactly where equipment fits, so filling the gaps between them is the honest interpretation of
         /// "extend the floor".
         ///
-        /// Must be read BEFORE anything is cloned, or it grows with its own output.
+        /// Must be read BEFORE anything is cloned, or it grows with its own output. In the frame <paramref name="frame"/>
+        /// maps world points into.
         /// </summary>
-        private static Bounds? CabinFloorBounds()
+        private static Bounds? CabinFloorBounds(Matrix4x4 frame)
         {
             try
             {
@@ -383,8 +386,8 @@ namespace RVRepairVan.Base
                     for (int k = 0; k < g.Tiles.Count; k++)
                     {
                         Tile t = g.Tiles[k];
-                        if (t == null) continue;
-                        Vector3 p = t.transform.position;
+                        if (t == null || IsOurs(t)) continue;
+                        Vector3 p = frame.MultiplyPoint3x4(t.transform.position);
                         if (!any) { b = new Bounds(p, Vector3.zero); any = true; } else b.Encapsulate(p);
                     }
                 }
@@ -400,6 +403,10 @@ namespace RVRepairVan.Base
 
         // Inner face of the RV's rear wall (Collider_Rear) in the root frame. The side walls stand at x +-1.57.
         private const float RearWallZ = 5.65f;
+        private const float SideWallX = 1.57f;
+        private const string ClonePrefix = "RVRepairVan_Tile_";
+
+        private static bool IsOurs(Tile t) => t.gameObject.name.StartsWith(ClonePrefix, StringComparison.Ordinal);
 
         /// <summary>
         /// The back of the cabin, where the bed stood before the gut. The vanilla tiles end at z 3.09, so the
@@ -408,7 +415,7 @@ namespace RVRepairVan.Base
         /// Only ever adds to the area above: a saved machine on a tile that is no longer laid would be destroyed.
         /// Must be read BEFORE anything is cloned, like <see cref="CabinFloorBounds"/>.
         /// </summary>
-        private static Bounds? RearFloorLocal(Transform root)
+        private static Bounds? RearFloorLocal(Matrix4x4 frame)
         {
             try
             {
@@ -424,8 +431,8 @@ namespace RVRepairVan.Base
                     for (int k = 0; k < g.Tiles.Count; k++)
                     {
                         Tile t = g.Tiles[k];
-                        if (t == null) continue;
-                        Vector3 p = root.InverseTransformPoint(t.transform.position);
+                        if (t == null || IsOurs(t)) continue;
+                        Vector3 p = frame.MultiplyPoint3x4(t.transform.position);
                         if (!any) { min = max = p; any = true; } else { min = Vector3.Min(min, p); max = Vector3.Max(max, p); }
                     }
                 }
@@ -452,7 +459,7 @@ namespace RVRepairVan.Base
             try
             {
                 GameObject go = UnityEngine.Object.Instantiate(template.gameObject, grid.transform);
-                go.name = "RVRepairVan_Tile_" + cx + "_" + cz;
+                go.name = ClonePrefix + cx + "_" + cz;
                 go.transform.localPosition = new Vector3(cx * size, 0f, cz * size);
                 go.SetActive(true);
 
@@ -469,6 +476,63 @@ namespace RVRepairVan.Base
             }
             catch (Exception e) { Core.Swallowed("RvBuildGrid.CloneTile", e); return false; }
         }
+
+#if DEBUG
+        /// <summary>
+        /// rvgrid: the tiles a fill would lay at the RV's pose right now, measured the old way (world space) and in
+        /// the RV's frame, and how many of each stand behind a side or the rear wall. Lays nothing.
+        /// </summary>
+        internal static void DebugPlan()
+        {
+            Property prop = PropertyOf();
+            Transform root = RVManager.Root;
+            var grids = prop != null ? prop.Grids : null;
+            if (root == null || grids == null || grids.Count == 0 || grids[0] == null || grids[0].Tiles == null || grids[0].Tiles.Count == 0)
+            {
+                Core.Log.Warning("[Grid] plan: RV, grid or tiles not ready.");
+                return;
+            }
+            Grid grid = grids[0];
+            Tile template = null;
+            for (int k = 0; k < grid.Tiles.Count && template == null; k++) if (grid.Tiles[k] != null && !IsOurs(grid.Tiles[k])) template = grid.Tiles[k];
+            if (template == null) { Core.Log.Warning("[Grid] plan: no vanilla tile on the floor grid."); return; }
+            Matrix4x4 frame = RvMobile.WorldToHomeRoot(root);
+            Plan("world space", grid, template, Matrix4x4.identity, root.worldToLocalMatrix, frame, prop);
+            Plan("RV frame", grid, template, frame, frame, frame, prop);
+            int ours = 0, outside = 0;
+            for (int k = 0; k < grid.Tiles.Count; k++)
+            {
+                Tile t = grid.Tiles[k];
+                if (t == null || !IsOurs(t)) continue;
+                ours++;
+                if (BehindWall(frame.MultiplyPoint3x4(t.transform.position))) outside++;
+            }
+            Core.Log.Msg("[Grid] plan: laid now: " + ours + " added tile(s), " + outside + " behind a wall. RV " + (RvMobile.Away ? "away" : "home") + ".");
+        }
+
+        private static bool BehindWall(Vector3 local) => Mathf.Abs(local.x) > SideWallX || local.z > RearWallZ;
+
+        private static void Plan(string how, Grid grid, Tile template, Matrix4x4 cabinFrame, Matrix4x4 rearFrame, Matrix4x4 judge, Property prop)
+        {
+            float size = Grid.TileSize;
+            Bounds? cabin = CabinFloorBounds(cabinFrame);
+            Bounds? rear = RearFloorLocal(rearFrame);
+            int inside = 0, behind = 0;
+            const int reach = 24;
+            for (int cx = template.x - reach; cx <= template.x + reach; cx++)
+                for (int cz = template.y - reach; cz <= template.y + reach; cz++)
+                {
+                    Vector3 world = grid.transform.TransformPoint(new Vector3(cx * size, 0f, cz * size));
+                    Vector3 c = cabinFrame.MultiplyPoint3x4(world), r = rearFrame.MultiplyPoint3x4(world);
+                    bool ok = cabin.HasValue ? cabin.Value.Contains(new Vector3(c.x, cabin.Value.center.y, c.z)) : SafeInBounds(prop, world);
+                    if (!ok && rear.HasValue) ok = rear.Value.Contains(new Vector3(r.x, rear.Value.center.y, r.z));
+                    if (!ok) continue;
+                    inside++;
+                    if (BehindWall(judge.MultiplyPoint3x4(world))) behind++;
+                }
+            Core.Log.Msg("[Grid] plan " + how + ": " + inside + " tile spot(s) on the floor, " + behind + " of them behind a wall.");
+        }
+#endif
 
         private static Property PropertyOf()
         {

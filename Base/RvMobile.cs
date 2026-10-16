@@ -573,6 +573,20 @@ namespace RVRepairVan.Base
             }
         }
 
+        /// <summary>
+        /// World to the RV root's frame as it stands at home. At home that is the root's own frame. Away the root stays
+        /// home while the RV drives, so the frame is taken from a part the chassis carries and where it sits at home.
+        /// </summary>
+        internal static Matrix4x4 WorldToHomeRoot(Transform root)
+        {
+            if (_chassis != null)
+                foreach (CarriedPart p in Carried)
+                    if (p.T != null && p.Parent != null && p.Parent.Pointer == root.Pointer)
+                        return Matrix4x4.TRS(p.LocalPos, p.LocalRot, p.T.localScale) * p.T.worldToLocalMatrix;
+            if (_chassis != null) Core.Log.Warning("[Mobile] no carried part hangs on the RV root - measuring from the root, which stays home.");
+            return root.worldToLocalMatrix;
+        }
+
         private static void Carry(Transform t)
         {
             Carried.Add(new CarriedPart { T = t, Parent = t.parent, LocalPos = t.localPosition, LocalRot = t.localRotation });
