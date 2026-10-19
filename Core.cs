@@ -9,6 +9,7 @@ using RVRepairVan.Quests;
 
 [assembly: MelonInfo(typeof(RVRepairVan.Core), "RVRepairVan", DooDesch.ModVersion.Current, "DooDesch", "https://github.com/DooDesch-Mods/ScheduleOne-RVRepairVan")]
 [assembly: MelonGame("TVGS", "Schedule I")]
+[assembly: MelonAdditionalDependencies("Chassis")]
 
 namespace RVRepairVan
 {
