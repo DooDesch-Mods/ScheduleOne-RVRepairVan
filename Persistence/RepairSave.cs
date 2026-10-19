@@ -125,10 +125,20 @@ namespace RVRepairVan.Persistence
         }
 
         // No mod data for this save yet (fresh save / first time / a save from before the mod) -> clean defaults.
-        // S1API calls this instead of OnLoaded when our save folder does not exist, so it is the "fresh save" signal.
+        // S1API calls this when our save folder does not exist, so it is the "fresh save" signal. It is NOT exclusive
+        // with OnLoaded: S1API serializes each [SaveableField] separately, and when only some of them are on disk (a
+        // save written before rv_battery_dead or the rv_away_* fields existed) it fires OnLoaded for the present ones
+        // and then OnCreated for the missing ones. A blind reset there wipes the questline progress just read.
         protected override void OnCreated()
         {
             Instance = this;
+
+            if (Loaded)
+            {
+                Core.Log.Msg("[State] OnCreated fired after OnLoaded (partial save data) - keeping what was loaded.");
+                return;
+            }
+
             _repaired = false;
             _stage = 0;
             _samples = 0;
