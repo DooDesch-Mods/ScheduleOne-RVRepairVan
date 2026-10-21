@@ -6,13 +6,13 @@
 > from Donna at the motel to Mrs. Ming to Marco the mechanic, with dead-drop errands, a
 > haggled price and a repair cinematic. After that, Marco turns the RV into a workshop.
 
-![Version](https://img.shields.io/badge/version-3.5.7-blue)
+![Version](https://img.shields.io/badge/version-3.5.8-blue)
 ![Game](https://img.shields.io/badge/game-Schedule%20I-purple)
 ![MelonLoader](https://img.shields.io/badge/MelonLoader-0.7.3+-green)
 ![S1API](https://img.shields.io/badge/S1API-required-orange)
 [![Polyfill](https://polyfill.doomods.com/badge/rvrepairvan.svg)](https://polyfill.doomods.com/mod/rvrepairvan)
 
-[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_c-S3YHzZHUZjPCe1WULpNSmT/badge.svg)](https://mlvscan.com/attestations/att_c-S3YHzZHUZjPCe1WULpNSmT)
+[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_hj7huuYxEpUR6yoGXWoa5_3O/badge.svg)](https://mlvscan.com/attestations/att_hj7huuYxEpUR6yoGXWoa5_3O)
 
 ![The RV driving through town at dusk](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
 

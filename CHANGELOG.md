@@ -4,6 +4,15 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.5.8] - 2026-10-21
+
+### Fixed
+- Loading an older save no longer resets the RV questline progress.
+- An arrest no longer leaves the RV stuck in the police impound. It goes back to its spot at the motel.
+- Co-op: the station view no longer shakes while someone else drives the RV.
+- Co-op: station ingredients stay put at a steady speed and only slide when the RV speeds up, brakes or turns.
+- Building in the RV after a drive: no build spots outside the walls, and turned items stand flat on a slope.
+
 ## [3.5.7] - 2026-10-16
 
 ### Fixed
