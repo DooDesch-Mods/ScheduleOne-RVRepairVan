@@ -58,7 +58,7 @@
 | Schedule I | `0.4.7f12` (IL2CPP, current Steam public build) |
 | MelonLoader | `0.7.3+` |
 | S1API | [ifBars/S1API_Forked](https://thunderstore.io/c/schedule-i/p/ifBars/S1API_Forked/) **3.2.1+** (dialogue, items, dead drops, money, save system) |
-| Chassis | [DooDesch/Chassis](https://thunderstore.io/c/schedule-i/p/DooDesch/Chassis/) **1.0.0+** (driver in the seat, first person, horn, indicators) |
+| Chassis | [DooDesch/Chassis](https://thunderstore.io/c/schedule-i/p/DooDesch/Chassis/) **1.4.0+** (driver in the seat, first person, horn, indicators) |
 
 ## Installation
 

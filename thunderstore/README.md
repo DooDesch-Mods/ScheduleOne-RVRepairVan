@@ -41,7 +41,7 @@
 
 - **Schedule I** `0.4.7f12` (IL2CPP) with **MelonLoader 0.7.3+**.
 - **S1API 3.2.1+** (pulled in as a dependency).
-- **Chassis 1.0.0+** (pulled in as a dependency).
+- **Chassis 1.4.0+** (pulled in as a dependency).
 
 ## Settings
 
