@@ -29,6 +29,11 @@ namespace RVRepairVan.Base
         /// <summary>The cushion's middle is this far ahead of the chair's bounds centre, which the backrest pulls back.</summary>
         private const float CushionForward = 0.08f;
         private const float HipHeight = 0.08f;
+        /// <summary>
+        /// The fitted eyes sit at the neck in the RV's high cab chairs, so first person looked into the rider's own
+        /// forearms. Up and forward by this much the view clears the head and keeps the hands on the wheel in sight.
+        /// </summary>
+        private const float EyeLift = 0.045f, EyeForward = 0.05f;
 
         private static Transform _pivot;
         private static Quaternion _rest = Quaternion.identity;
@@ -194,7 +199,9 @@ namespace RVRepairVan.Base
                     if (!driver && passengerTaken) { Core.Log.Msg("[Chassis] chassis seat " + i + " has no chair in the cab - it stays a vanilla seat."); continue; }
                     if (!driver) passengerTaken = true;
                     Vector3 point = model.TransformPoint(driver ? _driverSeat : _passengerSeat) + root.forward * CushionForward;
-                    profile.Seats.Add(ChassisApi.FitSeat(chassis, i, point, model, driver ? _pivot : null, HipHeight));
+                    SeatProfile seat = ChassisApi.FitSeat(chassis, i, point, model, driver ? _pivot : null, HipHeight);
+                    seat.Eyes += Vector3.up * EyeLift + Quaternion.Euler(0f, seat.Yaw, 0f) * Vector3.forward * EyeForward;
+                    profile.Seats.Add(seat);
                 }
 
                 bool used = ChassisApi.Register(profile);
