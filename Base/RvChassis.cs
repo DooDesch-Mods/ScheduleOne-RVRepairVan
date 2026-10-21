@@ -39,6 +39,11 @@ namespace RVRepairVan.Base
         /// runs this far from the hub, and the hands hold it this many degrees above level (ten to two).
         /// </summary>
         private const float RimRadius = 0.25f, GripAngle = 30f;
+        /// <summary>
+        /// From the middle of the cushion the arms only reach the wide RV wheel stretched out straight. The driver sits
+        /// this much further forward on the chair, so the elbows bend.
+        /// </summary>
+        private const float DriverForward = 0.12f;
 
         private static Transform _pivot;
         private static Quaternion _rest = Quaternion.identity;
@@ -203,7 +208,7 @@ namespace RVRepairVan.Base
                     bool driver = seats[i].isDriverSeat;
                     if (!driver && passengerTaken) { Core.Log.Msg("[Chassis] chassis seat " + i + " has no chair in the cab - it stays a vanilla seat."); continue; }
                     if (!driver) passengerTaken = true;
-                    Vector3 point = model.TransformPoint(driver ? _driverSeat : _passengerSeat) + root.forward * CushionForward;
+                    Vector3 point = model.TransformPoint(driver ? _driverSeat : _passengerSeat) + root.forward * (CushionForward + (driver ? DriverForward : 0f));
                     SeatProfile seat = ChassisApi.FitSeat(chassis, i, point, model, driver ? _pivot : null, HipHeight);
                     seat.Eyes += Vector3.up * EyeLift + Quaternion.Euler(0f, seat.Yaw, 0f) * Vector3.forward * EyeForward;
                     if (driver && _pivot != null)
