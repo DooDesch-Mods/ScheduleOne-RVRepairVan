@@ -4,6 +4,15 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.6.0] - 2026-10-22
+
+### Added
+- You and your passenger sit visibly in the RV cab, and the wheel turns as you steer. `V` switches to first person.
+- The driver holds the RV wheel with both hands around the rim, low left and right, and turns with it.
+
+### Changed
+- Needs Chassis 1.5.0. Horn on `G` and the indicators come from it.
+
 ## [3.5.8] - 2026-10-21
 
 ### Fixed
