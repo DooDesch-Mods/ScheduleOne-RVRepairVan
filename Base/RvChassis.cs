@@ -42,16 +42,11 @@ namespace RVRepairVan.Base
         private const float RimAbove = 0.12f, RimAhead = 0.03f;
         /// <summary>
         /// The RV wheel is 0.52 m across, so the fitted grip 0.17 m beside the hub put the hands on the spokes. The wrists
-        /// sit this far from the hub and above the rim's middle, so the hands lie on top of the rim with the fingers
-        /// over its edge, this many degrees above level (ten to two). Half the grip's turn bends the fingers forward along
-        /// the rim instead of straight out.
+        /// sit just outside the rim at its left and right, below level on the driver's half of the wheel (twenty past
+        /// eight to twenty to four), where the arms reach it from the backrest, and above the rim's middle. The full grip
+        /// turn curls the fingers in over the rim and the thumb under it.
         /// </summary>
-        private const float GripRadius = 0.20f, GripAbove = 0.03f, GripAngle = 30f, GripTurn = 0.5f;
-        /// <summary>
-        /// From the middle of the cushion the arms only reach the wide RV wheel stretched out straight. The driver sits
-        /// this much further forward on the chair, so the elbows bend.
-        /// </summary>
-        private const float DriverForward = 0.12f;
+        private const float GripRadius = 0.28f, GripAbove = 0.04f, GripAngle = -30f, GripTurn = 1f;
 
         private static Transform _pivot, _model;
         private static Quaternion _rest = Quaternion.identity;
@@ -218,7 +213,7 @@ namespace RVRepairVan.Base
                     bool driver = seats[i].isDriverSeat;
                     if (!driver && passengerTaken) { Core.Log.Msg("[Chassis] chassis seat " + i + " has no chair in the cab - it stays a vanilla seat."); continue; }
                     if (!driver) passengerTaken = true;
-                    Vector3 point = model.TransformPoint(driver ? _driverSeat : _passengerSeat) + root.forward * (CushionForward + (driver ? DriverForward : 0f));
+                    Vector3 point = model.TransformPoint(driver ? _driverSeat : _passengerSeat) + root.forward * CushionForward;
                     SeatProfile seat = ChassisApi.FitSeat(chassis, i, point, model, driver ? _pivot : null, HipHeight);
                     seat.Eyes += Vector3.up * EyeLift + Quaternion.Euler(0f, seat.Yaw, 0f) * Vector3.forward * EyeForward;
                     if (driver && _pivot != null)
@@ -238,7 +233,7 @@ namespace RVRepairVan.Base
             catch (Exception e) { Core.Log.Error("[Chassis] registering the RV profile failed - the RV keeps vanilla seats: " + e); }
         }
 
-        /// <summary>Right wrist on top of the rim, in world space: out to the right and up the wheel's face towards the windscreen.</summary>
+        /// <summary>Right wrist at the rim's right side, in world space: out to the right, turned by the grip angle on the wheel's face (negative = towards the driver).</summary>
         private static Vector3 RimGrip(Transform root)
         {
             Vector3 column = _pivot.TransformDirection(_column).normalized;
