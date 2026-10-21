@@ -34,6 +34,11 @@ namespace RVRepairVan.Base
         /// forearms. Up and forward by this much the view clears the head and keeps the hands on the wheel in sight.
         /// </summary>
         private const float EyeLift = 0.045f, EyeForward = 0.05f;
+        /// <summary>
+        /// The RV wheel is 0.55 m across, so the fitted grip 0.17 m beside the hub put the hands on the spokes. The rim
+        /// runs this far from the hub, and the hands hold it this many degrees above level (ten to two).
+        /// </summary>
+        private const float RimRadius = 0.25f, GripAngle = 30f;
 
         private static Transform _pivot;
         private static Quaternion _rest = Quaternion.identity;
@@ -201,6 +206,11 @@ namespace RVRepairVan.Base
                     Vector3 point = model.TransformPoint(driver ? _driverSeat : _passengerSeat) + root.forward * CushionForward;
                     SeatProfile seat = ChassisApi.FitSeat(chassis, i, point, model, driver ? _pivot : null, HipHeight);
                     seat.Eyes += Vector3.up * EyeLift + Quaternion.Euler(0f, seat.Yaw, 0f) * Vector3.forward * EyeForward;
+                    if (driver && _pivot != null)
+                    {
+                        seat.Hands.GripStart = model.InverseTransformPoint(RimGrip(root));
+                        Core.Log.Msg("[Chassis] driver's hands on the rim at model-local " + seat.Hands.GripStart.ToString("F3") + ".");
+                    }
                     profile.Seats.Add(seat);
                 }
 
@@ -210,6 +220,16 @@ namespace RVRepairVan.Base
                     + (profile.Steering != null ? "on" : "off") + ".");
             }
             catch (Exception e) { Core.Log.Error("[Chassis] registering the RV profile failed - the RV keeps vanilla seats: " + e); }
+        }
+
+        /// <summary>Right hand on the rim, in world space: out to the right and up the wheel's face towards the windscreen.</summary>
+        private static Vector3 RimGrip(Transform root)
+        {
+            Vector3 column = _pivot.TransformDirection(_column).normalized;
+            Vector3 right = Vector3.ProjectOnPlane(root.right, column).normalized;
+            Vector3 top = Vector3.ProjectOnPlane(root.forward, column).normalized;
+            float a = GripAngle * Mathf.Deg2Rad;
+            return _pivot.position + (right * Mathf.Cos(a) + top * Mathf.Sin(a)) * RimRadius;
         }
 
         /// <summary>The chassis goes back to being a plain veeper.</summary>
