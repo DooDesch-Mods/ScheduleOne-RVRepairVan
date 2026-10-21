@@ -58,19 +58,21 @@
 | Schedule I | `0.4.7f12` (IL2CPP, current Steam public build) |
 | MelonLoader | `0.7.3+` |
 | S1API | [ifBars/S1API_Forked](https://thunderstore.io/c/schedule-i/p/ifBars/S1API_Forked/) **3.2.1+** (dialogue, items, dead drops, money, save system) |
+| Chassis | [DooDesch/Chassis](https://thunderstore.io/c/schedule-i/p/DooDesch/Chassis/) **1.4.0+** (driver in the seat, first person, horn, indicators) |
 
 ## Installation
 
 ### Recommended: a Thunderstore mod manager
 
 Install with a mod manager (r2modman / Gale) from the Schedule I community; the
-dependencies (MelonLoader, S1API) are pulled in automatically.
+dependencies (MelonLoader, S1API, Chassis) are pulled in automatically.
 
 ### Manual
 
 1. Install **MelonLoader 0.7.3** for Schedule I.
 2. Install **S1API** (its DLLs go in `Mods/` and `Plugins/` per its own instructions).
-3. Drop **`RVRepairVan.dll`** into your Schedule I `Mods/` folder.
+3. Install **Chassis** (`Chassis.dll` goes in `Mods/`).
+4. Drop **`RVRepairVan.dll`** into your Schedule I `Mods/` folder.
 
 ## Configuration
 

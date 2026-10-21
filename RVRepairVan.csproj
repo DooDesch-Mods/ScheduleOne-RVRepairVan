@@ -106,6 +106,18 @@
   <Import Project="$(MSBuildThisFileDirectory)../Workspace/build/Deploy.props" Condition="Exists('$(MSBuildThisFileDirectory)../Workspace/build/Deploy.props')" />
   <Import Project="$(MSBuildThisFileDirectory)Workspace/build/Deploy.props" Condition="Exists('$(MSBuildThisFileDirectory)Workspace/build/Deploy.props')" />
 
+  <!-- Chassis seats the driver and the passenger in the cab, turns the steering wheel and runs horn, indicators and
+       automatic headlights. A sibling checkout builds it; otherwise the DLL from the shared lib folder. -->
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)../Chassis/Chassis.csproj')">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../Chassis/Chassis.csproj" Private="false" />
+  </ItemGroup>
+  <ItemGroup Condition="!Exists('$(MSBuildThisFileDirectory)../Chassis/Chassis.csproj')">
+    <Reference Include="Chassis">
+      <HintPath>$(WorkspaceLibPath)/$(Backend)/chassis/Chassis.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
   <!-- Mod loader references (both backends) -->
   <ItemGroup>
     <Reference Include="MelonLoader">

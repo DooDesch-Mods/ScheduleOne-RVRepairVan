@@ -118,6 +118,7 @@ namespace RVRepairVan.Base
             RvLights.Reset();
             RvAway.Reset();
             RvRide.Reset();
+            RvChassis.Reset();
         }
 
         // --- the wheel ------------------------------------------------------------------------------------
@@ -507,6 +508,7 @@ namespace RVRepairVan.Base
             Bounds homeBounds = BodyBounds(_model);
             RvWheels.Capture(_model, chassis, _homePos, _homeRot);
             RvSteps.Capture(_model, _homeRot);
+            RvChassis.Prepare(_model);
 
             Carried.Clear();
             Carry(_model);
@@ -537,6 +539,8 @@ namespace RVRepairVan.Base
             BuildHull(chassis, homeBounds);
             int baked = TakeStaticParts(_model);
             RvLights.Bind(_model);
+
+            RvChassis.Attach(chassis, _model);
 
             _driving = true;   // force the first SetDriving to run in full
             SetDriving(HasDriver(chassis));
@@ -690,6 +694,7 @@ namespace RVRepairVan.Base
             RvWheels.Release();
             RvSteps.Release();
             RvLights.Unbind();
+            RvChassis.Detach(chassis);
             ReleaseStaticParts();
             if (_hull != null) { UnityEngine.Object.Destroy(_hull.gameObject); _hull = null; }
             if (_hitBox != null) { UnityEngine.Object.Destroy(_hitBox.gameObject); _hitBox = null; }
@@ -1479,7 +1484,7 @@ namespace RVRepairVan.Base
                 Matrix4x4 delta = _model.localToWorldMatrix * _modelHomeInverse;
                 foreach (StaticPart p in _static)
                 {
-                    Matrix4x4 m = delta * RvSteps.Offset(p.Renderer) * RvWheels.Spin(p.Renderer) * p.HomeBase;
+                    Matrix4x4 m = delta * RvSteps.Offset(p.Renderer) * RvWheels.Spin(p.Renderer) * RvChassis.Offset(p.Renderer) * p.HomeBase;
                     for (int i = 0; i < p.Materials.Length; i++)
                     {
                         int sub = p.FirstSubMesh + i;
