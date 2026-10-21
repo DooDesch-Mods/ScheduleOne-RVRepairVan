@@ -43,10 +43,10 @@ namespace RVRepairVan.Base
         /// <summary>
         /// The RV wheel is 0.52 m across, so the fitted grip 0.17 m beside the hub put the hands on the spokes. The wrists
         /// sit just outside the rim at its left and right, below level on the driver's half of the wheel (twenty past
-        /// eight to twenty to four), where the arms reach it from the backrest, and above the rim's middle. The full grip
-        /// turn curls the fingers in over the rim and the thumb under it.
+        /// eight to twenty to four), where the arms reach it from the backrest, and above the rim's middle. A light grip
+        /// turn lays the fingers forward along the rim; a full turn would point them at the hub.
         /// </summary>
-        private const float GripRadius = 0.28f, GripAbove = 0.04f, GripAngle = -30f, GripTurn = 1f;
+        private const float GripRadius = 0.28f, GripAbove = 0.04f, GripAngle = -30f, GripTurn = 0.3f;
 
         private static Transform _pivot, _model;
         private static Quaternion _rest = Quaternion.identity;
