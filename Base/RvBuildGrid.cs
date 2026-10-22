@@ -28,6 +28,7 @@ namespace RVRepairVan.Base
         private static bool _applied;
         private static int _clonedTiles;
         private static object _sweep;
+        private static int _inheritedOccupants;
         private static Dictionary<int, Shadow> _shadows = new Dictionary<int, Shadow>();
 
         internal static void Reset()
@@ -185,6 +186,10 @@ namespace RVRepairVan.Base
 
                 _clonedTiles += added;
                 Core.Log.Msg("[Grid] added " + added + " extra tile(s) (requested " + extra + ").");
+                if (_inheritedOccupants > 0)
+                    Core.Log.Msg("[Grid] cleared " + _inheritedOccupants + " occupant entr(ies) the added tiles copied from the template tile ("
+                        + template.x + "," + template.y + ").");
+                _inheritedOccupants = 0;
             }
             catch (Exception e) { Core.Log.Warning("[Grid] expand failed: " + e.Message); }
         }
@@ -466,6 +471,15 @@ namespace RVRepairVan.Base
                 Tile tile = go.GetComponent<Tile>();
                 if (tile == null) { UnityEngine.Object.Destroy(go); return false; }
                 tile.InitializePropertyTile(cx, cz, offset, grid);
+
+                // Instantiate copies the template's serialized occupant lists. With equipment standing on the
+                // template tile when the floor is bought, every added tile would report that equipment as its
+                // occupant, and build mode would turn red on the whole new floor until the next load.
+                int inherited = (tile.BuildableOccupants != null ? tile.BuildableOccupants.Count : 0)
+                    + (tile.OccupantTiles != null ? tile.OccupantTiles.Count : 0);
+                if (tile.BuildableOccupants != null) tile.BuildableOccupants.Clear();
+                if (tile.OccupantTiles != null) tile.OccupantTiles.Clear();
+                if (inherited > 0) _inheritedOccupants += inherited;
 
                 // RegisterTile already appends to BOTH Tiles and CoordinateTilePairs, so adding to those by hand
                 // registers every tile twice - the measured symptom was a grid reporting 66 tiles after 24 were

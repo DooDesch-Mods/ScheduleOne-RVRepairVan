@@ -155,6 +155,62 @@ namespace RVRepairVan.Patches
             }
         }
 
+        /// <summary>
+        /// rvgrid tiles [item]: every tile of every RV grid through the check the build ghost runs on a footprint tile
+        /// (Grid.IsTileValidAtCoordinate), split into the RV's own tiles and the ones the workshop floor added, with
+        /// why a tile says no: occupants (dead ones counted apart), offset, not owned, or no collider for the ghost.
+        /// </summary>
+        internal static void TileCheck(string itemId)
+        {
+            Property rv = RvProperty();
+            if (rv == null) { Core.Log.Warning("[Debug] rvgrid tiles: RV property not found."); return; }
+            var def = Il2CppScheduleOne.Registry.GetItem(itemId)?.TryCast<Il2CppScheduleOne.ItemFramework.BuildableItemDefinition>();
+            GridItem prefab = def != null && def.BuiltItem != null ? def.BuiltItem.TryCast<GridItem>() : null;
+            if (prefab == null || prefab.CoordinateFootprintTilePairs == null || prefab.CoordinateFootprintTilePairs.Count == 0)
+            { Core.Log.Warning("[Debug] rvgrid tiles: '" + itemId + "' is no grid item with a footprint."); return; }
+            FootprintTile foot = prefab.CoordinateFootprintTilePairs[0].footprintTile;
+            for (int g = 0; rv.Grids != null && g < rv.Grids.Count; g++)
+            {
+                Grid grid = rv.Grids[g];
+                if (grid == null || grid.Tiles == null) continue;
+                foreach (bool ours in new[] { false, true })
+                {
+                    int n = 0, ok = 0, occupied = 0, dead = 0, offset = 0, unowned = 0, noCollider = 0, notMapped = 0;
+                    string firstOccupant = null;
+                    for (int t = 0; t < grid.Tiles.Count; t++)
+                    {
+                        Tile tile = grid.Tiles[t];
+                        if (tile == null || tile.gameObject.name.StartsWith("RVRepairVan_Tile_", StringComparison.Ordinal) != ours) continue;
+                        n++;
+                        var c = new Coordinate(tile.x, tile.y);
+                        if (grid.IsTileValidAtCoordinate(c, foot, prefab)) ok++;
+                        if (grid.GetTile(c) == null || grid.GetTile(c).Pointer != tile.Pointer) notMapped++;
+                        var occ = tile.BuildableOccupants;
+                        if (occ != null && occ.Count > 0)
+                        {
+                            occupied++;
+                            for (int o = 0; o < occ.Count; o++)
+                            {
+                                GridItem gi = occ[o];
+                                if (gi == null) { dead++; if (firstOccupant == null) firstOccupant = "(destroyed)"; }
+                                else if (firstOccupant == null) firstOccupant = gi.name;
+                            }
+                        }
+                        if (tile.AvailableOffset != 0f && foot.RequiredOffset != 0f && tile.AvailableOffset < foot.RequiredOffset) offset++;
+                        if (!tile.CanBeBuiltOn()) unowned++;
+                        bool col = false;
+                        foreach (Collider cl in tile.GetComponentsInChildren<Collider>(false)) if (cl.enabled) { col = true; break; }
+                        if (!col) noCollider++;
+                    }
+                    if (n == 0) continue;
+                    Core.Log.Msg("[Debug] rvgrid tiles '" + grid.name + "' (active=" + grid.gameObject.activeInHierarchy + ") " + (ours ? "added" : "RV's own")
+                        + ": " + n + " tile(s), " + ok + " take '" + itemId + "'. No because: occupied " + occupied + " (" + dead + " by destroyed items"
+                        + (firstOccupant != null ? ", first '" + firstOccupant + "'" : "") + "), offset " + offset + ", not owned " + unowned
+                        + ", not in the grid's map " + notMapped + "; no collider for the ghost " + noCollider + ".");
+                }
+            }
+        }
+
         internal static void GridExtent()
         {
             Property rv = RvProperty();
@@ -581,17 +637,60 @@ namespace RVRepairVan.Patches
             }
             if (parts.Length >= 3 && parts[1].ToLower() == "rot" && float.TryParse(parts[2], out float deg)) { RotateGhost(deg); return; }
             if (parts.Length >= 2 && parts[1].ToLower() == "place") { PlaceGhost(); return; }
-            if (parts.Length >= 2 && parts[1].ToLower() == "pickup") { PickupSecondGrid(); return; }
+            if (parts.Length >= 2 && parts[1].ToLower() == "pickup") { PickupSecondGrid(parts.Length > 2 && parts[2].ToLower() == "all"); return; }
+            if (parts.Length >= 2 && parts[1].ToLower() == "sweep") { MelonLoader.MelonCoroutines.Start(SweepGhost()); return; }
             LogGhost();
         }
 
-        /// <summary>Pick up every item standing on the RV's second grid, the way the player's hands do.</summary>
-        private static void PickupSecondGrid()
+        /// <summary>
+        /// <c>rvghost sweep</c>: point the held item's ghost at every tile of the RV's first grid in turn, the way
+        /// a player looks at the floor, and count per group (the RV's own tiles, the ones the workshop floor added)
+        /// how often the ghost turned out valid. The first few red ones are explained through <c>rvghost</c>.
+        /// </summary>
+        private static System.Collections.IEnumerator SweepGhost()
+        {
+            Property rv = RvProperty();
+            Transform root = RVManager.Root;
+            var pm = PlayerSingleton<PlayerMovement>.Instance;
+            var pc = PlayerSingleton<PlayerCamera>.Instance;
+            if (rv == null || root == null || rv.Grids == null || rv.Grids.Count == 0) { Core.Log.Warning("[Debug] rvghost sweep: RV property, root or grid not found."); yield break; }
+            if (pm == null || pc == null) { Core.Log.Warning("[Debug] rvghost sweep: no local player."); yield break; }
+            if (CurrentGhost("sweep") == null) yield break;
+            Grid grid = rv.Grids[0];
+            var tiles = new System.Collections.Generic.List<Tile>();
+            for (int t = 0; grid.Tiles != null && t < grid.Tiles.Count; t++) if (grid.Tiles[t] != null) tiles.Add(grid.Tiles[t]);
+            int[] n = new int[2], ok = new int[2], explained = new int[2];
+            foreach (Tile tile in tiles)
+            {
+                if (tile == null) continue;
+                int g = tile.gameObject.name.StartsWith("RVRepairVan_Tile_", StringComparison.Ordinal) ? 1 : 0;
+                Vector3 local = root.InverseTransformPoint(tile.transform.position);
+                Vector3 dir = Mathf.Abs(local.x) > 0.1f ? new Vector3(-Mathf.Sign(local.x), 0f, 0f) : Vector3.back;
+                pm.Teleport(root.TransformPoint(local + dir * 1.2f + Vector3.up * 1f), true);
+                yield return new WaitForSeconds(0.3f);
+                if (pc == null) { Core.Log.Warning("[Debug] rvghost sweep: camera gone mid-sweep."); yield break; }
+                pc.LookAt(tile.transform.position, 0.05f);
+                yield return new WaitForSeconds(0.35f);
+                BuildUpdate_Grid bu = CurrentGhost("sweep");
+                if (bu == null) yield break;
+                n[g]++;
+                if (bu._validPosition) { ok[g]++; continue; }
+                if (explained[g]++ < 3)
+                {
+                    Core.Log.Msg("[Debug] rvghost sweep: red at " + (g == 1 ? "added" : "RV's own") + " tile (" + tile.x + "," + tile.y + ") " + local.ToString("F2") + ":");
+                    LogGhost();
+                }
+            }
+            Core.Log.Msg("[Debug] rvghost sweep: RV's own tiles " + ok[0] + "/" + n[0] + " valid, added tiles " + ok[1] + "/" + n[1] + " valid.");
+        }
+
+        /// <summary>Pick up every item standing on the RV's second grid (or on every grid with 'all'), the way the player's hands do.</summary>
+        private static void PickupSecondGrid(bool all)
         {
             Property rv = RvProperty();
             if (rv == null || rv.Grids == null || rv.Grids.Count < 2) { Core.Log.Warning("[Debug] rvghost pickup: the RV has no second grid."); return; }
             var done = new System.Collections.Generic.HashSet<System.IntPtr>();
-            for (int g = 1; g < rv.Grids.Count; g++)
+            for (int g = all ? 0 : 1; g < rv.Grids.Count; g++)
             {
                 var grid = rv.Grids[g];
                 if (grid == null || grid.Tiles == null) continue;
