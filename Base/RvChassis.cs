@@ -34,8 +34,20 @@ namespace RVRepairVan.Base
         /// forearms. Up and forward by this much the view clears the head and keeps the hands on the wheel in sight.
         /// </summary>
         private const float EyeLift = 0.045f, EyeForward = 0.05f;
+        /// <summary>
+        /// The wheel's hub and column hang below the rim and reach towards the dashboard, so the middle of the wheel's
+        /// bounds sits this far under the rim's middle and this far behind it. The pivot goes to the rim's middle, so the
+        /// wheel turns about its own centre.
+        /// </summary>
+        private const float RimAbove = 0.12f, RimAhead = 0.03f;
+        /// <summary>
+        /// The RV wheel is 0.52 m across and drawn from a static batch, so Chassis cannot measure it from a mesh. The rim's
+        /// middle sits 0.255 m from the pivot. The hands hold it below level on the driver's half (twenty past eight to
+        /// twenty to four), where the arms reach it from the backrest.
+        /// </summary>
+        private const float RimRadius = 0.255f, GripAngle = -30f;
 
-        private static Transform _pivot;
+        private static Transform _pivot, _model;
         private static Quaternion _rest = Quaternion.identity;
         private static Vector3 _column = Vector3.forward;
         private static readonly HashSet<IntPtr> _wheelRenderers = new HashSet<IntPtr>();
@@ -48,6 +60,7 @@ namespace RVRepairVan.Base
         /// </summary>
         internal static void Prepare(Transform model)
         {
+            _model = model;
             PrepareSteering(model);
             MeasureChairs(model);
             CaptureHome();
@@ -75,7 +88,8 @@ namespace RVRepairVan.Base
                     Vector3 axisWorld = Column(wr.transform, wb.size);
                     pivot = new GameObject(PivotName).transform;
                     pivot.SetParent(wheel.parent, false);
-                    pivot.position = wb.center;
+                    Vector3 ahead = Vector3.ProjectOnPlane(-model.right, axisWorld).normalized;
+                    pivot.position = wb.center + axisWorld * RimAbove + ahead * RimAhead;
                     pivot.rotation = model.rotation;
                     wheel.SetParent(pivot, true);
                     _column = pivot.InverseTransformDirection(axisWorld);
@@ -201,6 +215,13 @@ namespace RVRepairVan.Base
                     Vector3 point = model.TransformPoint(driver ? _driverSeat : _passengerSeat) + root.forward * CushionForward;
                     SeatProfile seat = ChassisApi.FitSeat(chassis, i, point, model, driver ? _pivot : null, HipHeight);
                     seat.Eyes += Vector3.up * EyeLift + Quaternion.Euler(0f, seat.Yaw, 0f) * Vector3.forward * EyeForward;
+                    if (driver && _pivot != null)
+                    {
+                        seat.Hands.RimRadius = RimRadius;
+                        seat.Hands.RimOffset = 0f;
+                        seat.Hands.GripAngle = GripAngle;
+                        Core.Log.Msg("[Chassis] driver's hands close around the rim: radius " + RimRadius.ToString("F3") + " m, grip angle " + GripAngle.ToString("F0") + " deg.");
+                    }
                     profile.Seats.Add(seat);
                 }
 
@@ -211,6 +232,95 @@ namespace RVRepairVan.Base
             }
             catch (Exception e) { Core.Log.Error("[Chassis] registering the RV profile failed - the RV keeps vanilla seats: " + e); }
         }
+
+#if DEBUG
+        /// <summary>
+        /// Where the local avatar's hand bones sit against the wheel: model-local position, height above the rim plane
+        /// along the column (negative = under the face) and distance from the column axis.
+        /// </summary>
+        internal static void HandsReport()
+        {
+            var avatar = Il2CppScheduleOne.PlayerScripts.Player.Local != null ? Il2CppScheduleOne.PlayerScripts.Player.Local.Avatar : null;
+            if (avatar == null) { Core.Log.Warning("[Debug] rvhands: no local avatar."); return; }
+            if (_pivot == null || _model == null) { Core.Log.Warning("[Debug] rvhands: no steering pivot or model."); return; }
+            Vector3 column = _pivot.TransformDirection(_column).normalized;
+            int n = 0;
+            foreach (Transform t in avatar.GetComponentsInChildren<Transform>(true))
+            {
+                string name = t.name;
+                if (!(name.EndsWith("RightHand") || name.EndsWith("LeftHand") || name.EndsWith("HandIndex1") || name.EndsWith("HandIndex4_end")
+                    || name.EndsWith("HandThumb4_end") || name.EndsWith("ForeArm"))) continue;
+                Vector3 d = t.position - _pivot.position;
+                float h = Vector3.Dot(d, column);
+                float r = Vector3.ProjectOnPlane(d, column).magnitude;
+                Core.Log.Msg("[Debug] rvhands: " + name.Replace("mixamorig:", "") + " model " + _model.InverseTransformPoint(t.position).ToString("F3")
+                    + " above face " + h.ToString("F3") + " from axis " + r.ToString("F3"));
+                n++;
+            }
+            if (n == 0) Core.Log.Warning("[Debug] rvhands: no hand bones under the avatar.");
+            RimProbe(column);
+        }
+
+        /// <summary>
+        /// Rays down the column onto the wheel's own colliders, every 30 degrees around the hub (0 = right, 90 = towards
+        /// the windscreen): where the rim starts and ends from the axis and how high its top sits above the pivot.
+        /// </summary>
+        private static void RimProbe(Vector3 column)
+        {
+            Transform root = _model;
+            Vector3 right = Vector3.ProjectOnPlane(root.right, column).normalized;
+            Vector3 top = Vector3.ProjectOnPlane(root.forward, column).normalized;
+            int hitsTotal = 0;
+            for (int deg = 0; deg < 360; deg += 30)
+            {
+                float a = deg * Mathf.Deg2Rad;
+                Vector3 dir = right * Mathf.Cos(a) + top * Mathf.Sin(a);
+                float rMin = -1f, rMax = -1f, hMax = -9f, rAtTop = 0f;
+                for (float r = 0.10f; r <= 0.36f; r += 0.005f)
+                {
+                    Vector3 from = _pivot.position + dir * r + column * 0.4f;
+                    foreach (RaycastHit hit in Physics.RaycastAll(from, -column, 0.8f, ~0, QueryTriggerInteraction.Collide))
+                    {
+                        if (hit.collider == null || !hit.collider.transform.IsChildOf(_pivot)) continue;
+                        float h = Vector3.Dot(hit.point - _pivot.position, column);
+                        if (rMin < 0f) rMin = r;
+                        rMax = r;
+                        if (h > hMax) { hMax = h; rAtTop = r; }
+                        hitsTotal++;
+                    }
+                }
+                Core.Log.Msg("[Debug] rvhands rim " + deg + " deg: " + (rMin < 0f ? "no hit" : "r " + rMin.ToString("F3") + ".." + rMax.ToString("F3")
+                    + ", top " + hMax.ToString("F3") + " at r " + rAtTop.ToString("F3")));
+            }
+            foreach (Collider c in _pivot.GetComponentsInChildren<Collider>(true))
+            {
+                MeshCollider mc = c.TryCast<MeshCollider>();
+                Core.Log.Msg("[Debug] rvhands rim: collider " + c.name + " " + c.GetType().Name + " enabled " + c.enabled + " layer " + c.gameObject.layer
+                    + (mc != null ? " convex " + mc.convex + " mesh " + (mc.sharedMesh != null ? mc.sharedMesh.name + " " + mc.sharedMesh.vertexCount + " verts" : "none") : ""));
+            }
+            // Top and underside along the right hand's side (lateral, and 30 degrees towards the windscreen).
+            Vector3 lateral = Vector3.ProjectOnPlane(root.forward, column).normalized;
+            Vector3 ahead = -Vector3.ProjectOnPlane(root.right, column).normalized;
+            foreach (int deg in new[] { 0, 30 })
+            {
+                float a = deg * Mathf.Deg2Rad;
+                Vector3 dir = lateral * Mathf.Cos(a) + ahead * Mathf.Sin(a);
+                var line = new System.Text.StringBuilder("[Debug] rvhands profile " + deg + " deg (r: top/under):");
+                for (float r = 0.10f; r <= 0.34f; r += 0.01f)
+                {
+                    Vector3 p = _pivot.position + dir * r;
+                    float topH = float.NaN, underH = float.NaN;
+                    foreach (RaycastHit hit in Physics.RaycastAll(p + column * 0.4f, -column, 0.8f, ~0, QueryTriggerInteraction.Collide))
+                        if (hit.collider != null && hit.collider.transform.IsChildOf(_pivot)) { float h = Vector3.Dot(hit.point - _pivot.position, column); if (float.IsNaN(topH) || h > topH) topH = h; }
+                    foreach (RaycastHit hit in Physics.RaycastAll(p - column * 0.4f, column, 0.8f, ~0, QueryTriggerInteraction.Collide))
+                        if (hit.collider != null && hit.collider.transform.IsChildOf(_pivot)) { float h = Vector3.Dot(hit.point - _pivot.position, column); if (float.IsNaN(underH) || h < underH) underH = h; }
+                    if (!float.IsNaN(topH) || !float.IsNaN(underH))
+                        line.Append(" " + r.ToString("F2") + ":" + (float.IsNaN(topH) ? "-" : topH.ToString("F3")) + "/" + (float.IsNaN(underH) ? "-" : underH.ToString("F3")));
+                }
+                Core.Log.Msg(line.ToString());
+            }
+        }
+#endif
 
         /// <summary>The chassis goes back to being a plain veeper.</summary>
         internal static void Detach(LandVehicle chassis)
@@ -223,6 +333,7 @@ namespace RVRepairVan.Base
         internal static void Reset()
         {
             _pivot = null;
+            _model = null;
             _chairs = false;
             _wheelRenderers.Clear();
         }
