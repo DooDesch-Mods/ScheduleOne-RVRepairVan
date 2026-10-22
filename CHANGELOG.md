@@ -4,6 +4,11 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.6.2] - 2026-10-22
+
+### Fixed
+- The new work floor no longer stays red in build mode when something stood in the RV before you bought it.
+
 ## [3.6.1] - 2026-10-22
 
 ### Fixed
