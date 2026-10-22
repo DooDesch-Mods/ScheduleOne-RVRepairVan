@@ -24,11 +24,23 @@ namespace RVRepairVan.Base
         private const string Frame = "RV";
         internal const string PivotName = "RVRepairVan_SteeringPivot";
 
-        /// <summary>A cab chair's cushion sits this far above the bottom of its bounds.</summary>
-        private const float CushionAboveBase = 0.45f;
-        /// <summary>The cushion's middle is this far ahead of the chair's bounds centre, which the backrest pulls back.</summary>
-        private const float CushionForward = 0.08f;
+        /// <summary>
+        /// The seat point FitSeat gets sits this far above the bottom of a cab chair's bounds. The cushion's top is 0.64 m
+        /// up (the chair mesh); from this point FitSeat's hip height puts the hip joints 0.14 m above the cushion, so the
+        /// thighs lie on it.
+        /// </summary>
+        private const float SeatAboveBase = 0.51f;
+        /// <summary>The seat point sits this far behind the chair's bounds centre, so the back leans on the backrest.</summary>
+        private const float CushionForward = -0.02f;
         private const float HipHeight = 0.08f;
+        /// <summary>
+        /// The chairs are too high for the feet to reach the floor with the thighs on the cushion. The knees bend over the
+        /// cushion's front edge and the feet hang under them: both this far ahead of the seat point, the feet below it,
+        /// the knees above it.
+        /// </summary>
+        private const float FootAhead = 0.44f, FootBelow = 0.20f, KneeAhead = 0.53f, KneeAbove = 0.34f, FootSide = 0.15f;
+        /// <summary>FitSeat lays the passenger's hands this far under the thighs on the cushion; lifted, they rest on the knees.</summary>
+        private const float LapLift = 0.16f;
         /// <summary>
         /// The fitted eyes sit at the neck in the RV's high cab chairs, so first person looked into the rider's own
         /// forearms. Up and forward by this much the view clears the head and keeps the hands on the wheel in sight.
@@ -158,7 +170,8 @@ namespace RVRepairVan.Base
         // ---- cab chairs ------------------------------------------------------------------------------------------------
 
         private static bool _chairs;
-        private static Vector3 _driverSeat, _passengerSeat;   // model space, on the cushion
+        private static Vector3 _driverSeat, _passengerSeat;   // model space, the seat points FitSeat gets
+        private static Transform _driverChair, _passengerChair;
 
         private static void MeasureChairs(Transform model)
         {
@@ -170,14 +183,16 @@ namespace RVRepairVan.Base
             Vector3 wheelAt = _pivot != null ? _pivot.position : model.TransformPoint(new Vector3(-4.74f, 1.92f, -0.84f));
             Bounds ba = ChairBounds(a), bb = ChairBounds(b);
             bool aDrives = Vector3.Distance(ba.center, wheelAt) <= Vector3.Distance(bb.center, wheelAt);
+            _driverChair = aDrives ? a : b;
+            _passengerChair = aDrives ? b : a;
             _driverSeat = model.InverseTransformPoint(Cushion(aDrives ? ba : bb));
             _passengerSeat = model.InverseTransformPoint(Cushion(aDrives ? bb : ba));
             _chairs = true;
-            Core.Log.Msg("[Chassis] cab chairs: driver '" + (aDrives ? a : b).name + "' cushion at model-local " + _driverSeat.ToString("F2")
+            Core.Log.Msg("[Chassis] cab chairs: driver '" + (aDrives ? a : b).name + "' seat point at model-local " + _driverSeat.ToString("F2")
                 + ", passenger at " + _passengerSeat.ToString("F2") + ".");
         }
 
-        private static Vector3 Cushion(Bounds chair) => new Vector3(chair.center.x, chair.min.y + CushionAboveBase, chair.center.z);
+        private static Vector3 Cushion(Bounds chair) => new Vector3(chair.center.x, chair.min.y + SeatAboveBase, chair.center.z);
 
         // ---- profile ---------------------------------------------------------------------------------------------------
 
@@ -215,6 +230,19 @@ namespace RVRepairVan.Base
                     Vector3 point = model.TransformPoint(driver ? _driverSeat : _passengerSeat) + root.forward * CushionForward;
                     SeatProfile seat = ChassisApi.FitSeat(chassis, i, point, model, driver ? _pivot : null, HipHeight);
                     seat.Eyes += Vector3.up * EyeLift + Quaternion.Euler(0f, seat.Yaw, 0f) * Vector3.forward * EyeForward;
+                    if (seat.Feet != null)
+                    {
+                        Vector3 side = root.right * FootSide;
+                        seat.Feet.Position = model.InverseTransformPoint(point + root.forward * FootAhead - root.up * FootBelow + side);
+                        seat.Feet.Knee = model.InverseTransformPoint(point + root.forward * KneeAhead + root.up * KneeAbove + side);
+                    }
+                    else Core.Log.Warning("[Chassis] seat " + i + " was fitted without feet - its legs follow the sit animation.");
+                    if (!driver && seat.Hands != null)
+                    {
+                        Vector3 lift = model.InverseTransformDirection(root.up) * LapLift;
+                        seat.Hands.GripStart += lift;
+                        seat.Hands.Elbow += lift;
+                    }
                     if (driver && _pivot != null)
                     {
                         seat.Hands.RimRadius = RimRadius;
@@ -259,6 +287,63 @@ namespace RVRepairVan.Base
             }
             if (n == 0) Core.Log.Warning("[Debug] rvhands: no hand bones under the avatar.");
             RimProbe(column);
+        }
+
+        /// <summary>
+        /// Rays straight down onto each cab chair every 5 cm from the backrest to the front edge: the highest hit on the
+        /// chair's own colliders, in model space. Then the local avatar's hips, thighs, knees and feet in model space.
+        /// </summary>
+        internal static void SeatReport()
+        {
+            if (_model == null) { Core.Log.Warning("[Debug] rvseat: no RV model."); return; }
+            foreach (Transform chair in new[] { _driverChair, _passengerChair })
+            {
+                if (chair == null) { Core.Log.Warning("[Debug] rvseat: a cab chair was not measured."); continue; }
+                Bounds b = ChairBounds(chair);
+                Vector3 c = _model.InverseTransformPoint(b.center);
+                Core.Log.Msg("[Debug] rvseat " + chair.name + ": bounds centre model " + c.ToString("F3") + " min y " + _model.InverseTransformPoint(b.min).y.ToString("F3")
+                    + " max y " + _model.InverseTransformPoint(b.max).y.ToString("F3") + " size " + b.size.ToString("F3"));
+                foreach (Collider col in chair.GetComponentsInChildren<Collider>(true))
+                    Core.Log.Msg("[Debug] rvseat " + chair.name + " collider " + col.name + " " + col.GetType().Name + " enabled " + col.enabled + " layer " + col.gameObject.layer
+                        + " bounds y " + _model.InverseTransformPoint(col.bounds.min).y.ToString("F3") + ".." + _model.InverseTransformPoint(col.bounds.max).y.ToString("F3"));
+                var line = new System.Text.StringBuilder("[Debug] rvseat " + chair.name + " top along -x (model x: y):");
+                for (float dx = -0.45f; dx <= 0.45f; dx += 0.05f)
+                {
+                    Vector3 local = new Vector3(c.x + dx, c.y + 1.5f, c.z);
+                    Vector3 from = _model.TransformPoint(local);
+                    float best = float.NaN;
+                    foreach (RaycastHit hit in Physics.RaycastAll(from, -_model.up, 3f, ~0, QueryTriggerInteraction.Collide))
+                    {
+                        if (hit.collider == null || !hit.collider.transform.IsChildOf(chair)) continue;
+                        float y = _model.InverseTransformPoint(hit.point).y;
+                        if (float.IsNaN(best) || y > best) best = y;
+                    }
+                    line.Append(" " + (c.x + dx).ToString("F2") + ":" + (float.IsNaN(best) ? "-" : best.ToString("F3")));
+                }
+                Core.Log.Msg(line.ToString());
+            }
+            // The cab floor under the feet: the first hit that is no chair and no part of a player.
+            foreach (float fx in new[] { -4.6f, -4.8f, -5.0f })
+            {
+                Vector3 from = _model.TransformPoint(new Vector3(fx, 2.0f, -0.85f));
+                float floor = float.NaN; string what = "-";
+                foreach (RaycastHit hit in Physics.RaycastAll(from, -_model.up, 3f, ~0, QueryTriggerInteraction.Ignore))
+                {
+                    if (hit.collider == null || hit.collider.GetComponentInParent<Il2CppScheduleOne.PlayerScripts.Player>() != null) continue;
+                    if (_driverChair != null && hit.collider.transform.IsChildOf(_driverChair)) continue;
+                    float y = _model.InverseTransformPoint(hit.point).y;
+                    if (float.IsNaN(floor) || y > floor) { floor = y; what = hit.collider.name; }
+                }
+                Core.Log.Msg("[Debug] rvseat floor at model x " + fx.ToString("F2") + ": y " + (float.IsNaN(floor) ? "-" : floor.ToString("F3")) + " (" + what + ")");
+            }
+            var avatar = Il2CppScheduleOne.PlayerScripts.Player.Local != null ? Il2CppScheduleOne.PlayerScripts.Player.Local.Avatar : null;
+            if (avatar == null) { Core.Log.Warning("[Debug] rvseat: no local avatar."); return; }
+            foreach (Transform t in avatar.GetComponentsInChildren<Transform>(true))
+            {
+                string n = t.name.Replace("mixamorig:", "");
+                if (n == "Hips" || n.EndsWith("UpLeg") || n == "LeftLeg" || n == "RightLeg" || n == "LeftFoot" || n == "RightFoot" || n == "LeftToeBase" || n == "RightToeBase")
+                    Core.Log.Msg("[Debug] rvseat bone " + n + " model " + _model.InverseTransformPoint(t.position).ToString("F3"));
+            }
         }
 
         /// <summary>
@@ -335,6 +420,7 @@ namespace RVRepairVan.Base
             _pivot = null;
             _model = null;
             _chairs = false;
+            _driverChair = _passengerChair = null;
             _wheelRenderers.Clear();
         }
 
