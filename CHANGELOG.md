@@ -4,6 +4,12 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.6.1] - 2026-10-22
+
+### Fixed
+- Driver and passenger sit on the RV cab chairs with their knees bent. They used to sink into the cushion with their legs
+  stretched out.
+
 ## [3.6.0] - 2026-10-22
 
 ### Added
