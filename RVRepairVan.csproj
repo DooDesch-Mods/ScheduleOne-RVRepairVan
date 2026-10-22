@@ -107,11 +107,15 @@
   <Import Project="$(MSBuildThisFileDirectory)Workspace/build/Deploy.props" Condition="Exists('$(MSBuildThisFileDirectory)Workspace/build/Deploy.props')" />
 
   <!-- Chassis seats the driver and the passenger in the cab, turns the steering wheel and runs horn, indicators and
-       automatic headlights. A sibling checkout builds it; otherwise the DLL from the shared lib folder. -->
-  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)../Chassis/Chassis.csproj')">
-    <ProjectReference Include="$(MSBuildThisFileDirectory)../Chassis/Chassis.csproj" Private="false" />
+       automatic headlights. A sibling checkout builds it; otherwise the DLL from the shared lib folder.
+       ChassisProject points at another checkout, e.g. a Chassis worktree with an API change. -->
+  <PropertyGroup>
+    <ChassisProject Condition="'$(ChassisProject)' == ''">$(MSBuildThisFileDirectory)../Chassis/Chassis.csproj</ChassisProject>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(ChassisProject)')">
+    <ProjectReference Include="$(ChassisProject)" Private="false" />
   </ItemGroup>
-  <ItemGroup Condition="!Exists('$(MSBuildThisFileDirectory)../Chassis/Chassis.csproj')">
+  <ItemGroup Condition="!Exists('$(ChassisProject)')">
     <Reference Include="Chassis">
       <HintPath>$(WorkspaceLibPath)/$(Backend)/chassis/Chassis.dll</HintPath>
       <Private>false</Private>

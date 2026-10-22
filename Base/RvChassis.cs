@@ -41,12 +41,11 @@ namespace RVRepairVan.Base
         /// </summary>
         private const float RimAbove = 0.12f, RimAhead = 0.03f;
         /// <summary>
-        /// The RV wheel is 0.52 m across, so the fitted grip 0.17 m beside the hub put the hands on the spokes. The wrists
-        /// sit just outside the rim at its left and right, below level on the driver's half of the wheel (twenty past
-        /// eight to twenty to four), where the arms reach it from the backrest, and above the rim's middle. A light grip
-        /// turn lays the fingers forward along the rim; a full turn would point them at the hub.
+        /// The RV wheel is 0.52 m across and drawn from a static batch, so Chassis cannot measure it from a mesh. The rim's
+        /// middle sits 0.255 m from the pivot. The hands hold it below level on the driver's half (twenty past eight to
+        /// twenty to four), where the arms reach it from the backrest.
         /// </summary>
-        private const float GripRadius = 0.28f, GripAbove = 0.04f, GripAngle = -30f, GripTurn = 0.3f;
+        private const float RimRadius = 0.255f, GripAngle = -30f;
 
         private static Transform _pivot, _model;
         private static Quaternion _rest = Quaternion.identity;
@@ -218,9 +217,10 @@ namespace RVRepairVan.Base
                     seat.Eyes += Vector3.up * EyeLift + Quaternion.Euler(0f, seat.Yaw, 0f) * Vector3.forward * EyeForward;
                     if (driver && _pivot != null)
                     {
-                        seat.Hands.GripStart = model.InverseTransformPoint(RimGrip(root));
-                        seat.Hands.RotationWeight = GripTurn;
-                        Core.Log.Msg("[Chassis] driver's hands on the rim at model-local " + seat.Hands.GripStart.ToString("F3") + ", grip turn " + GripTurn.ToString("F1") + ".");
+                        seat.Hands.RimRadius = RimRadius;
+                        seat.Hands.RimOffset = 0f;
+                        seat.Hands.GripAngle = GripAngle;
+                        Core.Log.Msg("[Chassis] driver's hands close around the rim: radius " + RimRadius.ToString("F3") + " m, grip angle " + GripAngle.ToString("F0") + " deg.");
                     }
                     profile.Seats.Add(seat);
                 }
@@ -231,16 +231,6 @@ namespace RVRepairVan.Base
                     + (profile.Steering != null ? "on" : "off") + ".");
             }
             catch (Exception e) { Core.Log.Error("[Chassis] registering the RV profile failed - the RV keeps vanilla seats: " + e); }
-        }
-
-        /// <summary>Right wrist at the rim's right side, in world space: out to the right, turned by the grip angle on the wheel's face (negative = towards the driver).</summary>
-        private static Vector3 RimGrip(Transform root)
-        {
-            Vector3 column = _pivot.TransformDirection(_column).normalized;
-            Vector3 right = Vector3.ProjectOnPlane(root.right, column).normalized;
-            Vector3 top = Vector3.ProjectOnPlane(root.forward, column).normalized;
-            float a = GripAngle * Mathf.Deg2Rad;
-            return _pivot.position + (right * Mathf.Cos(a) + top * Mathf.Sin(a)) * GripRadius + column * GripAbove;
         }
 
 #if DEBUG
