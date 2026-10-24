@@ -132,6 +132,11 @@
       <HintPath>$(MelonLoaderPath)/0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- Managed Newtonsoft shipped with MelonLoader, the one S1API serialises saves with. -->
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(MelonLoaderPath)/Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <!-- IL2CPP-only references -->
