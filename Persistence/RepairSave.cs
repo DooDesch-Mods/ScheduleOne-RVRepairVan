@@ -11,7 +11,9 @@ namespace RVRepairVan.Persistence
     /// while the game reverted the RV to wrecked - the quest then looked gone with no way back. Now "didn't save"
     /// reverts our state exactly like the game reverts the RV.
     ///
-    /// S1API auto-discovers this type (non-abstract, parameterless ctor) and keeps a single instance.
+    /// S1API auto-discovers this type (non-abstract, parameterless ctor) and keeps a single instance. It writes
+    /// one file per [SaveableField] into Modded/Saveables/RepairSave/, so the whole state is one field and the
+    /// save folder holds one file, rv_state.json.
     /// </summary>
     public class RepairSave : Saveable
     {
@@ -30,61 +32,84 @@ namespace RVRepairVan.Persistence
         /// </summary>
         public override SaveableLoadOrder LoadOrder => SaveableLoadOrder.BeforeBaseGame;
 
-        // One file per field (S1API serialises each [SaveableField] separately) - primitives keep IL2CPP JSON
-        // reflection trivial and risk-free. Names must not be "QuestData" (reserved by the API).
-        [SaveableField("rv_repaired")] private bool _repaired;
-        [SaveableField("rv_stage")] private int _stage;
-        [SaveableField("rv_samples")] private int _samples;
-        [SaveableField("rv_discount")] private int _discount;
-        // Bitmask of the upgrades Marco has been paid for (see RvUpgrade). The upgrades themselves are runtime
-        // effects on scene objects, so this mask is what gets re-applied on every load.
-        [SaveableField("rv_upgrades")] private int _upgrades;
-        // In-game minute stamp (TimeManager.GetTotalMinSum) at which Marco took the job, for the
-        // "repair takes a day" option. 0 = no job running. Persisted so a reload keeps the remaining time.
-        [SaveableField("rv_repair_started")] private int _repairStartedAt;
-        // Where the RV stands when it was driven off its spot (Engine upgrade): the chassis pose. Not away = home.
-        [SaveableField("rv_away")] private bool _away;
-        [SaveableField("rv_away_px")] private float _awayPx;
-        [SaveableField("rv_away_py")] private float _awayPy;
-        [SaveableField("rv_away_pz")] private float _awayPz;
-        [SaveableField("rv_away_rx")] private float _awayRx;
-        [SaveableField("rv_away_ry")] private float _awayRy;
-        [SaveableField("rv_away_rz")] private float _awayRz;
-        [SaveableField("rv_away_rw")] private float _awayRw;
-        // In-game minute stamp of the last drive (Engine upgrade), and whether the battery went flat after standing.
-        [SaveableField("rv_last_driven")] private int _lastDriven;
-        [SaveableField("rv_battery_dead")] private bool _batteryDead;
+        /// <summary>
+        /// The persisted state. A plain managed class with primitive fields, serialised by Newtonsoft as one
+        /// JSON object. Format is 0 only on an instance that no rv_state.json was read into.
+        /// </summary>
+        internal sealed class State
+        {
+            public int Format;
+            public bool Repaired;
+            public int Stage;
+            public int Samples;
+            public int Discount;
+            // Bitmask of the upgrades Marco has been paid for (see RvUpgrade). The upgrades themselves are runtime
+            // effects on scene objects, so this mask is what gets re-applied on every load.
+            public int Upgrades;
+            // In-game minute stamp (TimeManager.GetTotalMinSum) at which Marco took the job, for the
+            // "repair takes a day" option. 0 = no job running. Persisted so a reload keeps the remaining time.
+            public int RepairStartedAt;
+            // Where the RV stands when it was driven off its spot (Engine upgrade): the chassis pose. Not away = home.
+            public bool Away;
+            public float AwayPx, AwayPy, AwayPz;
+            public float AwayRx, AwayRy, AwayRz, AwayRw = 1f;
+            // In-game minute stamp of the last drive (Engine upgrade), and whether the battery went flat after standing.
+            public int LastDriven;
+            public bool BatteryDead;
+        }
+
+        internal const int CurrentFormat = 1;
+
+        // Names must not be "QuestData" (reserved by the API).
+        [SaveableField("rv_state")] private State _state = new State();
+
+        // The per-field files of 3.6.2 and older. S1API still reads them into these fields when they exist; OnLoaded
+        // moves them into _state and sets them to null, and S1API deletes the file of a null field on the next save.
+        [SaveableField("rv_repaired")] private bool? _oldRepaired;
+        [SaveableField("rv_stage")] private int? _oldStage;
+        [SaveableField("rv_samples")] private int? _oldSamples;
+        [SaveableField("rv_discount")] private int? _oldDiscount;
+        [SaveableField("rv_upgrades")] private int? _oldUpgrades;
+        [SaveableField("rv_repair_started")] private int? _oldRepairStarted;
+        [SaveableField("rv_away")] private bool? _oldAway;
+        [SaveableField("rv_away_px")] private float? _oldAwayPx;
+        [SaveableField("rv_away_py")] private float? _oldAwayPy;
+        [SaveableField("rv_away_pz")] private float? _oldAwayPz;
+        [SaveableField("rv_away_rx")] private float? _oldAwayRx;
+        [SaveableField("rv_away_ry")] private float? _oldAwayRy;
+        [SaveableField("rv_away_rz")] private float? _oldAwayRz;
+        [SaveableField("rv_away_rw")] private float? _oldAwayRw;
+        [SaveableField("rv_last_driven")] private int? _oldLastDriven;
+        [SaveableField("rv_battery_dead")] private bool? _oldBatteryDead;
 
         public RepairSave() { Instance = this; }
 
-        internal bool Repaired { get => _repaired; set => _repaired = value; }
-        internal int Stage { get => _stage; set => _stage = value; }
-        internal int Samples { get => _samples; set => _samples = value; }
-        internal int Discount { get => _discount; set => _discount = value; }
-        internal int Upgrades { get => _upgrades; set => _upgrades = value; }
-        internal int RepairStartedAt { get => _repairStartedAt; set => _repairStartedAt = value; }
-        internal int LastDriven { get => _lastDriven; set => _lastDriven = value; }
-        internal bool BatteryDead { get => _batteryDead; set => _batteryDead = value; }
+        internal bool Repaired { get => _state.Repaired; set => _state.Repaired = value; }
+        internal int Stage { get => _state.Stage; set => _state.Stage = value; }
+        internal int Samples { get => _state.Samples; set => _state.Samples = value; }
+        internal int Discount { get => _state.Discount; set => _state.Discount = value; }
+        internal int Upgrades { get => _state.Upgrades; set => _state.Upgrades = value; }
+        internal int RepairStartedAt { get => _state.RepairStartedAt; set => _state.RepairStartedAt = value; }
+        internal int LastDriven { get => _state.LastDriven; set => _state.LastDriven = value; }
+        internal bool BatteryDead { get => _state.BatteryDead; set => _state.BatteryDead = value; }
 
-        internal bool Away => _away;
-        internal Vector3 AwayPos => new Vector3(_awayPx, _awayPy, _awayPz);
-        internal Quaternion AwayRot => new Quaternion(_awayRx, _awayRy, _awayRz, _awayRw);
+        internal bool Away => _state.Away;
+        internal Vector3 AwayPos => new Vector3(_state.AwayPx, _state.AwayPy, _state.AwayPz);
+        internal Quaternion AwayRot => new Quaternion(_state.AwayRx, _state.AwayRy, _state.AwayRz, _state.AwayRw);
 
         internal void SetAway(Vector3 pos, Quaternion rot)
         {
-            _away = true;
-            _awayPx = pos.x; _awayPy = pos.y; _awayPz = pos.z;
-            _awayRx = rot.x; _awayRy = rot.y; _awayRz = rot.z; _awayRw = rot.w;
+            _state.Away = true;
+            _state.AwayPx = pos.x; _state.AwayPy = pos.y; _state.AwayPz = pos.z;
+            _state.AwayRx = rot.x; _state.AwayRy = rot.y; _state.AwayRz = rot.z; _state.AwayRw = rot.w;
         }
 
-        internal void ClearAway() => SetAwayFields(false);
-
-        private void SetAwayFields(bool away)
+        internal void ClearAway()
         {
-            _away = away;
-            _awayPx = _awayPy = _awayPz = 0f;
-            _awayRx = _awayRy = _awayRz = 0f;
-            _awayRw = 1f;
+            _state.Away = false;
+            _state.AwayPx = _state.AwayPy = _state.AwayPz = 0f;
+            _state.AwayRx = _state.AwayRy = _state.AwayRz = 0f;
+            _state.AwayRw = 1f;
         }
 
         /// <summary>
@@ -103,15 +128,8 @@ namespace RVRepairVan.Persistence
             Loaded = false;
             if (Instance != null)
             {
-                Instance._repaired = false;
-                Instance._stage = 0;
-                Instance._samples = 0;
-                Instance._discount = 0;
-                Instance._upgrades = 0;
-                Instance._repairStartedAt = 0;
-                Instance._lastDriven = 0;
-                Instance._batteryDead = false;
-                Instance.SetAwayFields(false);
+                Instance._state = new State();
+                Instance.ClearOldFields();
             }
         }
 
@@ -120,41 +138,94 @@ namespace RVRepairVan.Persistence
         {
             Instance = this;
             Loaded = true;
-            _stage = Quests.Questline.StageForLoad(_repaired, _stage);
-            Core.Log.Msg($"[State] loaded: repaired={_repaired} stage={_stage} samples={_samples} discount={_discount} upgrades={_upgrades} away={_away} lastDriven={_lastDriven} batteryDead={_batteryDead}");
+            if (_state == null)
+            {
+                Core.Log.Warning("[State] rv_state.json held null - starting from defaults.");
+                _state = new State();
+            }
+            if (_state.Format == 0)
+                MigrateOldFields();
+            else if (ClearOldFields() > 0)
+                Core.Log.Warning("[State] old per-field files lie beside rv_state.json - rv_state.json wins, the old files go on the next save.");
+            _state.Format = CurrentFormat;
+            _state.Stage = Quests.Questline.StageForLoad(_state.Repaired, _state.Stage);
+            Core.Log.Msg($"[State] loaded: repaired={_state.Repaired} stage={_state.Stage} samples={_state.Samples} discount={_state.Discount} upgrades={_state.Upgrades} away={_state.Away} lastDriven={_state.LastDriven} batteryDead={_state.BatteryDead}");
+        }
+
+        /// <summary>
+        /// A save from 3.6.2 or older has no rv_state.json but up to 16 single files. Copy what is there into
+        /// _state; a missing file keeps its default, as it did when each field was its own file.
+        /// </summary>
+        private void MigrateOldFields()
+        {
+            _state.Repaired = _oldRepaired ?? false;
+            _state.Stage = _oldStage ?? 0;
+            _state.Samples = _oldSamples ?? 0;
+            _state.Discount = _oldDiscount ?? 0;
+            _state.Upgrades = _oldUpgrades ?? 0;
+            _state.RepairStartedAt = _oldRepairStarted ?? 0;
+            _state.Away = _oldAway ?? false;
+            _state.AwayPx = _oldAwayPx ?? 0f;
+            _state.AwayPy = _oldAwayPy ?? 0f;
+            _state.AwayPz = _oldAwayPz ?? 0f;
+            _state.AwayRx = _oldAwayRx ?? 0f;
+            _state.AwayRy = _oldAwayRy ?? 0f;
+            _state.AwayRz = _oldAwayRz ?? 0f;
+            _state.AwayRw = _oldAwayRw ?? 1f;
+            _state.LastDriven = _oldLastDriven ?? 0;
+            _state.BatteryDead = _oldBatteryDead ?? false;
+            int found = ClearOldFields();
+            if (found > 0)
+                Core.Log.Msg($"[State] read {found} old per-field file(s) - the next save writes rv_state.json and removes them.");
+            else
+                Core.Log.Msg("[State] save folder exists but holds no RV state - defaults applied.");
+        }
+
+        // Sets every old per-field value to null and returns how many were set.
+        private int ClearOldFields()
+        {
+            int n = 0;
+            if (_oldRepaired != null) { _oldRepaired = null; n++; }
+            if (_oldStage != null) { _oldStage = null; n++; }
+            if (_oldSamples != null) { _oldSamples = null; n++; }
+            if (_oldDiscount != null) { _oldDiscount = null; n++; }
+            if (_oldUpgrades != null) { _oldUpgrades = null; n++; }
+            if (_oldRepairStarted != null) { _oldRepairStarted = null; n++; }
+            if (_oldAway != null) { _oldAway = null; n++; }
+            if (_oldAwayPx != null) { _oldAwayPx = null; n++; }
+            if (_oldAwayPy != null) { _oldAwayPy = null; n++; }
+            if (_oldAwayPz != null) { _oldAwayPz = null; n++; }
+            if (_oldAwayRx != null) { _oldAwayRx = null; n++; }
+            if (_oldAwayRy != null) { _oldAwayRy = null; n++; }
+            if (_oldAwayRz != null) { _oldAwayRz = null; n++; }
+            if (_oldAwayRw != null) { _oldAwayRw = null; n++; }
+            if (_oldLastDriven != null) { _oldLastDriven = null; n++; }
+            if (_oldBatteryDead != null) { _oldBatteryDead = null; n++; }
+            return n;
         }
 
         // No mod data for this save yet (fresh save / first time / a save from before the mod) -> clean defaults.
-        // S1API calls this when our save folder does not exist, so it is the "fresh save" signal. It is NOT exclusive
-        // with OnLoaded: S1API serializes each [SaveableField] separately, and when only some of them are on disk (a
-        // save written before rv_battery_dead or the rv_away_* fields existed) it fires OnLoaded for the present ones
-        // and then OnCreated for the missing ones. A blind reset there wipes the questline progress just read.
+        // S1API calls this when our save folder does not exist, so it is the "fresh save" signal. The Loaded guard
+        // keeps a value that OnLoaded already read if both ever fire for the same load.
         protected override void OnCreated()
         {
             Instance = this;
 
             if (Loaded)
             {
-                Core.Log.Msg("[State] OnCreated fired after OnLoaded (partial save data) - keeping what was loaded.");
+                Core.Log.Msg("[State] OnCreated fired after OnLoaded - keeping what was loaded.");
                 return;
             }
 
-            _repaired = false;
-            _stage = 0;
-            _samples = 0;
-            _discount = 0;
-            _upgrades = 0;
-            _repairStartedAt = 0;
-            _lastDriven = 0;
-            _batteryDead = false;
-            SetAwayFields(false);
+            _state = new State { Format = CurrentFormat };
+            ClearOldFields();
             Loaded = true;
             Core.Log.Msg("[State] created (fresh save) - defaults applied.");
         }
 
         protected override void OnSaved()
         {
-            Core.Log.Msg($"[State] saved: repaired={_repaired} stage={_stage} samples={_samples} discount={_discount} upgrades={_upgrades}");
+            Core.Log.Msg($"[State] saved rv_state.json: repaired={_state.Repaired} stage={_state.Stage} samples={_state.Samples} discount={_state.Discount} upgrades={_state.Upgrades}");
         }
     }
 }
