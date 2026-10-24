@@ -4,6 +4,14 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.6.3] - 2026-10-24
+
+### Changed
+- The RV quest saves into one file, `rv_state.json`, instead of 16. Old saves load as before.
+
+### Fixed
+- A damaged RV save file no longer resets the quest and the upgrades on the next save. The damaged file is kept beside it.
+
 ## [3.6.2] - 2026-10-22
 
 ### Fixed
