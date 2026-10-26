@@ -40,7 +40,7 @@ namespace RVRepairVan.Net
         PaymentSettled = 104, // A = ticket, B = 1 refund / 0 keep - only the client holding the ticket acts
         MobileSync = 105,     // A = ObjectId of the chassis the RV rides on, -1 = the RV is home
         BatterySync = 106,    // A = 1 the RV's battery is flat, 0 it starts
-        InteriorSync = 107,   // A = unlocked RvPart mask, B = the parts taken out (absolute)
+        InteriorSync = 108,   // A = unlocked RvPart mask, B = the parts taken out (absolute)
         Ping = 200,   // connectivity / latency ping
 #if DEBUG
         DebugGiveItems = 201,   // DEBUG: host -> clients, spawn packaged test products into each client's inventory
