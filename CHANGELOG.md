@@ -4,6 +4,22 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [4.0.0] - 2026-10-27
+
+### Added
+- Marco paints the RV in his metallic, matte and chrome colours, the trim in a second colour. The paint stays after
+  the trip home and a reload.
+- The interior is sold part by part at Marco's Bodyshop. Take out only what you need, put it back later for free.
+- The workshop floor is sold at the bodyshop too, with no other upgrade needed. It covers every free bit of floor.
+- The roof hatch opens and closes with E from inside, and it shuts when you drive off.
+
+### Changed
+- Needs Marco's Bodyshop and Sideload. Old saves with the gutted interior keep every part out and unlocked.
+
+### Fixed
+- The RV no longer slides sideways when you get out.
+- Police no longer walk through the RV's walls. They come in through the door.
+
 ## [3.6.4] - 2026-10-26
 
 ### Changed
