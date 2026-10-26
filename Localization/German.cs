@@ -112,9 +112,10 @@ namespace RVRepairVan.Localization
                 ["She runs. Just don't leave the keys in."] = "Sie läuft. Lass bloß den Schlüssel nicht stecken.",
 
                 // Marco's bodyshop: the RV's furniture and the workshop floor
+                ["RV"] = "Wohnmobil",
                 ["Can you do more to the RV?"] = "Kannst du noch mehr am Wohnmobil machen?",
-                ["Park her on the yellow spot out front, then ask me to modify your vehicle."] =
-                    "Stell sie vorne auf den gelben Platz und sag mir dann, dass ich dein Fahrzeug umbauen soll.",
+                ["Park her on the lot out front, then ask me to modify your vehicle."] =
+                    "Stell sie vorne auf den Parkplatz und sag mir dann, dass ich dein Fahrzeug umbauen soll.",
                 ["I can't work on her where she sits. Get the engine in first, then drive her over."] =
                     "Da, wo sie steht, kann ich nicht an ihr arbeiten. Erst kommt der Motor rein, dann fährst du sie rüber.",
                 ["Interior"] = "Innenraum",

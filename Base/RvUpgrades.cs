@@ -245,6 +245,7 @@ namespace RVRepairVan.Base
             RvSavePoint.Ensure();
             RvMobile.EnsureWheel();
             if (RepairStateStore.GetRepaired()) RvInterior.Sync();   // the furniture before the grid that lays around it
+            RvPaint.Show();
             if (!RVRepairVanPreferences.UpgradesEnabled) return;
             foreach (RvUpgrade up in Order)
                 if (Owned(up)) Apply(up);

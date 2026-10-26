@@ -151,6 +151,8 @@ namespace RVRepairVan.Persistence
                     case nameof(RepairSave.State.BatteryDead): s.BatteryDead = Convert.ToBoolean(v); return true;
                     case nameof(RepairSave.State.InteriorUnlocked): s.InteriorUnlocked = Convert.ToInt32(v); return true;
                     case nameof(RepairSave.State.InteriorRemoved): s.InteriorRemoved = Convert.ToInt32(v); return true;
+                    case nameof(RepairSave.State.Paint): s.Paint = Convert.ToString(v) ?? ""; return true;
+                    case nameof(RepairSave.State.Paint2): s.Paint2 = Convert.ToString(v) ?? ""; return true;
                     default: return false;
                 }
             }

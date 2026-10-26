@@ -93,6 +93,7 @@ namespace RVRepairVan.Patches
             new[] { "rvtilt", "how far each placed item in the RV leans against it; 'redo' sets every pose again, 'vanilla' toggles the fix, 'lean 8' rolls the parked RV", "rvtilt redo" },
             new[] { "rvcargo", "how the first loose body in the driving RV moves against it, per physics step and per frame; 'vanilla' toggles the fix, 'pin' holds it like a poured bag", "rvcargo probe 4" },
             new[] { "rvinterior", "the RV's furniture: unlocked, out, box and refit block per part; 'rvinterior bed' takes a part out or puts it back, 'all out|in' every part", "rvinterior bed" },
+            new[] { "rvpaint", "the RV's outside paint: 'rvpaint' dumps every renderer and its materials, 'rvpaint FF0000,metallic' paints (host), 'rvpaint stock' takes it off, a trailing '2' means the trim", "rvpaint 2E6B3A,metallic" },
             new[] { "rvharmony", "every method this mod patches; warns for a patch that is applied more than once", "rvharmony" },
         };
 
@@ -128,7 +129,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach" && cmd != "rvhands" && cmd != "rvseat"
                 && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt" && cmd != "rvcargo"
-                && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony" && cmd != "rvinterior")
+                && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony" && cmd != "rvinterior" && cmd != "rvpaint")
                 return false;   // not ours - let the game handle it
 
             // Both overloads can fire for a single submission (the string body calls the List body), so run the
@@ -274,6 +275,11 @@ namespace RVRepairVan.Patches
                         else Core.Log.Warning("[Debug] rvwreck: destroy call failed (is the RV loaded?).");
                         break;
                     case "rvinterior": Interior(parts); break;
+                    case "rvpaint":
+                        if (parts.Length < 2) Base.RvPaint.DebugDump();
+                        else if (RVRepairVan.Net.NetworkBus.Online && !RVRepairVan.Net.NetworkBus.IsServer) Core.Log.Warning("[Debug] rvpaint: run it on the host.");
+                        else Base.RvPaint.HostSet(Base.RvPaint.Normalize(parts[1]), "rvpaint", parts.Length > 2 && parts[2] == "2");
+                        break;
                     case "rvparts":  RvDevTools.Parts(string.Join(" ", parts, 1, parts.Length - 1)); break;
                     case "rvtoggle":
                         // Node names carry spaces ("Chair (1)"), so the path is every word after the command and only a

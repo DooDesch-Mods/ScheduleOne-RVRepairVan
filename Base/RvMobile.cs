@@ -541,6 +541,10 @@ namespace RVRepairVan.Base
             RvLights.Bind(_model);
 
             RvChassis.Attach(chassis, _model);
+            RvPaint.OnAttach(chassis);
+            // Whoever names the chassis (the bodyshop's menu, the owned-vehicle marker) means the RV.
+            try { chassis.vehicleName = L10n.T("RV"); }
+            catch (System.Exception e) { Core.Log.Warning("[Mobile] naming the chassis failed - menus call the RV 'Veeper': " + e.Message); }
 
             _driving = true;   // force the first SetDriving to run in full
             SetDriving(HasDriver(chassis));
@@ -696,6 +700,7 @@ namespace RVRepairVan.Base
             RvLights.Unbind();
             RvChassis.Detach(chassis);
             ReleaseStaticParts();
+            RvPaint.Show();
             if (_hull != null) { UnityEngine.Object.Destroy(_hull.gameObject); _hull = null; }
             if (_hitBox != null) { UnityEngine.Object.Destroy(_hitBox.gameObject); _hitBox = null; }
             _chassisColliders.Clear();
@@ -1478,12 +1483,16 @@ namespace RVRepairVan.Base
 
         private static IEnumerator DrawStaticParts()
         {
-            int failures = 0;
+            int failures = 0, frame = 0;
             while (_static.Count > 0 && _model != null)
             {
                 Matrix4x4 delta = _model.localToWorldMatrix * _modelHomeInverse;
+                // The bodyshop paints the body through Chassis, which swaps the renderers' materials: the redraw
+                // re-reads the painted parts' materials a few times a second, so a paint or its preview shows.
+                bool repaint = ++frame % RepaintFrames == 0;
                 foreach (StaticPart p in _static)
                 {
+                    if (repaint && RvPaint.IsTarget(p.Renderer)) Reread(p);
                     Matrix4x4 m = delta * RvSteps.Offset(p.Renderer) * RvWheels.Spin(p.Renderer) * RvChassis.Offset(p.Renderer) * p.HomeBase;
                     for (int i = 0; i < p.Materials.Length; i++)
                     {
@@ -1501,6 +1510,8 @@ namespace RVRepairVan.Base
             _draw = null;
         }
 
+        private const int RepaintFrames = 10;
+
         /// <summary>A redrawn static part picks up the materials its renderer has now (a lamp switched on or off).</summary>
         internal static void RefreshStatic(Renderer r)
         {
@@ -1508,10 +1519,16 @@ namespace RVRepairVan.Base
             foreach (StaticPart p in _static)
             {
                 if (p.Renderer == null || p.Renderer.Pointer != r.Pointer) continue;
-                var mats = r.sharedMaterials;
-                for (int i = 0; i < p.Materials.Length && i < mats.Length; i++) p.Materials[i] = mats[i];
+                Reread(p);
                 return;
             }
+        }
+
+        private static void Reread(StaticPart p)
+        {
+            if (p.Renderer == null) return;
+            var mats = p.Renderer.sharedMaterials;
+            for (int i = 0; i < p.Materials.Length && i < mats.Length; i++) p.Materials[i] = mats[i];
         }
 
         private static void ReleaseStaticParts()

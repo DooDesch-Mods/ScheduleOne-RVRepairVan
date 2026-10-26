@@ -129,6 +129,7 @@ namespace RVRepairVan.Quests
                     case RvOp.StageSync: ApplyStageSync(m.A, m.B); break;
                     case RvOp.TransientSync: ApplyTransient(m.A, m.B, m.C); break;
                     case RvOp.InteriorSync: Base.RvInterior.ApplySync(m.A, m.B); break;
+                    case RvOp.PaintSync: Base.RvPaint.ApplySync(m.A, m.B, m.C == 1); break;
                     case RvOp.UpgradeSync: Base.RvUpgrades.ApplySync(m.A); break;
                     case RvOp.MobileSync: Base.RvMobile.ApplySync(m.A); break;
                     case RvOp.BatterySync: Base.RvBattery.ApplySync(m.A); break;
@@ -154,6 +155,7 @@ namespace RVRepairVan.Quests
             // The furniture before the upgrades: the workshop grid lays its floor around the parts that are in.
             NetworkBus.BroadcastToAll(RvOp.InteriorSync, Base.RvInterior.Unlocked, Base.RvInterior.Removed);
             NetworkBus.BroadcastToAll(RvOp.UpgradeSync, Base.RvUpgrades.Mask);
+            Base.RvPaint.Broadcast();
             Base.RvMobile.HostSnapshot();   // after the upgrades: the client attaches the model the Engine upgrade set up
             Base.RvBattery.HostSnapshot();
             HostResyncErrandItem();

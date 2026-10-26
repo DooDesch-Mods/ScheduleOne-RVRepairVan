@@ -13,8 +13,8 @@ namespace RVRepairVan.Garage
     /// <summary>
     /// The RV at Marco's bodyshop. The RV reaches the yard bay on its chassis (the Engine upgrade), so the bodyshop
     /// sees that chassis as the vehicle. Two categories of its own: the furniture part by part, and the workshop
-    /// floor. The car categories that change the chassis' own body (paint, looks) are hidden for it: the chassis is
-    /// never seen.
+    /// floor. Paint goes on the RV's body through <see cref="RvPaint"/>; the looks of the chassis are hidden for it,
+    /// the chassis is never seen.
     ///
     /// While the interior is open the roof and the wall facing the camera are hidden, and the camera looks down into
     /// the RV from the side.
@@ -62,8 +62,8 @@ namespace RVRepairVan.Garage
                     Left = _ => ShowShell(),
                     Entries = WorkshopEntries,
                 });
-                // The chassis under the RV is never seen; painting it or changing its lights would change nothing.
-                BodyshopApi.Gate("paint", v => IsRv(v) ? "" : null);
+                // Paint goes on the RV's body (RvPaint names it as the chassis' paint targets). The chassis' own lights,
+                // glass and wheels are never seen, so its looks would change nothing.
                 BodyshopApi.Gate("looks", v => IsRv(v) ? "" : null);
                 Core.Log.Msg("[Garage] RV categories registered at Marco's bodyshop.");
             }
@@ -94,7 +94,7 @@ namespace RVRepairVan.Garage
         }
 
         internal static string AskMoreLine() => RvUpgrades.Owned(RvUpgrade.Engine)
-            ? L10n.T("Park her on the yellow spot out front, then ask me to modify your vehicle.")
+            ? L10n.T("Park her on the lot out front, then ask me to modify your vehicle.")
             : L10n.T("I can't work on her where she sits. Get the engine in first, then drive her over.");
 
         // ---- interior --------------------------------------------------------------------------------------------

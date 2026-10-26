@@ -39,7 +39,7 @@
   - **Make room for a crew** ($15,000): three employees work inside. Put a locker in. Needs
     the workshop floor.
   - **Build a loading dock** ($25,000): your supplier delivers to the RV.
-- **Marco's Bodyshop.** Drive the RV onto the yellow spot in front of his garage and ask him
+- **Marco's Bodyshop.** Drive the RV onto the lot in front of his garage and ask him
   to modify your vehicle:
   - **Interior, part by part**: bed, kitchen bench, upper and lower cabinets, both walls,
     bedside table and the decor. Each part is paid once ($150 to $450); after that, taking
@@ -144,7 +144,7 @@ in development builds and are not shipped in the release.
 4. Optional: ask him to go lower, fetch his package, then hold out packaged product to
    him for more off the bill.
 5. **Pay**, watch the repair, then go **see your RV**. Marco texts you about his build-outs.
-6. For the interior and the workshop floor: buy the engine, drive the RV onto the yellow spot
+6. For the interior and the workshop floor: buy the engine, drive the RV onto the lot
    in front of Marco's garage, get out and ask him to modify your vehicle.
 
 Prefer no story? Set `QuestMode = Simple` and just pay Marco directly.

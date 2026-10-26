@@ -56,7 +56,8 @@ namespace RVRepairVan
             Patches.DebugConsolePatch.DeclareForTools();
 #endif
             RVRepairVan.Net.NetworkBus.Init(HarmonyInstance);   // co-op sync (host-authoritative; no-op offline)
-            Garage.RvGarage.Register();   // the furniture and the workshop floor at Marco's bodyshop
+            Garage.RvGarage.Register();
+            Base.RvPaint.Init();   // the furniture and the workshop floor at Marco's bodyshop
 
             Log.Msg($"RVRepairVan initialized. Enabled={RVRepairVanPreferences.Enabled}, Questline={RVRepairVanPreferences.QuestlineEnabled}, RepairPrice={RVRepairVanPreferences.RepairPrice}");
         }

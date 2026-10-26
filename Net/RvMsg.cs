@@ -41,6 +41,7 @@ namespace RVRepairVan.Net
         MobileSync = 105,     // A = ObjectId of the chassis the RV rides on, -1 = the RV is home
         BatterySync = 106,    // A = 1 the RV's battery is flat, 0 it starts
         InteriorSync = 108,   // A = unlocked RvPart mask, B = the parts taken out (absolute)
+        PaintSync = 109,      // A = the RV's paint 0xRRGGBB, -1 = stock; B = finish index; C = 0 body, 1 trim (RvPaint)
         Ping = 200,   // connectivity / latency ping
 #if DEBUG
         DebugGiveItems = 201,   // DEBUG: host -> clients, spawn packaged test products into each client's inventory

@@ -59,6 +59,10 @@ namespace RVRepairVan.Persistence
             // The RV's furniture (RvPart bits): paid for once at the bodyshop, and taken out right now.
             public int InteriorUnlocked;
             public int InteriorRemoved;
+            // The outside paint from the bodyshop, a Chassis "paint" value (RRGGBB,finish); empty = stock.
+            public string Paint = "";
+            // The second paint on the trim, a Chassis "paint2" value; empty = stock.
+            public string Paint2 = "";
         }
 
         // 2: the "gut" upgrade became the two interior masks.
@@ -98,6 +102,8 @@ namespace RVRepairVan.Persistence
         internal bool BatteryDead { get => _state.BatteryDead; set => _state.BatteryDead = value; }
         internal int InteriorUnlocked { get => _state.InteriorUnlocked; set => _state.InteriorUnlocked = value; }
         internal int InteriorRemoved { get => _state.InteriorRemoved; set => _state.InteriorRemoved = value; }
+        internal string Paint { get => _state.Paint ?? ""; set => _state.Paint = value ?? ""; }
+        internal string Paint2 { get => _state.Paint2 ?? ""; set => _state.Paint2 = value ?? ""; }
 
         internal bool Away => _state.Away;
         internal Vector3 AwayPos => new Vector3(_state.AwayPx, _state.AwayPy, _state.AwayPz);
@@ -157,7 +163,7 @@ namespace RVRepairVan.Persistence
             if (format < 2) Base.RvInterior.MigrateGut(_state);
             _state.Format = CurrentFormat;
             _state.Stage = Quests.Questline.StageForLoad(_state.Repaired, _state.Stage);
-            Core.Log.Msg($"[State] loaded: repaired={_state.Repaired} stage={_state.Stage} samples={_state.Samples} discount={_state.Discount} upgrades={_state.Upgrades} away={_state.Away} lastDriven={_state.LastDriven} batteryDead={_state.BatteryDead} interior={_state.InteriorUnlocked}/{_state.InteriorRemoved}");
+            Core.Log.Msg($"[State] loaded: repaired={_state.Repaired} stage={_state.Stage} samples={_state.Samples} discount={_state.Discount} upgrades={_state.Upgrades} away={_state.Away} lastDriven={_state.LastDriven} batteryDead={_state.BatteryDead} interior={_state.InteriorUnlocked}/{_state.InteriorRemoved} paint='{_state.Paint}' paint2='{_state.Paint2}'");
         }
 
         /// <summary>
