@@ -12,7 +12,7 @@
 ![S1API](https://img.shields.io/badge/S1API-required-orange)
 [![Polyfill](https://polyfill.doomods.com/badge/rvrepairvan.svg)](https://polyfill.doomods.com/mod/rvrepairvan)
 
-[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_8-95Vk5nDLfuEfLpQ5uiFpz-/badge.svg)](https://mlvscan.com/attestations/att_8-95Vk5nDLfuEfLpQ5uiFpz-)
+[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_aJgzQiXZ2BNt7nfGqQxxsLOg/badge.svg)](https://mlvscan.com/attestations/att_aJgzQiXZ2BNt7nfGqQxxsLOg)
 
 ![The RV driving through town at dusk](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
 
