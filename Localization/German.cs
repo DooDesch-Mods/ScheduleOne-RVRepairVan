@@ -141,6 +141,8 @@ namespace RVRepairVan.Localization
                 ["Missing engine"] = "Motor fehlt",
                 ["Battery dead"] = "Batterie leer",
                 ["Swap battery"] = "Batterie tauschen",
+                ["Open hatch"] = "Dachluke öffnen",
+                ["Close hatch"] = "Dachluke schließen",
                 ["Left the keys in again? Battery's dead, bring a new one to the wheel."] = "Schon wieder den Schlüssel stecken lassen? Die Batterie ist leer, bring eine neue ans Steuer.",
                 ["Leaves of Grass. Signed 'W.W.'"] = "Grashalme. Signiert 'W.W.'",
                 ["The RV is away."] = "Das Wohnmobil ist unterwegs.",

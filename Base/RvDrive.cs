@@ -38,6 +38,35 @@ namespace RVRepairVan.Base
             Core.Log.Msg("[Drive] look: eye=" + eye + " at " + at);
         }
 
+        /// <summary>rvdrive exitwatch [seconds]: leave the driver seat and log the chassis' tilt and body state every frame.</summary>
+        internal static void ExitWatch(string arg)
+        {
+            if (_chassis == null) { Core.Log.Warning("[Drive] exitwatch: no chassis out."); return; }
+            float seconds = float.TryParse(arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float s) ? s : 1.5f;
+            MelonCoroutines.Start(Watch(seconds));
+        }
+
+        private static IEnumerator Watch(float seconds)
+        {
+            float until = Time.time + seconds;
+            int frame = 0;
+            while (Time.time < until && _chassis != null)
+            {
+                if (frame == 3) Exit();
+                Transform t = _chassis.transform;
+                Rigidbody rb = _chassis.Rb;
+                float roll = Vector3.SignedAngle(Vector3.ProjectOnPlane(Vector3.up, t.forward), t.up, t.forward);
+                float pitch = Vector3.SignedAngle(Vector3.ProjectOnPlane(Vector3.up, t.right), t.up, t.right);
+                Core.Log.Msg("[Drive] watch f" + frame + " roll=" + roll.ToString("0.00") + " pitch=" + pitch.ToString("0.00") + " pos=" + t.position.ToString("F2")
+                    + (rb != null ? " kin=" + rb.isKinematic + " cons=" + rb.constraints + " sleep=" + rb.IsSleeping() + " v=" + rb.velocity.magnitude.ToString("0.00")
+                        + " w=" + rb.angularVelocity.ToString("F2") : " no body")
+                    + " in=" + _chassis.LocalPlayerIsInVehicle + " parked=" + _chassis.isParked);
+                frame++;
+                yield return null;
+            }
+            Core.Log.Msg("[Drive] watch done after " + frame + " frame(s).");
+        }
+
         private static object _rec;
 
         /// <summary>rvdrive rec [seconds] [fps]: write every frame to &lt;game&gt;/rvrec as PNG. Game time runs at a fixed step,

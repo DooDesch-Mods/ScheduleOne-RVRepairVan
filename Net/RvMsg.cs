@@ -29,6 +29,7 @@ namespace RVRepairVan.Net
         BatterySwap = 16,    // client used up a battery at the wheel - the RV's flat battery is fixed
         MobileReport = 17,   // A = chassis the RV rides on at the client; -1 = attach failed, -2 = not spawned there yet (B = the named chassis)
         ArrestHome = 18,     // client was arrested after driving the RV - A = chassis it drove; the host sends the RV home instead of the impound
+        HatchRequest = 19,   // client wants the roof hatch open (A = 1) or shut (A = 0)
         // RequestSnapshot carries A = the client's mod version (NetworkBus.VersionCode), 0 from builds before it existed.
         // Paid intents (PayRepair, MingPayLoss, MarcoPayLoss, BuyUpgrade) also carry B = ticket, C = amount paid.
 
@@ -40,6 +41,7 @@ namespace RVRepairVan.Net
         PaymentSettled = 104, // A = ticket, B = 1 refund / 0 keep - only the client holding the ticket acts
         MobileSync = 105,     // A = ObjectId of the chassis the RV rides on, -1 = the RV is home
         BatterySync = 106,    // A = 1 the RV's battery is flat, 0 it starts
+        HatchSync = 107,      // A = 1 the roof hatch is open, 0 it is shut
         InteriorSync = 108,   // A = unlocked RvPart mask, B = the parts taken out (absolute)
         PaintSync = 109,      // A = the RV's paint 0xRRGGBB, -1 = stock; B = finish index; C = 0 body, 1 trim (RvPaint)
         Ping = 200,   // connectivity / latency ping

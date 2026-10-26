@@ -218,13 +218,16 @@ namespace RVRepairVan.Garage
                     if (isRoof) roof++; else wall++;
                     Core.LogDebug("[Garage] hidden " + (isRoof ? "roof" : "wall") + " piece " + r.gameObject.name + " box " + b.min.ToString("F2") + " .. " + b.max.ToString("F2"));
                 }
-                Core.Log.Msg("[Garage] RV opened up for the camera: " + roof + " roof piece(s), " + wall + " wall piece(s) hidden.");
+                // The roof hatch is drawn by hand each frame, not by its renderer.
+                RvHatch.Hidden = true;
+                Core.Log.Msg("[Garage] RV opened up for the camera: " + roof + " roof piece(s), " + wall + " wall piece(s) and the hatch hidden.");
             }
             catch (Exception e) { Core.Log.Error("[Garage] opening the RV for the camera failed: " + e); ShowShell(); }
         }
 
         internal static void ShowShell()
         {
+            RvHatch.Hidden = false;
             if (_hidden.Count == 0) return;
             int n = 0;
             foreach (var r in _hidden)

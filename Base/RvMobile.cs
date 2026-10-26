@@ -119,6 +119,8 @@ namespace RVRepairVan.Base
             RvAway.Reset();
             RvRide.Reset();
             RvChassis.Reset();
+            RvHatch.Reset();
+            RvNavWalls.Reset();
         }
 
         // --- the wheel ------------------------------------------------------------------------------------
@@ -132,6 +134,8 @@ namespace RVRepairVan.Base
         /// </summary>
         internal static void EnsureWheel()
         {
+            RvHatch.Ensure(_chassis == null);
+            RvNavWalls.Ensure();
             if (_wheel != null) return;
             if (!RVRepairVanPreferences.UpgradesEnabled) return;
             if (RVManager.IsDestroyed()) return;
@@ -504,6 +508,8 @@ namespace RVRepairVan.Base
             LevelHome(chassis);
 
             // Captured at home, before anything moves: the static-batch redraw measures the drive offset from here.
+            // The hatch takes its own batched mesh first, so the redraw below leaves it out.
+            RvHatch.Ensure(true);
             _modelHomeInverse = _model.worldToLocalMatrix;
             Bounds homeBounds = BodyBounds(_model);
             RvWheels.Capture(_model, chassis, _homePos, _homeRot);
@@ -994,6 +1000,7 @@ namespace RVRepairVan.Base
             Rigidbody rb = _chassis.Rb;
             if (driving)
             {
+                RvHatch.OnDriveStart();
                 // The ignores first, then free the body: an RV collider overlapping the chassis' box would shove it.
                 // Switching a collider off can drop its ignores, so they are set again each time.
                 SetChassisColliders(true);

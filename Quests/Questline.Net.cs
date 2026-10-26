@@ -99,6 +99,7 @@ namespace RVRepairVan.Quests
                     case RvOp.MobileReport: Base.RvMobile.HostOnClientReport(m.A, m.B); break;
                     case RvOp.BatterySwap: Base.RvBattery.HostOnSwap(); break;
                     case RvOp.ArrestHome: Base.RvMobile.HostOnArrestHome(m.A); break;
+                    case RvOp.HatchRequest: Base.RvHatch.HostOnRequest(m.A); break;
 #if DEBUG
                     case RvOp.Ping: Core.Log.Msg("[Net] host <- Ping " + m.A); break;
 #endif
@@ -133,6 +134,7 @@ namespace RVRepairVan.Quests
                     case RvOp.UpgradeSync: Base.RvUpgrades.ApplySync(m.A); break;
                     case RvOp.MobileSync: Base.RvMobile.ApplySync(m.A); break;
                     case RvOp.BatterySync: Base.RvBattery.ApplySync(m.A); break;
+                    case RvOp.HatchSync: Base.RvHatch.ApplySync(m.A); break;
                     case RvOp.RepairApplied: ApplyRepair(); break;
                     case RvOp.PaymentSettled: if (!NetworkBus.IsServer) ClientPayment.Settle(m.A, m.B != 0); break;
 #if DEBUG
@@ -158,6 +160,7 @@ namespace RVRepairVan.Quests
             Base.RvPaint.Broadcast();
             Base.RvMobile.HostSnapshot();   // after the upgrades: the client attaches the model the Engine upgrade set up
             Base.RvBattery.HostSnapshot();
+            Base.RvHatch.HostSnapshot();
             HostResyncErrandItem();
             Core.LogDebug("[Net] host snapshot sent: Stage=" + Stage + " Discount=" + DiscountTotal
                 + " Repaired=" + RepairStateStore.GetRepaired() + " Upgrades=" + Base.RvUpgrades.Mask);
