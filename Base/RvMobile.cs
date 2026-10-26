@@ -1514,6 +1514,8 @@ namespace RVRepairVan.Base
                 bool repaint = ++frame % RepaintFrames == 0;
                 foreach (StaticPart p in _static)
                 {
+                    // A part the interior took out or the garage camera opened up stays hidden in the redraw too.
+                    if (p.Renderer == null || !p.Renderer.enabled || !p.Renderer.gameObject.activeInHierarchy) continue;
                     if (repaint && RvPaint.IsTarget(p.Renderer)) Reread(p);
                     Matrix4x4 m = delta * RvSteps.Offset(p.Renderer) * RvWheels.Spin(p.Renderer) * RvChassis.Offset(p.Renderer) * p.HomeBase;
                     for (int i = 0; i < p.Materials.Length; i++)
@@ -1533,6 +1535,16 @@ namespace RVRepairVan.Base
         }
 
         private const int RepaintFrames = 10;
+
+        /// <summary>
+        /// The matrix that takes a renderer's world bounds into the model's frame. A static-batched part keeps its bounds
+        /// at the home spot while it is redrawn elsewhere, so its bounds go through the model's home matrix.
+        /// </summary>
+        internal static Matrix4x4 WorldToModel(Renderer r, Transform model)
+        {
+            if (r != null && _static.Count > 0 && r.isPartOfStaticBatch) return _modelHomeInverse;
+            return model.worldToLocalMatrix;
+        }
 
         /// <summary>A redrawn static part picks up the materials its renderer has now (a lamp switched on or off).</summary>
         internal static void RefreshStatic(Renderer r)

@@ -1,12 +1,15 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using DooDesch.Localization;
 using Il2CppScheduleOne.Vehicles;
 using MarcosBodyshop.Api;
+using MelonLoader;
 using RVRepairVan.Base;
 using RVRepairVan.Config;
 using RVRepairVan.Managers;
 using RVRepairVan.Persistence;
+using UnityEngine.Rendering;
 
 namespace RVRepairVan.Garage
 {
@@ -203,7 +206,8 @@ namespace RVRepairVan.Garage
                 if (!Frame(out Transform model, out Bounds all, out Vector3 side)) { Core.Log.Warning("[Garage] the RV's furniture is not measured - the roof stays."); return; }
                 float floor = RvInterior.FloorY(model);
                 float sideEdge = Vector3.Dot(all.max, side) - 0.2f;
-                int roof = 0, wall = 0;
+                int roof = 0, wall = 0, shell = 0;
+                float length = side == Vector3.right ? all.size.z : all.size.x;
                 foreach (var r in model.GetComponentsInChildren<Renderer>(false))
                 {
                     if (r == null || !r.enabled) continue;
@@ -212,6 +216,11 @@ namespace RVRepairVan.Garage
                     float along = side == Vector3.right ? b.size.z : b.size.x;
                     bool isRoof = b.min.y - floor > RoofGap;
                     bool isWall = !isRoof && across < WallThickness && along > WallLength && Vector3.Dot(b.center, side) > sideEdge;
+                    // The body is one mesh from the floor to the roof: it cannot be cut open, so it turns see-through.
+                    // It runs most of the RV's length; furniture and partitions (parts the player buys) do not.
+                    bool isShell = !isRoof && !isWall && b.min.y - floor < RoofGap && b.max.y - floor > RoofGap
+                        && along > ShellShare * length && across > WallThickness;
+                    if (isShell) { if (Ghost(r)) shell++; continue; }
                     if (!isRoof && !isWall) continue;
                     r.enabled = false;
                     _hidden.Add(r);
@@ -220,7 +229,8 @@ namespace RVRepairVan.Garage
                 }
                 // The roof hatch is drawn by hand each frame, not by its renderer.
                 RvHatch.Hidden = true;
-                Core.Log.Msg("[Garage] RV opened up for the camera: " + roof + " roof piece(s), " + wall + " wall piece(s) and the hatch hidden.");
+                Core.Log.Msg("[Garage] RV opened up for the camera: " + roof + " roof piece(s), " + wall + " wall piece(s) and the hatch hidden, "
+                    + shell + " shell piece(s) see-through.");
             }
             catch (Exception e) { Core.Log.Error("[Garage] opening the RV for the camera failed: " + e); ShowShell(); }
         }
@@ -228,23 +238,136 @@ namespace RVRepairVan.Garage
         internal static void ShowShell()
         {
             RvHatch.Hidden = false;
-            if (_hidden.Count == 0) return;
+            int solid = 0;
+            foreach (var g in _ghosts)
+            {
+                try
+                {
+                    if (g.R == null) continue;
+                    if (g.Mesh != null) g.R.enabled = true;
+                    else
+                    {
+                        g.R.sharedMaterials = g.Original;
+                        g.R.shadowCastingMode = g.Shadows;
+                        RvMobile.RefreshStatic(g.R);
+                    }
+                    solid++;
+                }
+                catch (Exception e) { Core.Log.Warning("[Garage] giving a shell piece its own materials back failed: " + e.Message); }
+                finally { foreach (var m in g.Mine) if (m != null) UnityEngine.Object.Destroy(m); }
+            }
+            _ghosts.Clear();
+            if (_hidden.Count == 0 && solid == 0) return;
             int n = 0;
             foreach (var r in _hidden)
                 if (r != null) { r.enabled = true; n++; }
             _hidden.Clear();
-            Core.LogDebug("[Garage] " + n + " roof and wall piece(s) shown again.");
+            Core.LogDebug("[Garage] " + n + " roof and wall piece(s) shown again, " + solid + " shell piece(s) solid again.");
+        }
+
+        // ---- see-through shell ------------------------------------------------------------------------------------
+
+        private const float ShellAlpha = 0.14f;
+        // A shell piece is at least this share of the furniture's length.
+        private const float ShellShare = 0.6f;
+
+        private sealed class GhostedShell
+        {
+            internal Renderer R;
+            internal Material[] Original, Mine;
+            internal ShadowCastingMode Shadows;
+            internal Mesh Mesh;     // set when the piece is hidden and drawn here; null when its materials are swapped
+            internal int Layer;
+        }
+
+        private static readonly List<GhostedShell> _ghosts = new List<GhostedShell>();
+        private static Shader _lit;
+        private static object _drawGhosts;
+
+        // Transparent URP Lit copies of the piece's materials, its colour and texture kept; no shadow, so the sun reaches
+        // the cabin. A static-batched piece is redrawn by RvMobile, which takes the new materials. Any other piece is
+        // hidden and drawn here each frame: Chassis puts its paint back on painted slots, so a swap would not hold.
+        private static bool Ghost(Renderer r)
+        {
+            if (_lit == null) _lit = Shader.Find("Universal Render Pipeline/Lit");
+            if (_lit == null) { Core.Log.Warning("[Garage] no URP Lit shader - the RV's body stays solid in the interior view."); return false; }
+            var g = new GhostedShell { R = r, Original = r.sharedMaterials, Shadows = r.shadowCastingMode, Layer = r.gameObject.layer };
+            if (!r.isPartOfStaticBatch)
+            {
+                var mf = r.GetComponent<MeshFilter>();
+                g.Mesh = mf != null ? mf.sharedMesh : null;
+                if (g.Mesh == null) { Core.Log.Warning("[Garage] shell piece " + r.gameObject.name + " has no mesh to draw - it stays solid."); return false; }
+            }
+            g.Mine = new Material[g.Original.Length];
+            for (int i = 0; i < g.Mine.Length; i++) g.Mine[i] = SeeThrough(g.Original[i]);
+            if (g.Mesh != null) r.enabled = false;
+            else
+            {
+                r.sharedMaterials = g.Mine;
+                r.shadowCastingMode = ShadowCastingMode.Off;
+                RvMobile.RefreshStatic(r);
+            }
+            _ghosts.Add(g);
+            if (g.Mesh != null && _drawGhosts == null) _drawGhosts = MelonCoroutines.Start(DrawGhosts());
+            Core.LogDebug("[Garage] shell piece " + r.gameObject.name + " see-through (" + (g.Mesh != null ? "drawn here" : "materials swapped") + ").");
+            return true;
+        }
+
+        private static IEnumerator DrawGhosts()
+        {
+            int failures = 0;
+            while (_ghosts.Count > 0)
+            {
+                foreach (var g in _ghosts)
+                {
+                    if (g.Mesh == null || g.R == null) continue;
+                    Matrix4x4 m = g.R.transform.localToWorldMatrix;
+                    for (int i = 0; i < g.Mine.Length && i < g.Mesh.subMeshCount; i++)
+                    {
+                        try { Graphics.DrawMesh(g.Mesh, m, g.Mine[i], g.Layer, null, i, null, false, true); }
+                        catch (Exception e) { if (failures++ == 0) Core.Log.Error("[Garage] drawing the see-through shell failed: " + e.Message); }
+                    }
+                }
+                yield return null;
+            }
+            _drawGhosts = null;
+        }
+
+        private static Material SeeThrough(Material src)
+        {
+            var m = new Material(_lit) { name = "RVRepairVan_Shell" };
+            if (src != null)
+            {
+                if (src.HasProperty("_BaseMap") && src.GetTexture("_BaseMap") != null) m.SetTexture("_BaseMap", src.GetTexture("_BaseMap"));
+                else if (src.HasProperty("_MainTex") && src.GetTexture("_MainTex") != null) m.SetTexture("_BaseMap", src.GetTexture("_MainTex"));
+                Color c = src.HasProperty("_BaseColor") ? src.GetColor("_BaseColor") : src.HasProperty("_Color") ? src.GetColor("_Color") : Color.white;
+                c.a *= ShellAlpha;
+                m.SetColor("_BaseColor", c);
+            }
+            else m.SetColor("_BaseColor", new Color(1f, 1f, 1f, ShellAlpha));
+            m.SetFloat("_Surface", 1f);
+            m.SetFloat("_Blend", 0f);
+            m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+            m.SetFloat("_ZWrite", 0f);
+            m.SetOverrideTag("RenderType", "Transparent");
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.renderQueue = (int)RenderQueue.Transparent;
+            return m;
         }
 
         private static bool LocalBox(Transform model, Renderer r, out Bounds box)
         {
             box = default;
             Bounds w = r.bounds;
+            // A renderer without a mesh reports an empty box at the world origin.
+            if (w.size.sqrMagnitude < 1e-6f) { Core.LogDebug("[Garage] " + r.gameObject.name + " has an empty box - neither roof nor wall."); return false; }
             Vector3 c = w.center, e = w.extents;
+            Matrix4x4 toModel = RvMobile.WorldToModel(r, model);
             for (int i = 0; i < 8; i++)
             {
                 var corner = new Vector3(c.x + ((i & 1) == 0 ? -e.x : e.x), c.y + ((i & 2) == 0 ? -e.y : e.y), c.z + ((i & 4) == 0 ? -e.z : e.z));
-                Vector3 p = model.InverseTransformPoint(corner);
+                Vector3 p = toModel.MultiplyPoint3x4(corner);
                 if (i == 0) box = new Bounds(p, Vector3.zero); else box.Encapsulate(p);
             }
             return true;

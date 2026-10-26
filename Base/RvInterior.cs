@@ -330,11 +330,14 @@ namespace RVRepairVan.Base
             {
                 if (r == null || !r.enabled) continue;
                 Bounds w = r.bounds;
+                // A renderer without a mesh reports an empty box at the world origin, far outside the RV.
+                if (w.size.sqrMagnitude < 1e-6f) { Core.LogDebug("[Interior] " + r.gameObject.name + " has an empty box - left out of the measure."); continue; }
                 Vector3 c = w.center, e = w.extents;
+                Matrix4x4 toModel = RvMobile.WorldToModel(r, model);
                 for (int i = 0; i < 8; i++)
                 {
                     var corner = new Vector3(c.x + ((i & 1) == 0 ? -e.x : e.x), c.y + ((i & 2) == 0 ? -e.y : e.y), c.z + ((i & 4) == 0 ? -e.z : e.z));
-                    Vector3 p = model.InverseTransformPoint(corner);
+                    Vector3 p = toModel.MultiplyPoint3x4(corner);
                     if (!any) { box = new Bounds(p, Vector3.zero); any = true; } else box.Encapsulate(p);
                 }
             }
