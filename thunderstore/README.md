@@ -28,8 +28,9 @@
 - **Repair cinematic** when you pay. Plays in both modes.
 - **Marco's build-outs** once the RV stands again: an engine to drive the RV anywhere
   ($10,000), room for a crew of three ($15,000) and a loading dock for your supplier ($25,000).
-- **Marco's Bodyshop**: drive the RV onto the lot in front of his garage. Take the
-  interior out part by part (each paid once, then free to switch) and buy the workshop
+  The roof hatch opens with E from inside and shuts when you drive off.
+- **Marco's Bodyshop**: drive the RV onto the lot in front of his garage. Paint it in two
+  colours (shell and trim), take the interior out part by part (each paid once, then free to switch) and buy the workshop
   floor ($7,500) to build on every bit of free floor.
 - **Save intercom** on the RV wall, like in every other property.
 - **Save-bound progress** - quest and repair live in the game save.
