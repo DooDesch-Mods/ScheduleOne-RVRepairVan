@@ -113,10 +113,14 @@ namespace RVRepairVan.Base
             tyreMid /= _tyres.Count;
 
             int moved = 0;
+            float grown = 0f;
+            var before = new AxleSpan();
+            var after = new AxleSpan();
             foreach (WheelCollider w in wheels)
             {
                 Vector3 wl = ct.InverseTransformPoint(w.transform.position);
                 bool left = wl.x < 0f, front = wl.z > wheelMid;
+                before.Add(front, wl.z);
                 Vector3 sum = Vector3.zero;
                 float radius = 0f;
                 int n = 0;
@@ -141,14 +145,90 @@ namespace RVRepairVan.Base
                 // The collider's own centre offset is kept, so its transform goes where that offset lands on the tyre.
                 Vector3 offset = ct.InverseTransformVector(w.transform.TransformVector(w.center));
                 w.transform.position = ct.TransformPoint(centreAtRest - offset + Vector3.up * rest);
+                after.Add(front, ct.InverseTransformPoint(w.transform.position).z);
+                float stock = w.radius;
                 w.radius = radius / s;
+                if (stock > 0.001f) grown += w.radius / stock;
                 var axle = new Axle { W = w, Rest = centreAtRest, Radius = radius };
                 _axles.Add(axle);
                 foreach (Tyre t in mine) t.Axle = axle;
                 moved++;
-                Core.LogDebug("[Wheels]   " + w.name + " -> " + centreAtRest.ToString("F2") + " r " + radius.ToString("0.00") + " (scale " + s.ToString("0.00") + ", " + n + " tyre(s)).");
+                Core.LogDebug("[Wheels]   " + w.name + " -> " + centreAtRest.ToString("F2") + " r " + radius.ToString("0.00") + " (was " + (stock * s).ToString("0.00") + ", scale " + s.ToString("0.00") + ", " + n + " tyre(s)).");
             }
+            KeepPull(chassis, moved > 0 ? grown / moved : 1f);
+            KeepBalance(chassis, before, after);
             return moved;
+        }
+
+        // Front and rear axle positions along the chassis, as the mean of each end's wheels.
+        private sealed class AxleSpan
+        {
+            private float _front, _rear;
+            private int _fronts, _rears;
+            internal void Add(bool front, float z) { if (front) { _front += z; _fronts++; } else { _rear += z; _rears++; } }
+            internal bool Complete => _fronts > 0 && _rears > 0;
+            internal float Front => _front / _fronts;
+            internal float Rear => _rear / _rears;
+        }
+
+        // The RV's axles sit further apart than the chassis' own, with the front axle well ahead. Left where it was,
+        // the centre of mass would rest almost on the rear axle: the front tyres would carry a quarter of the weight
+        // and spin under throttle. It moves with the axles so each end carries the share it carried on the chassis.
+        private static void KeepBalance(LandVehicle chassis, AxleSpan before, AxleSpan after)
+        {
+            Rigidbody rb = chassis.Rb;
+            if (rb == null) { Core.Log.Error("[Wheels] the chassis has no rigidbody - its weight stays over the rear axle and the front tyres may spin."); return; }
+            if (!before.Complete || !after.Complete || before.Front - before.Rear < 0.1f)
+            {
+                Core.Log.Warning("[Wheels] no front and rear axle to measure - the centre of mass stays where the chassis has it.");
+                return;
+            }
+            // The vehicle copies its centre-of-mass marker into the rigidbody when it starts, which may still be ahead,
+            // so the marker moves as well as the rigidbody's value.
+            Transform ct = chassis.transform;
+            Transform marker = chassis.centerOfMass;
+            Vector3 com = marker != null ? ct.InverseTransformPoint(marker.position) : rb.centerOfMass;
+            float share = (com.z - before.Rear) / (before.Front - before.Rear);
+            Vector3 moved = new Vector3(com.x, com.y, after.Rear + share * (after.Front - after.Rear));
+            if (marker != null) marker.position = ct.TransformPoint(moved);
+            rb.centerOfMass = moved;
+            Core.Log.Msg("[Wheels] centre of mass " + com.ToString("F2") + " -> " + moved.ToString("F2") + ", " + (share * 100f).ToString("0")
+                + "% of the way from the rear axle as on the chassis (axles " + before.Rear.ToString("0.00") + "/" + before.Front.ToString("0.00")
+                + " -> " + after.Rear.ToString("0.00") + "/" + after.Front.ToString("0.00") + ")" + (marker == null ? ", the chassis has no marker" : "") + ".");
+        }
+
+        // Torque the RV adds below LowGearUntil km/h, fading out by LowGearFadeTo. A car of the veeper's weight takes the
+        // 20 degree ramp at Hyland Point only with a run-up; the RV is long and loses its run-up where the ramp steepens.
+        private const float LowGear = 1.6f, LowGearUntil = 10f, LowGearFadeTo = 30f;
+
+        // The vehicle turns its throttle into wheel torque, and a larger wheel turns the same torque into less push on
+        // the road. On the RV's tyres the chassis would pull a third less than the veeper it is, so its gearing grows
+        // with the wheels. On top, a low gear pulls harder at walking pace, so the RV starts on a steep ramp and does
+        // not roll back. The chassis is despawned when the RV goes home.
+        private static void KeepPull(LandVehicle chassis, float grown)
+        {
+            // Wheels already on the RV's tyres mean this chassis was tuned before.
+            if (grown <= 1.001f)
+            {
+                Core.Log.Msg("[Wheels] tyres no larger than the chassis' wheels; gearing " + chassis.diffGearing.ToString("0.00") + " and torque stay.");
+                return;
+            }
+            float before = chassis.diffGearing;
+            chassis.diffGearing = before * grown;
+            Core.Log.Msg("[Wheels] tyres " + grown.ToString("0.00") + "x the chassis' own; gearing " + before.ToString("0.00") + " -> "
+                + chassis.diffGearing.ToString("0.00") + " keeps the veeper's pull.");
+
+            AnimationCurve stock = chassis.motorTorque;
+            if (stock == null) { Core.Log.Error("[Wheels] the chassis has no torque curve - the RV gets no low gear and may stall on steep ramps."); return; }
+            var low = new AnimationCurve();
+            foreach (float kmh in new[] { 0f, LowGearUntil, (LowGearUntil + LowGearFadeTo) * 0.5f, LowGearFadeTo, 50f, 100f, 200f })
+            {
+                float boost = Mathf.Lerp(LowGear, 1f, Mathf.InverseLerp(LowGearUntil, LowGearFadeTo, kmh));
+                low.AddKey(kmh, stock.Evaluate(kmh) * boost);
+            }
+            chassis.motorTorque = low;
+            Core.Log.Msg("[Wheels] low gear: " + stock.Evaluate(0f).ToString("0") + " -> " + low.Evaluate(0f).ToString("0") + " Nm at a standstill, "
+                + low.Evaluate(LowGearFadeTo).ToString("0") + " Nm from " + LowGearFadeTo.ToString("0") + " km/h.");
         }
 
         /// <summary>How much one unit of the wheel's own radius and suspension travel measures in chassis space.</summary>
