@@ -85,20 +85,20 @@ namespace RVRepairVan.Base
         }
 
         // The outer hull in rv/Main from the shell colliders (Collider_* under the model's "rv"), else the measured one.
+        // Each collider is measured in its own space: a world box of an RV standing at an angle is meters too wide.
         private static Bounds Hull(Transform model, Transform main, out int count)
         {
             count = 0;
             var b = new Bounds();
+            bool any = false;
             foreach (Collider c in model.GetComponentsInChildren<Collider>(true))
             {
                 if (c.isTrigger || !c.name.StartsWith("Collider_")) continue;
-                Bounds w = c.bounds;
-                for (int i = 0; i < 8; i++)
-                {
-                    Vector3 corner = new Vector3((i & 1) == 0 ? w.min.x : w.max.x, (i & 2) == 0 ? w.min.y : w.max.y, (i & 4) == 0 ? w.min.z : w.max.z);
-                    Vector3 p = main.InverseTransformPoint(corner);
-                    if (count == 0 && i == 0) b = new Bounds(p, Vector3.zero); else b.Encapsulate(p);
-                }
+                BoxCollider box = c.TryCast<BoxCollider>();
+                MeshCollider mesh = box == null ? c.TryCast<MeshCollider>() : null;
+                if (box != null) Encapsulate(ref b, ref any, main, c.transform, new Bounds(box.center, box.size));
+                else if (mesh != null && mesh.sharedMesh != null) Encapsulate(ref b, ref any, main, c.transform, mesh.sharedMesh.bounds);
+                else Encapsulate(ref b, ref any, main, null, c.bounds);
                 count++;
             }
             if (count == 0 || b.size.x < 6f || b.size.y < 2f)
@@ -118,20 +118,32 @@ namespace RVRepairVan.Base
             var door = model.GetComponentInChildren<Il2CppScheduleOne.Doors.PivotDoor>(true);
             if (door == null) { Core.Log.Warning("[NavWalls] no door leaf on the RV model - the doorway is left open where it was measured."); return; }
             bool any = false;
+            var leaf = new Bounds();
             foreach (Renderer r in door.GetComponentsInChildren<Renderer>(true))
             {
-                Bounds w = r.bounds;
-                foreach (float x in new[] { main.InverseTransformPoint(w.min).x, main.InverseTransformPoint(w.max).x })
-                {
-                    if (!any) { min = max = x; any = true; }
-                    else { min = Mathf.Min(min, x); max = Mathf.Max(max, x); }
-                }
+                // A batched renderer's mesh is the combined one; its world box is all there is.
+                MeshFilter mf = r.isPartOfStaticBatch ? null : r.GetComponent<MeshFilter>();
+                if (mf != null && mf.sharedMesh != null) Encapsulate(ref leaf, ref any, main, r.transform, mf.sharedMesh.bounds);
+                else Encapsulate(ref leaf, ref any, main, null, r.bounds);
             }
+            if (any) { min = leaf.min.x; max = leaf.max.x; }
             if (!any || max - min < 0.5f || max - min > 2f)
             {
                 Core.Log.Warning("[NavWalls] the door leaf measures " + (max - min).ToString("F2") + " m - the doorway is left open where it was measured.");
                 min = FallbackDoorMinX;
                 max = FallbackDoorMaxX;
+            }
+        }
+
+        // The eight corners of a box (in 'space', or world space when it is null) into rv/Main.
+        private static void Encapsulate(ref Bounds b, ref bool any, Transform main, Transform space, Bounds box)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = new Vector3((i & 1) == 0 ? box.min.x : box.max.x, (i & 2) == 0 ? box.min.y : box.max.y, (i & 4) == 0 ? box.min.z : box.max.z);
+                Vector3 p = main.InverseTransformPoint(space != null ? space.TransformPoint(corner) : corner);
+                if (!any) { b = new Bounds(p, Vector3.zero); any = true; }
+                else b.Encapsulate(p);
             }
         }
 
