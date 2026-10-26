@@ -109,6 +109,39 @@ namespace RVRepairVan.Base
                 + " km/h roll=" + roll.ToString("0.0") + " pitch=" + pitch.ToString("0.0") + " wheels=" + grounded + "/" + wheels
                 + " throttle=" + _chassis.currentThrottle.ToString("0.00")
                 + (_chassis.Rb != null ? " com=" + _chassis.Rb.centerOfMass.ToString("F2") + " inertia=" + _chassis.Rb.inertiaTensor.ToString("F0") : ""));
+            var drive = new System.Text.StringBuilder();
+            if (_chassis.driveWheels != null)
+                foreach (WheelCollider w in _chassis.driveWheels)
+                    if (w != null)
+                    {
+                        drive.Append(" " + w.name + " r=" + (w.radius * RvWheels.Scale(w, t)).ToString("0.00") + " torque=" + w.motorTorque.ToString("0")
+                            + " brake=" + w.brakeTorque.ToString("0") + " tyre=" + (w.rpm * w.radius * RvWheels.Scale(w, t) * 0.12f * Mathf.PI).ToString("0.0") + "km/h");
+                    }
+            Core.Log.Msg("[Drive] stat " + tag + " mass=" + (_chassis.Rb != null ? _chassis.Rb.mass.ToString("0") : "-")
+                + " motor0=" + _chassis.motorTorque.Evaluate(0f).ToString("0") + " motor50=" + _chassis.motorTorque.Evaluate(50f).ToString("0")
+                + " gearing=" + _chassis.diffGearing.ToString("0.00") + " top=" + _chassis.TopSpeed.ToString("0") + " drive:" + drive);
+            Touching(tag);
+        }
+
+        // Every body collider of the chassis that presses into the world, so a stall tells grip from a scraping hull.
+        private static void Touching(string tag)
+        {
+            Rigidbody own = _chassis.Rb;
+            int touches = 0;
+            foreach (Collider b in _chassis.GetComponentsInChildren<Collider>(false))
+            {
+                if (b.attachedRigidbody != own || !b.enabled || b.isTrigger || b.TryCast<WheelCollider>() != null) continue;
+                Bounds box = b.bounds;
+                foreach (Collider h in Physics.OverlapBox(box.center, box.extents + Vector3.one * 0.05f, Quaternion.identity, ~0, QueryTriggerInteraction.Ignore))
+                {
+                    if (h == null || h.attachedRigidbody == own || Physics.GetIgnoreCollision(b, h)) continue;
+                    if (!Physics.ComputePenetration(b, b.transform.position, b.transform.rotation, h, h.transform.position, h.transform.rotation, out Vector3 dir, out float depth)) continue;
+                    touches++;
+                    Core.Log.Msg("[Drive] stat " + tag + " touch '" + b.name + "' x '" + h.name + "' (" + h.transform.root.name + ") depth " + depth.ToString("F2")
+                        + " at " + b.ClosestPoint(h.bounds.center).ToString("F1"));
+                }
+            }
+            if (touches == 0) Core.Log.Msg("[Drive] stat " + tag + " touch: no body collider presses into the world.");
         }
 
         private static Il2CppScheduleOne.NPCs.NPC _target;
