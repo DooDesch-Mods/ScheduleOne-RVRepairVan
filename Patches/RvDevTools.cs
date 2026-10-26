@@ -580,6 +580,13 @@ namespace RVRepairVan.Patches
                 Core.Log.Msg("[Debug] rvdoor: DoorController '" + Path(d.transform) + "' active=" + d.gameObject.activeInHierarchy + " enabled=" + d.enabled
                     + " access=" + d.PlayerAccess + " outside=" + d.CanPlayerAccess(Il2CppScheduleOne.Doors.EDoorSide.Exterior)
                     + " inside=" + d.CanPlayerAccess(Il2CppScheduleOne.Doors.EDoorSide.Interior) + " open=" + d.IsOpen);
+            // The swing of each door leaf: a set 'updating' flag with the leaf at rest means the swing coroutine never ran.
+            Transform model = RVManager.Model;
+            var pivots = new List<Il2CppScheduleOne.Doors.PivotDoor>(root.GetComponentsInChildren<Il2CppScheduleOne.Doors.PivotDoor>(true));
+            if (model != null && !model.IsChildOf(root)) pivots.AddRange(model.GetComponentsInChildren<Il2CppScheduleOne.Doors.PivotDoor>(true));
+            foreach (var p in pivots)
+                Core.Log.Msg("[Debug] rvdoor: PivotDoor '" + Path(p.transform) + "' active=" + p.gameObject.activeInHierarchy + " updating=" + p.isUpdatingDoor
+                    + " target=" + p.targetDoorAngle.ToString("0") + " leafY=" + (p.DoorTransform != null ? p.DoorTransform.localEulerAngles.y.ToString("0.0") : "-"));
             if (action == "open")
                 foreach (var d in root.GetComponentsInChildren<Il2CppScheduleOne.Doors.DoorController>(false))
                 {
