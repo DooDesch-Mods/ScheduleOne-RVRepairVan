@@ -100,19 +100,40 @@ namespace RVRepairVan.Localization
                 ["I'll come back with the money."] = "Ich komme mit dem Geld wieder.",
 
                 // Marco's RV build-outs (each one paid for, each one with its own cinematic)
-                ["Clear out the inside ({0})"] = "Den Innenraum ausräumen ({0})",
                 ["Put in a work floor ({0})"] = "Einen Arbeitsboden einbauen ({0})",
                 ["Make room for a crew ({0})"] = "Platz für eine Crew schaffen ({0})",
                 ["Build a loading dock ({0})"] = "Eine Laderampe bauen ({0})",
                 ["Get the engine running ({0})"] = "Den Motor zum Laufen bringen ({0})",
-                ["All cleared out. Want to build in there? You'll need a proper floor."] =
-                    "Alles raus. Willst du da drin was bauen? Dann brauchst du einen richtigen Boden.",
                 ["Floor's in. You can set up shop in there now."] = "Boden ist drin. Jetzt kannst du da drin aufbauen.",
                 ["Room for {0} now. Hire 'em through the Fixer, and put a locker in there so they get paid. Yeah, science."] =
                     "Jetzt ist Platz für {0}. Stell sie über den Fixer ein und stell einen Spind rein, damit sie bezahlt werden. Yeah, Wissenschaft.",
                 ["Dock's done. Deliveries can come straight to the RV now."] =
                     "Rampe steht. Lieferungen kommen jetzt direkt zum Wohnmobil.",
                 ["She runs. Just don't leave the keys in."] = "Sie läuft. Lass bloß den Schlüssel nicht stecken.",
+
+                // Marco's bodyshop: the RV's furniture and the workshop floor
+                ["Can you do more to the RV?"] = "Kannst du noch mehr am Wohnmobil machen?",
+                ["Park her on the yellow spot out front, then ask me to modify your vehicle."] =
+                    "Stell sie vorne auf den gelben Platz und sag mir dann, dass ich dein Fahrzeug umbauen soll.",
+                ["I can't work on her where she sits. Get the engine in first, then drive her over."] =
+                    "Da, wo sie steht, kann ich nicht an ihr arbeiten. Erst kommt der Motor rein, dann fährst du sie rüber.",
+                ["Interior"] = "Innenraum",
+                ["Workshop"] = "Werkstatt",
+                ["Workshop Floor"] = "Werkstattboden",
+                ["Build on every bit of floor the furniture leaves free."] = "Bau auf jedem Stück Boden, das die Möbel frei lassen.",
+                ["{0} of {1} fitted"] = "{0} von {1} eingebaut",
+                ["Paid for. Taking it out or putting it back is free."] = "Bezahlt. Aus- und Einbau kosten nichts mehr.",
+                ["Pay once, then take it out or put it back for free."] = "Einmal zahlen, danach kosten Aus- und Einbau nichts.",
+                ["Clear the floor here first."] = "Räum hier zuerst den Boden frei.",
+                ["Repair the RV first."] = "Reparier zuerst das Wohnmobil.",
+                ["Bed"] = "Bett",
+                ["Kitchen Bench"] = "Küchenzeile",
+                ["Upper Cabinets"] = "Oberschränke",
+                ["Lower Cabinets"] = "Unterschränke",
+                ["Bedroom Wall"] = "Schlafzimmerwand",
+                ["Wall Behind Driver"] = "Wand hinter dem Fahrer",
+                ["Bedside Table"] = "Nachttisch",
+                ["Decor"] = "Deko",
                 ["Drive"] = "Fahren",
                 ["Seat taken"] = "Platz belegt",
                 ["Sit"] = "Hinsetzen",

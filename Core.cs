@@ -9,7 +9,7 @@ using RVRepairVan.Quests;
 
 [assembly: MelonInfo(typeof(RVRepairVan.Core), "RVRepairVan", DooDesch.ModVersion.Current, "DooDesch", "https://github.com/DooDesch-Mods/ScheduleOne-RVRepairVan")]
 [assembly: MelonGame("TVGS", "Schedule I")]
-[assembly: MelonAdditionalDependencies("Chassis")]
+[assembly: MelonAdditionalDependencies("Chassis", "MarcosBodyshop")]
 
 namespace RVRepairVan
 {
@@ -56,6 +56,7 @@ namespace RVRepairVan
             Patches.DebugConsolePatch.DeclareForTools();
 #endif
             RVRepairVan.Net.NetworkBus.Init(HarmonyInstance);   // co-op sync (host-authoritative; no-op offline)
+            Garage.RvGarage.Register();   // the furniture and the workshop floor at Marco's bodyshop
 
             Log.Msg($"RVRepairVan initialized. Enabled={RVRepairVanPreferences.Enabled}, Questline={RVRepairVanPreferences.QuestlineEnabled}, RepairPrice={RVRepairVanPreferences.RepairPrice}");
         }

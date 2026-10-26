@@ -20,7 +20,8 @@ namespace RVRepairVan.Config
         private static MelonPreferences_Entry<int> _minSampleDiscount;
         private static MelonPreferences_Entry<int> _maxSampleDiscount;
         private static MelonPreferences_Entry<bool> _upgradesEnabled;
-        private static MelonPreferences_Entry<int> _priceGutInterior;
+        private static readonly System.Collections.Generic.Dictionary<Base.RvPart, MelonPreferences_Entry<int>> _partPrices =
+            new System.Collections.Generic.Dictionary<Base.RvPart, MelonPreferences_Entry<int>>();
         private static MelonPreferences_Entry<int> _priceWorkshopFloor;
         private static MelonPreferences_Entry<int> _priceCrewQuarters;
         private static MelonPreferences_Entry<int> _priceLoadingDock;
@@ -60,11 +61,17 @@ namespace RVRepairVan.Config
                 "Largest price cut a single free sample can give. Each packaged sample cuts the price by its value, clamped between min and max, down to the Repair Price floor.");
 
             _upgradesEnabled = CreateEntry("UpgradesEnabled", true, "Marco's RV upgrades",
-                "After the repair, Marco sells five build-outs that turn the RV into a working base you can drive. Turn off to keep the RV as a plain shell.");
-            _priceGutInterior = CreateEntry("PriceGutInterior", 2500, "Upgrade price: gut the interior",
-                "Rips out the bed, bench, cabinets, chairs and the partition wall to make room. Prerequisite for the workshop floor.");
+                "After the repair, Marco sells build-outs that turn the RV into a working base you can drive. Turn off to keep the RV as a plain shell.");
+            PartPriceEntry(Base.RvPart.Bed, "PriceInteriorBed", 450, "Bed");
+            PartPriceEntry(Base.RvPart.Kitchen, "PriceInteriorKitchen", 400, "Kitchen bench");
+            PartPriceEntry(Base.RvPart.UpperCabinets, "PriceInteriorUpperCabinets", 300, "Wall cabinets");
+            PartPriceEntry(Base.RvPart.LowerCabinets, "PriceInteriorLowerCabinets", 350, "Floor cabinets");
+            PartPriceEntry(Base.RvPart.BedroomWall, "PriceInteriorBedroomWall", 250, "Bedroom wall");
+            PartPriceEntry(Base.RvPart.CabWall, "PriceInteriorCabWall", 250, "Cab wall");
+            PartPriceEntry(Base.RvPart.BedsideTable, "PriceInteriorBedsideTable", 150, "Bedside table");
+            PartPriceEntry(Base.RvPart.Decor, "PriceInteriorDecor", 350, "Clutter");
             _priceWorkshopFloor = CreateEntry("PriceWorkshopFloor", 7500, "Upgrade price: workshop floor",
-                "Extends the RV's build grid by Extra Build Tiles. The RV's own 32 tiles come free with the repair. Prerequisite for the crew quarters.");
+                "Extends the RV's build grid over the free floor. The RV's own 32 tiles come free with the repair. Prerequisite for the crew quarters.");
             _priceCrewQuarters = CreateEntry("PriceCrewQuarters", 15000, "Upgrade price: crew quarters",
                 "Lets you hire and station employees at the RV. They still need a locker placed inside before they work.");
             _priceLoadingDock = CreateEntry("PriceLoadingDock", 25000, "Upgrade price: loading dock",
@@ -100,6 +107,12 @@ namespace RVRepairVan.Config
         internal const float DebugCashAmount = 10000f;
 #endif
 
+        private static void PartPriceEntry(Base.RvPart part, string id, int price, string name)
+        {
+            _partPrices[part] = CreateEntry(id, price, "Bodyshop price: " + name.ToLowerInvariant(),
+                "Paid once at Marco's garage to take this part out or put it back. After that, switching is free.");
+        }
+
         private static MelonPreferences_Entry<T> CreateEntry<T>(string identifier, T defaultValue, string displayName, string description = null)
         {
             return _category.CreateEntry(identifier, defaultValue, displayName, description);
@@ -115,7 +128,9 @@ namespace RVRepairVan.Config
         internal static int MaxSampleDiscount => Mathf.Max(MinSampleDiscount, _maxSampleDiscount?.Value ?? 500);
 
         internal static bool UpgradesEnabled => _upgradesEnabled?.Value ?? true;
-        internal static int PriceGutInterior => Mathf.Max(0, _priceGutInterior?.Value ?? 2500);
+        /// <summary>The one-time price of a furniture part at the bodyshop.</summary>
+        internal static int PartPrice(Base.RvPart part) =>
+            _partPrices.TryGetValue(part, out var e) && e != null ? Mathf.Max(0, e.Value) : 0;
         internal static int PriceWorkshopFloor => Mathf.Max(0, _priceWorkshopFloor?.Value ?? 7500);
         internal static int PriceCrewQuarters => Mathf.Max(0, _priceCrewQuarters?.Value ?? 15000);
         internal static int PriceLoadingDock => Mathf.Max(0, _priceLoadingDock?.Value ?? 25000);

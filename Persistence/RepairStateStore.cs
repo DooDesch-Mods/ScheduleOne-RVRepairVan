@@ -22,10 +22,10 @@ namespace RVRepairVan.Persistence
         // A co-op client mirrors host state here instead of the save-bound RepairSave (see class summary).
         private static bool ClientMode => NetworkBus.Online && !NetworkBus.IsServer;
         private static bool _cRepaired;
-        private static int _cStage, _cSamples, _cDiscount, _cUpgrades;
+        private static int _cStage, _cSamples, _cDiscount, _cUpgrades, _cInteriorUnlocked, _cInteriorRemoved;
 
         /// <summary>Clear the client mirror (called on scene load so a previous co-op session never leaks in).</summary>
-        internal static void ResetClient() { _cRepaired = false; _cStage = 0; _cSamples = 0; _cDiscount = 0; _cUpgrades = 0; }
+        internal static void ResetClient() { _cRepaired = false; _cStage = 0; _cSamples = 0; _cDiscount = 0; _cUpgrades = 0; _cInteriorUnlocked = 0; _cInteriorRemoved = 0; }
 
         internal static bool GetRepaired() => ClientMode ? _cRepaired : (S != null && S.Repaired);
         internal static void SetRepaired(bool repaired) { if (ClientMode) _cRepaired = repaired; else if (S != null) S.Repaired = repaired; }
@@ -41,6 +41,11 @@ namespace RVRepairVan.Persistence
 
         internal static int GetUpgrades() => ClientMode ? _cUpgrades : (S != null ? S.Upgrades : 0);
         internal static void SetUpgrades(int mask) { if (ClientMode) _cUpgrades = mask; else if (S != null) S.Upgrades = mask; }
+
+        internal static int GetInteriorUnlocked() => ClientMode ? _cInteriorUnlocked : (S != null ? S.InteriorUnlocked : 0);
+        internal static void SetInteriorUnlocked(int mask) { if (ClientMode) _cInteriorUnlocked = mask; else if (S != null) S.InteriorUnlocked = mask; }
+        internal static int GetInteriorRemoved() => ClientMode ? _cInteriorRemoved : (S != null ? S.InteriorRemoved : 0);
+        internal static void SetInteriorRemoved(int mask) { if (ClientMode) _cInteriorRemoved = mask; else if (S != null) S.InteriorRemoved = mask; }
 
         // Only meaningful on the host/offline: the "repair takes a day" job clock. A client never runs the timer.
         internal static int GetRepairStartedAt() => S != null ? S.RepairStartedAt : 0;

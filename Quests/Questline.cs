@@ -86,9 +86,9 @@ namespace RVRepairVan.Quests
         // and its handler index into.
         // Marco's build-out shop. Order matters only for the display order of the choices - the prerequisites
         // themselves live in RvUpgrades.
+        // The ones inside the RV (furniture, workshop floor) are sold at Marco's bodyshop (Garage.RvGarage).
         private static readonly Base.RvUpgrade[] UpgradeOrder =
         {
-            Base.RvUpgrade.GutInterior, Base.RvUpgrade.WorkshopFloor,
             Base.RvUpgrade.CrewQuarters, Base.RvUpgrade.LoadingDock, Base.RvUpgrade.Engine,
         };
         private static readonly DialogueController.DialogueChoice[] _upgradeChoices =
@@ -534,6 +534,8 @@ namespace RVRepairVan.Quests
                 _upgradeChoices[u] = AddChoice(marco, Base.RvUpgrades.ChoiceText(up), 93 - u,
                     () => Base.RvUpgrades.Available(up), () => Base.RvUpgrades.Buy(up));
             }
+            AddChoice(marco, L10n.T("Can you do more to the RV?"), 89,
+                () => Garage.RvGarage.AskMoreVisible(), () => SayMarco(Garage.RvGarage.AskMoreLine()));
             Core.LogDebug("[Questline] Marco dialogue injected" + (degraded ? " (degraded)." : "."));
             return true;
         }

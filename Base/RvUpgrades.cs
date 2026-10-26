@@ -13,8 +13,8 @@ namespace RVRepairVan.Base
     internal enum RvUpgrade
     {
         None = 0,
-        GutInterior = 1,     // clears the bed/bench/cabinets/chairs/partition to make room
-        WorkshopFloor = 2,   // turns on the RV's build grid so equipment can be placed
+        GutInterior = 1,     // retired: 3.x sold the whole interior as one; a save with it migrates to RvPart masks
+        WorkshopFloor = 2,   // the build grid covers every floor space the furniture leaves free (bodyshop)
         CrewQuarters = 4,    // employee capacity + idle points + a walkable interior
         LoadingDock = 8,     // a delivery destination at the RV
         Engine = 16,         // the RV can be driven (RvMobile)
@@ -37,7 +37,7 @@ namespace RVRepairVan.Base
         // Applied in dependency order - the crew needs the grid, which needs the room.
         private static readonly RvUpgrade[] Order =
         {
-            RvUpgrade.GutInterior, RvUpgrade.WorkshopFloor, RvUpgrade.CrewQuarters, RvUpgrade.LoadingDock, RvUpgrade.Engine,
+            RvUpgrade.WorkshopFloor, RvUpgrade.CrewQuarters, RvUpgrade.LoadingDock, RvUpgrade.Engine,
         };
 
         /// <summary>The full owned mask. Setting it on the host replicates, exactly like Questline.Stage.</summary>
@@ -52,8 +52,7 @@ namespace RVRepairVan.Base
         }
 
         /// <summary>Every bit we actually support - used to sanitise anything that arrives over the wire.</summary>
-        private const int AllBits = (int)(RvUpgrade.GutInterior | RvUpgrade.WorkshopFloor
-                                        | RvUpgrade.CrewQuarters | RvUpgrade.LoadingDock | RvUpgrade.Engine);
+        private const int AllBits = (int)(RvUpgrade.WorkshopFloor | RvUpgrade.CrewQuarters | RvUpgrade.LoadingDock | RvUpgrade.Engine);
 
         /// <summary>
         /// Exactly one known upgrade? A purchase arrives as an int over the network, and anything else - a
@@ -61,8 +60,7 @@ namespace RVRepairVan.Base
         /// itself for nothing. Everything that can be bought goes through this gate first.
         /// </summary>
         internal static bool IsValid(RvUpgrade up) =>
-            up == RvUpgrade.GutInterior || up == RvUpgrade.WorkshopFloor
-            || up == RvUpgrade.CrewQuarters || up == RvUpgrade.LoadingDock || up == RvUpgrade.Engine;
+            up == RvUpgrade.WorkshopFloor || up == RvUpgrade.CrewQuarters || up == RvUpgrade.LoadingDock || up == RvUpgrade.Engine;
 
         internal static bool Owned(RvUpgrade up) => IsValid(up) && (Mask & (int)up) != 0;
 
@@ -70,7 +68,6 @@ namespace RVRepairVan.Base
         {
             switch (up)
             {
-                case RvUpgrade.GutInterior: return RVRepairVanPreferences.PriceGutInterior;
                 case RvUpgrade.WorkshopFloor: return RVRepairVanPreferences.PriceWorkshopFloor;
                 case RvUpgrade.CrewQuarters: return RVRepairVanPreferences.PriceCrewQuarters;
                 case RvUpgrade.LoadingDock: return RVRepairVanPreferences.PriceLoadingDock;
@@ -79,12 +76,11 @@ namespace RVRepairVan.Base
             }
         }
 
-        /// <summary>What has to be owned first. The dock stands alone; the interior chain builds on itself.</summary>
+        /// <summary>What has to be owned first. Only the crew builds on another upgrade: it works at the stations.</summary>
         private static RvUpgrade Prerequisite(RvUpgrade up)
         {
             switch (up)
             {
-                case RvUpgrade.WorkshopFloor: return RvUpgrade.GutInterior;
                 case RvUpgrade.CrewQuarters: return RvUpgrade.WorkshopFloor;
                 default: return RvUpgrade.None;
             }
@@ -96,7 +92,6 @@ namespace RVRepairVan.Base
             string money = MoneyManager.FormatAmount(Price(up));
             switch (up)
             {
-                case RvUpgrade.GutInterior: return L10n.T("Clear out the inside ({0})", money);
                 case RvUpgrade.WorkshopFloor: return L10n.T("Put in a work floor ({0})", money);
                 case RvUpgrade.CrewQuarters: return L10n.T("Make room for a crew ({0})", money);
                 case RvUpgrade.LoadingDock: return L10n.T("Build a loading dock ({0})", money);
@@ -109,8 +104,6 @@ namespace RVRepairVan.Base
         {
             switch (up)
             {
-                case RvUpgrade.GutInterior:
-                    return L10n.T("All cleared out. Want to build in there? You'll need a proper floor.");
                 case RvUpgrade.WorkshopFloor:
                     return L10n.T("Floor's in. You can set up shop in there now.");
                 case RvUpgrade.CrewQuarters:
@@ -213,6 +206,24 @@ namespace RVRepairVan.Base
             catch (Exception e) { Core.Log.Warning("[Upgrade] host buy " + up + " failed: " + e.Message); return false; }
         }
 
+        /// <summary>
+        /// Host: an upgrade bought at the bodyshop. The bodyshop has taken the money and plays its own workshop
+        /// effect, so this only checks, records, replicates and applies. Returns null when done, else the reason.
+        /// </summary>
+        internal static string HostGrant(RvUpgrade up)
+        {
+            if (!IsValid(up)) return "Not available.";
+            if (!RVRepairVanPreferences.Enabled || !RVRepairVanPreferences.UpgradesEnabled) { Core.Log.Warning("[Upgrade] " + up + " refused - upgrades are switched off."); return "Not available."; }
+            if (!RepairStateStore.GetRepaired()) { Core.Log.Warning("[Upgrade] " + up + " refused - the RV is not repaired."); return "Repair the RV first."; }
+            if (Owned(up)) return "Already installed.";
+            RvUpgrade need = Prerequisite(up);
+            if (need != RvUpgrade.None && !Owned(need)) { Core.Log.Warning("[Upgrade] " + up + " refused - needs " + need + "."); return "Not available."; }
+            Mask = Mask | (int)up;   // setter replicates to clients
+            Core.Log.Msg("[Upgrade] " + up + " fitted at the bodyshop.");
+            Apply(up);
+            return null;
+        }
+
         /// <summary>Client: adopt the host's mask and apply whatever is newly owned.</summary>
         internal static void ApplySync(int mask)
         {
@@ -233,10 +244,11 @@ namespace RVRepairVan.Base
             RvLiner.Ensure();   // not an upgrade: the stock model has holes whether or not anything was bought
             RvSavePoint.Ensure();
             RvMobile.EnsureWheel();
+            if (RepairStateStore.GetRepaired()) RvInterior.Sync();   // the furniture before the grid that lays around it
             if (!RVRepairVanPreferences.UpgradesEnabled) return;
             foreach (RvUpgrade up in Order)
                 if (Owned(up)) Apply(up);
-            RvEasterEggs.Ensure();   // after the gut, so the cook gear shows with it
+            RvEasterEggs.Ensure();   // after the furniture, so the cook gear only shows where nothing stands
         }
 
         private static void Apply(RvUpgrade up)
@@ -245,7 +257,6 @@ namespace RVRepairVan.Base
             {
                 switch (up)
                 {
-                    case RvUpgrade.GutInterior: RvInterior.Apply(); break;
                     case RvUpgrade.WorkshopFloor: RvBuildGrid.Apply(); break;
                     case RvUpgrade.CrewQuarters: RvCrew.Apply(); break;
                     case RvUpgrade.LoadingDock: RvDeliveryDock.Apply(); break;

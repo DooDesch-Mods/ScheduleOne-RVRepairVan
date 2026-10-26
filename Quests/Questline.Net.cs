@@ -128,6 +128,7 @@ namespace RVRepairVan.Quests
                 {
                     case RvOp.StageSync: ApplyStageSync(m.A, m.B); break;
                     case RvOp.TransientSync: ApplyTransient(m.A, m.B, m.C); break;
+                    case RvOp.InteriorSync: Base.RvInterior.ApplySync(m.A, m.B); break;
                     case RvOp.UpgradeSync: Base.RvUpgrades.ApplySync(m.A); break;
                     case RvOp.MobileSync: Base.RvMobile.ApplySync(m.A); break;
                     case RvOp.BatterySync: Base.RvBattery.ApplySync(m.A); break;
@@ -150,6 +151,8 @@ namespace RVRepairVan.Quests
             if (RepairStateStore.GetRepaired()) NetworkBus.BroadcastToAll(RvOp.RepairApplied);
             // Send the build-out mask AFTER RepairApplied: the client applies the upgrades against the repaired
             // RV, and the interior/grid modules only resolve once the intact model is the active one.
+            // The furniture before the upgrades: the workshop grid lays its floor around the parts that are in.
+            NetworkBus.BroadcastToAll(RvOp.InteriorSync, Base.RvInterior.Unlocked, Base.RvInterior.Removed);
             NetworkBus.BroadcastToAll(RvOp.UpgradeSync, Base.RvUpgrades.Mask);
             Base.RvMobile.HostSnapshot();   // after the upgrades: the client attaches the model the Engine upgrade set up
             Base.RvBattery.HostSnapshot();

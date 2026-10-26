@@ -122,6 +122,21 @@
     </Reference>
   </ItemGroup>
 
+  <!-- Marco's Bodyshop sells the furniture and the workshop floor. A sibling checkout builds it; otherwise the DLL
+       from the shared lib folder. BodyshopProject points at another checkout. -->
+  <PropertyGroup>
+    <BodyshopProject Condition="'$(BodyshopProject)' == ''">$(MSBuildThisFileDirectory)../MarcosBodyshop/MarcosBodyshop.csproj</BodyshopProject>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(BodyshopProject)')">
+    <ProjectReference Include="$(BodyshopProject)" Private="false" />
+  </ItemGroup>
+  <ItemGroup Condition="!Exists('$(BodyshopProject)')">
+    <Reference Include="MarcosBodyshop">
+      <HintPath>$(WorkspaceLibPath)/$(Backend)/marcosbodyshop/MarcosBodyshop.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
   <!-- Mod loader references (both backends) -->
   <ItemGroup>
     <Reference Include="MelonLoader">
