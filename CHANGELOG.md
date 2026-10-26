@@ -4,6 +4,14 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [3.6.4] - 2026-10-26
+
+### Changed
+- The RV pulls harder below 10 km/h, so it gets going faster from a standstill.
+
+### Fixed
+- The RV gets up steep ramps, like the highway ramp at Hyland Point with Serena Flats, and pulls away on them from a stop. It used to stall and roll back.
+
 ## [3.6.3] - 2026-10-24
 
 ### Changed
