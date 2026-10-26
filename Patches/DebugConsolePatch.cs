@@ -92,6 +92,8 @@ namespace RVRepairVan.Patches
             new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'arrest' arrests you, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
             new[] { "rvtilt", "how far each placed item in the RV leans against it; 'redo' sets every pose again, 'vanilla' toggles the fix, 'lean 8' rolls the parked RV", "rvtilt redo" },
             new[] { "rvcargo", "how the first loose body in the driving RV moves against it, per physics step and per frame; 'vanilla' toggles the fix, 'pin' holds it like a poured bag", "rvcargo probe 4" },
+            new[] { "rvhatch", "the roof hatch; 'open' / 'close' set it, 'use' presses its prompt, 'look' stands you under it looking up", "rvhatch look" },
+            new[] { "rvnav", "the RV's shell, floor and ground, and how the NavMesh and a police chase reach into it", "rvnav" },
             new[] { "rvharmony", "every method this mod patches; warns for a patch that is applied more than once", "rvharmony" },
         };
 
@@ -104,7 +106,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach" && cmd != "rvhands" && cmd != "rvseat"
                 && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt" && cmd != "rvcargo"
-                && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony")
+                && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony" && cmd != "rvhatch" && cmd != "rvnav")
                 return false;   // not ours - let the game handle it
 
             // Both overloads can fire for a single submission (the string body calls the List body), so run the
@@ -180,6 +182,7 @@ namespace RVRepairVan.Patches
                         else if (parts.Length > 1 && parts[1].ToLower() == "info") Base.RvDrive.Info();
                         else if (parts.Length > 1 && parts[1].ToLower() == "lights") Base.RvDrive.Lights();
                         else if (parts.Length > 1 && parts[1].ToLower() == "rec") Base.RvDrive.Rec(parts.Length > 2 ? parts[2..] : Array.Empty<string>());
+                        else if (parts.Length > 1 && parts[1].ToLower() == "exitwatch") Base.RvDrive.ExitWatch(parts.Length > 2 ? parts[2] : "");
                         else if (parts.Length > 1 && parts[1].ToLower() == "tp") Base.RvDrive.Tp(parts.Length > 2 ? parts[2..] : Array.Empty<string>());
                         else if (parts.Length > 1 && parts[1].ToLower() == "hull") Base.RvDrive.HullToggle(parts.Length > 2 ? parts[2].ToLower() : "");
                         else if (parts.Length > 1 && parts[1].ToLower() == "stat") { Base.RvDrive.Stat(parts.Length > 2 ? parts[2] : "-"); Base.RvWheels.Report(); }
@@ -302,6 +305,8 @@ namespace RVRepairVan.Patches
                         Core.Log.Msg("[Debug] rvgiveclient: broadcast DebugGiveItems to clients (run this on the HOST).");
                         break;
                     case "rvharmony": HarmonyReport(); break;
+                    case "rvhatch": Base.RvHatch.DebugCmd(parts.Length > 1 ? parts[1..] : Array.Empty<string>()); break;
+                    case "rvnav": Base.RvNavWalls.DebugCmd(parts.Length > 1 ? parts[1..] : Array.Empty<string>()); break;
                 }
             }
             catch (Exception e) { Core.Log.Warning("[Debug] console cmd failed: " + e.Message); }
