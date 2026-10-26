@@ -107,10 +107,11 @@ namespace RVRepairVan.Base
         {
             Transform gear = root.Find(Gear.Name);
             if (gear == null) return;
-            bool show = RvInterior.Applied;
+            // The gear sits on floor that a fitted part would cover; it only shows on free floor.
+            bool show = !RvInterior.InFittedPart(gear.position, 0.15f);
             if (gear.gameObject.activeSelf == show) return;
             gear.gameObject.SetActive(show);
-            Core.LogDebug("[Eggs] cook gear " + (show ? "shown" : "hidden") + " (interior gutted=" + show + ").");
+            Core.LogDebug("[Eggs] cook gear " + (show ? "shown" : "hidden") + " (spot free=" + show + ").");
         }
 
         // --- the props -------------------------------------------------------------------------------------

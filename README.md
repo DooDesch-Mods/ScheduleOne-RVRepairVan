@@ -32,16 +32,20 @@
   model. Lose one and the owner wants **$500** before the quest goes on.
 - **Repair cinematic.** You pay, the screen goes black, Marco works on the RV, and it fades
   back in repaired. Plays in both modes.
-- **Marco's build-outs.** Once the RV stands again, he sells five upgrades, each with its
-  own short cinematic:
-  - **Clear out the inside** ($2,500): bed, bench and cabinets go, dash and seats stay.
-  - **Put in a work floor** ($7,500): 24 build tiles on top of the RV's own 32.
-  - **Make room for a crew** ($15,000): three employees work inside. Put a locker in.
-  - **Build a loading dock** ($25,000): your supplier delivers to the RV.
+- **Marco's build-outs.** Once the RV stands again, he sells three upgrades in his dialogue,
+  each with its own short cinematic:
   - **Get the engine running** ($10,000): take the wheel and drive the RV anywhere. Parked
     away, it keeps its stations; the crew and deliveries wait until it is back on its spot.
-
-  The first three build on each other. The dock and the engine stand alone.
+  - **Make room for a crew** ($15,000): three employees work inside. Put a locker in. Needs
+    the workshop floor.
+  - **Build a loading dock** ($25,000): your supplier delivers to the RV.
+- **Marco's Bodyshop.** Drive the RV onto the lot in front of his garage and ask him
+  to modify your vehicle:
+  - **Interior, part by part**: bed, kitchen bench, upper and lower cabinets, both walls,
+    bedside table and the decor. Each part is paid once ($150 to $450); after that, taking
+    it out or putting it back is free. A part goes back only on an empty floor.
+  - **Workshop floor** ($7,500): build on every bit of floor the furniture leaves free.
+  - **Engine parts** from Chassis, as for every car.
 - **Save intercom.** The repaired RV has the wall intercom every property has. Press E on it
   to save.
 - **Save-bound progress.** Quest progress and the repaired RV live in the game save. Quit
@@ -58,20 +62,22 @@
 | Schedule I | `0.4.7f12` (IL2CPP, current Steam public build) |
 | MelonLoader | `0.7.3+` |
 | S1API | [ifBars/S1API_Forked](https://thunderstore.io/c/schedule-i/p/ifBars/S1API_Forked/) **3.2.1+** (dialogue, items, dead drops, money, save system) |
-| Chassis | [DooDesch/Chassis](https://thunderstore.io/c/schedule-i/p/DooDesch/Chassis/) **1.5.0+** (driver in the seat, first person, horn, indicators) |
+| Chassis | [DooDesch/Chassis](https://thunderstore.io/c/schedule-i/p/DooDesch/Chassis/) **1.7.0+** (driver in the seat, first person, horn, indicators) |
+| Marco's Bodyshop | [DooDesch/MarcosBodyshop](https://thunderstore.io/c/schedule-i/p/DooDesch/MarcosBodyshop/) **1.0.0+** (the garage menu for the interior and the workshop floor) |
+| Sideload | [DooDesch/Sideload](https://thunderstore.io/c/schedule-i/p/DooDesch/Sideload/) **1.35.0+** (draws the garage menu) |
 
 ## Installation
 
 ### Recommended: a Thunderstore mod manager
 
 Install with a mod manager (r2modman / Gale) from the Schedule I community; the
-dependencies (MelonLoader, S1API, Chassis) are pulled in automatically.
+dependencies (MelonLoader, S1API, Chassis, Marco's Bodyshop, Sideload) are pulled in automatically.
 
 ### Manual
 
 1. Install **MelonLoader 0.7.3** for Schedule I.
 2. Install **S1API** (its DLLs go in `Mods/` and `Plugins/` per its own instructions).
-3. Install **Chassis** (`Chassis.dll` goes in `Mods/`).
+3. Install **Chassis**, **Sideload** and **Marco's Bodyshop** per their own instructions.
 4. Drop **`RVRepairVan.dll`** into your Schedule I `Mods/` folder.
 
 ## Configuration
@@ -89,13 +95,20 @@ Settings live in
 | `MinSampleDiscount` | `100` | Smallest price cut a single packaged sample can give. |
 | `MaxSampleDiscount` | `500` | Largest price cut a single packaged sample can give. |
 | `UpgradesEnabled` | `true` | Marco's build-outs. Off = the RV stays a plain shell. |
-| `PriceGutInterior` | `2500` | Clears the bed, bench and cabinets. Dash and seats stay. |
-| `PriceWorkshopFloor` | `7500` | Extends the build grid. Needs the interior gutted first. |
+| `PriceInteriorBed` | `450` | Bodyshop: unlock the bed once. |
+| `PriceInteriorKitchen` | `400` | Bodyshop: unlock the kitchen bench once. |
+| `PriceInteriorUpperCabinets` | `300` | Bodyshop: unlock the upper cabinets once. |
+| `PriceInteriorLowerCabinets` | `350` | Bodyshop: unlock the lower cabinets once. |
+| `PriceInteriorBedroomWall` | `250` | Bodyshop: unlock the bedroom wall once. |
+| `PriceInteriorCabWall` | `250` | Bodyshop: unlock the wall behind the driver once. |
+| `PriceInteriorBedsideTable` | `150` | Bodyshop: unlock the bedside table once. |
+| `PriceInteriorDecor` | `350` | Bodyshop: unlock the decor once. |
+| `PriceWorkshopFloor` | `7500` | Bodyshop: the build grid covers the free floor. |
 | `PriceCrewQuarters` | `15000` | Lets employees be stationed at the RV. Needs the workshop floor. |
 | `PriceLoadingDock` | `25000` | Adds a delivery dock. |
 | `PriceEngine` | `10000` | Makes the RV drivable. Away from its spot, the crew and deliveries wait. |
 | `CrewSize` | `3` | How many employees the RV holds once the crew quarters are built. |
-| `BuildGridExtraTiles` | `24` | Tiles the workshop floor adds on top of the RV's own 32. |
+| `BuildGridExtraTiles` | `96` | Upper limit for the tiles the workshop floor lays on top of the RV's own 32. |
 | `InstantRepair` | `false` | Repairs the RV free of charge as soon as it is wrecked. |
 | `RepairTakesADay` | `false` | Marco keeps the RV for 24 in-game hours and texts you when it is done. |
 
@@ -131,6 +144,8 @@ in development builds and are not shipped in the release.
 4. Optional: ask him to go lower, fetch his package, then hold out packaged product to
    him for more off the bill.
 5. **Pay**, watch the repair, then go **see your RV**. Marco texts you about his build-outs.
+6. For the interior and the workshop floor: buy the engine, drive the RV onto the lot
+   in front of Marco's garage, get out and ask him to modify your vehicle.
 
 Prefer no story? Set `QuestMode = Simple` and just pay Marco directly.
 

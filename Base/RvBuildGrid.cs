@@ -1,4 +1,5 @@
 using System;
+using DooDesch.Localization;
 using System.Collections;
 using System.Collections.Generic;
 using Il2CppScheduleOne.EntityFramework;
@@ -11,7 +12,7 @@ using MelonLoader;
 namespace RVRepairVan.Base
 {
     /// <summary>
-    /// Upgrade 2 - "workshop floor". Extends the RV's build grid.
+    /// The "workshop floor" upgrade. Extends the RV's build grid.
     ///
     /// Measurement decided the shape of this one, twice over. The RV ships two grids on the interior floor
     /// (<c>@Properties/RV/RV/Container/Grid</c> with 18 tiles and <c>Grid (1)</c> with 14). They read as inactive
@@ -22,6 +23,10 @@ namespace RVRepairVan.Base
     /// What the upgrade actually buys is more floor: <c>BuildGridExtraTiles</c> cloned tiles registered into the
     /// grid on top of the vanilla ones. Activation is still done here, harmlessly and idempotently, so the
     /// upgrade also covers any case where the grids are not already on.
+    ///
+    /// The floor only covers what the furniture leaves free: a spot under a part that is fitted
+    /// (<see cref="RvInterior"/>) gets no tile, a part taken out frees its spots, and a part put back takes its
+    /// spots again. Putting a part back is refused while anything stands there (<see cref="RefitBlocked"/>).
     /// </summary>
     internal static class RvBuildGrid
     {
@@ -157,7 +162,7 @@ namespace RVRepairVan.Base
                 if (root == null) Core.Log.Warning("[Grid] no RV root - the floor is measured in world space.");
                 Bounds? cabin = CabinFloorBounds(frame);
                 Bounds? rear = root != null ? RearFloorLocal(frame) : null;
-                int added = 0, skippedOutside = 0;
+                int added = 0, skippedOutside = 0, skippedFurniture = 0;
                 for (int cx = template.x - reach; cx <= template.x + reach && added < extra; cx++)
                     for (int cz = template.y - reach; cz <= template.y + reach && added < extra; cz++)
                     {
@@ -175,6 +180,7 @@ namespace RVRepairVan.Base
                         if (!inside && rear.HasValue)
                             inside = rear.Value.Contains(new Vector3(local.x, rear.Value.center.y, local.z));
                         if (!inside) { skippedOutside++; continue; }
+                        if (UnderFittedPart(world, size) != RvPart.None) { skippedFurniture++; continue; }
 
                         if (CloneTile(grid, template, cx, cz, size, offset)) added++;
                     }
@@ -182,7 +188,7 @@ namespace RVRepairVan.Base
                 if (added >= extra)
                     Core.Log.Warning("[Grid] hit the BuildGridExtraTiles cap of " + extra
                         + " - raise it if parts of the floor are still bare.");
-                Core.LogDebug("[Grid] fill: reach=" + reach + " tileSize=" + size + " outsideBounds=" + skippedOutside);
+                Core.LogDebug("[Grid] fill: reach=" + reach + " tileSize=" + size + " outsideBounds=" + skippedOutside + " underFurniture=" + skippedFurniture);
 
                 _clonedTiles += added;
                 Core.Log.Msg("[Grid] added " + added + " extra tile(s) (requested " + extra + ").");
@@ -192,6 +198,113 @@ namespace RVRepairVan.Base
                 _inheritedOccupants = 0;
             }
             catch (Exception e) { Core.Log.Warning("[Grid] expand failed: " + e.Message); }
+        }
+
+        // ---- furniture ------------------------------------------------------------------------------------------
+
+        // A part counts as standing on the floor when its bottom is this close to it (the wall cabinets do not).
+        private const float FloorContact = 0.5f;
+        // How far a tile may reach into a part's box before it counts as under it.
+        private const float Overlap = 0.1f;
+
+        /// <summary>The fitted part whose floor a tile at <paramref name="world"/> would cover, or None.</summary>
+        private static RvPart UnderFittedPart(Vector3 world, float size)
+        {
+            Transform model = RVManager.Model;
+            if (model == null) return RvPart.None;
+            foreach (var p in RvInterior.Parts)
+                if (!RvInterior.IsRemoved(p) && Covers(model, p, world, size)) return p;
+            return RvPart.None;
+        }
+
+        private static bool Covers(Transform model, RvPart p, Vector3 world, float size)
+        {
+            if (!RvInterior.Box(p, out Bounds box)) return false;
+            if (box.min.y - RvInterior.FloorY(model) > FloorContact) return false;
+            Vector3 l = model.InverseTransformPoint(world);
+            float half = size * 0.5f - Overlap;
+            return l.x + half > box.min.x && l.x - half < box.max.x && l.z + half > box.min.z && l.z - half < box.max.z;
+        }
+
+        /// <summary>
+        /// Why a part that is out cannot go back in, or null. Anything standing on its floor blocks it, on any grid,
+        /// whether the floor was bought or not.
+        /// </summary>
+        internal static string RefitBlocked(RvPart p)
+        {
+            try
+            {
+                if (!RvInterior.IsRemoved(p)) return null;
+                Transform model = RVManager.Model;
+                Property prop = PropertyOf();
+                var grids = prop != null ? prop.Grids : null;
+                if (model == null || grids == null) return null;
+                float size = Grid.TileSize;
+                for (int i = 0; i < grids.Count; i++)
+                {
+                    Grid g = grids[i];
+                    if (g == null || g.Tiles == null) continue;
+                    for (int k = 0; k < g.Tiles.Count; k++)
+                    {
+                        Tile t = g.Tiles[k];
+                        if (t == null || t.BuildableOccupants == null || t.BuildableOccupants.Count == 0) continue;
+                        if (Covers(model, p, t.transform.position, size)) return L10n.T("Clear the floor here first.");
+                    }
+                }
+                return null;
+            }
+            catch (Exception e)
+            {
+                Core.Log.Error("[Grid] checking the floor under " + p + " failed - refitting is refused: " + e.Message);
+                return L10n.T("Clear the floor here first.");
+            }
+        }
+
+        /// <summary>
+        /// The furniture changed: take back the added tiles under parts that went in, then lay floor where parts came
+        /// out. Only with the workshop floor; the vanilla tiles are never touched.
+        /// </summary>
+        internal static void PartsChanged()
+        {
+            if (!_applied || !RvUpgrades.Owned(RvUpgrade.WorkshopFloor)) return;
+            try
+            {
+                Property prop = PropertyOf();
+                var grids = prop != null ? prop.Grids : null;
+                if (grids == null || grids.Count == 0 || grids[0] == null) return;
+                Grid grid = grids[0];
+                float size = Grid.TileSize;
+                int removed = 0, kept = 0;
+                for (int k = grid.Tiles.Count - 1; k >= 0; k--)
+                {
+                    Tile t = grid.Tiles[k];
+                    if (t == null || !IsOurs(t)) continue;
+                    RvPart under = UnderFittedPart(t.transform.position, size);
+                    if (under == RvPart.None) continue;
+                    if (t.BuildableOccupants != null && t.BuildableOccupants.Count > 0)
+                    {
+                        kept++;
+                        Core.Log.Warning("[Grid] tile " + t.x + "," + t.y + " under the " + under + " carries an item - it stays.");
+                        continue;
+                    }
+                    RemoveTile(grid, t);
+                    removed++;
+                }
+                _clonedTiles = Math.Max(0, _clonedTiles - removed);
+                if (removed > 0 || kept > 0) Core.Log.Msg("[Grid] furniture went in: " + removed + " tile(s) taken back" + (kept > 0 ? ", " + kept + " kept under items" : "") + ".");
+                ExpandGrid(prop, RVRepairVanPreferences.BuildGridExtraTiles);
+                Sweep();
+            }
+            catch (Exception e) { Core.Log.Error("[Grid] following the furniture failed: " + e); }
+        }
+
+        private static void RemoveTile(Grid grid, Tile t)
+        {
+            var c = new Coordinate(t.x, t.y);
+            try { grid.DeregisterTile(t); } catch (Exception e) { Core.Log.Warning("[Grid] DeregisterTile failed: " + e.Message); }
+            try { if (grid._coordinateToTile != null && grid._coordinateToTile.ContainsKey(c)) grid._coordinateToTile.Remove(c); }
+            catch (Exception e) { Core.Log.Warning("[Grid] removing tile " + c.x + "," + c.y + " from the lookup failed: " + e.Message); }
+            UnityEngine.Object.Destroy(t.gameObject);
         }
 
         /// <summary>

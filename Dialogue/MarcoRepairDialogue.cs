@@ -22,10 +22,10 @@ namespace RVRepairVan.Dialogue
         private static bool _injected;
         private static DialogueController.DialogueChoice _repairChoice;
 
-        // Marco sells the same build-outs in Simple mode; only the repair itself skips the story.
+        // Marco sells the same build-outs in Simple mode; only the repair itself skips the story. The ones inside the
+        // RV (furniture, workshop floor) are sold at his bodyshop (Garage.RvGarage).
         private static readonly Base.RvUpgrade[] UpgradeOrder =
         {
-            Base.RvUpgrade.GutInterior, Base.RvUpgrade.WorkshopFloor,
             Base.RvUpgrade.CrewQuarters, Base.RvUpgrade.LoadingDock, Base.RvUpgrade.Engine,
         };
         private static readonly DialogueController.DialogueChoice[] _upgradeChoices =
@@ -128,6 +128,19 @@ namespace RVRepairVan.Dialogue
                     dc.AddDialogueChoice(uc, 93 - u);
                     _upgradeChoices[u] = uc;
                 }
+
+                var more = new DialogueController.DialogueChoice
+                {
+                    Enabled = true,
+                    ChoiceText = L10n.T("Can you do more to the RV?"),
+                    Conversation = null,
+                    Priority = 89
+                };
+                Func<bool, bool> moreShow = (_) => { try { return Garage.RvGarage.AskMoreVisible(); } catch (Exception e) { Core.Swallowed("MarcoRepairDialogue.MoreShowCheck", e); return false; } };
+                more.shouldShowCheck = DelegateSupport.ConvertDelegate<DialogueController.DialogueChoice.ShouldShowCheck>(moreShow);
+                more.onChoosen = new UnityEvent();
+                more.onChoosen.AddListener((Action)(() => WorldSay(FindMarco(), Garage.RvGarage.AskMoreLine())));
+                dc.AddDialogueChoice(more, 89);
 
                 _injected = true;
                 Core.Log.Msg("[Marco] RV repair dialogue injected.");

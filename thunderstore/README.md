@@ -26,9 +26,11 @@
 - **Carried quest items** in dead drops (a crate, a package). Lose one and the owner wants
   $500.
 - **Repair cinematic** when you pay. Plays in both modes.
-- **Marco's build-outs** once the RV stands again: clear out the inside ($2,500), a work
-  floor with 24 more build tiles ($7,500), room for a crew of three ($15,000), a loading
-  dock for your supplier ($25,000), and an engine to drive the RV anywhere ($10,000).
+- **Marco's build-outs** once the RV stands again: an engine to drive the RV anywhere
+  ($10,000), room for a crew of three ($15,000) and a loading dock for your supplier ($25,000).
+- **Marco's Bodyshop**: drive the RV onto the lot in front of his garage. Take the
+  interior out part by part (each paid once, then free to switch) and buy the workshop
+  floor ($7,500) to build on every bit of free floor.
 - **Save intercom** on the RV wall, like in every other property.
 - **Save-bound progress** - quest and repair live in the game save.
 - **Simple mode** (`QuestMode = Simple`): skip the story, just pay Marco the flat price.
@@ -41,14 +43,14 @@
 
 - **Schedule I** `0.4.7f12` (IL2CPP) with **MelonLoader 0.7.3+**.
 - **S1API 3.2.1+** (pulled in as a dependency).
-- **Chassis 1.5.0+** (pulled in as a dependency).
+- **Chassis 1.7.0+**, **Marco's Bodyshop 1.0.0+** and **Sideload 1.35.0+** (pulled in as dependencies).
 
 ## Settings
 
 `Enabled`, `QuestMode` (Questline / Simple), `RepairPrice` (1500, Simple + floor),
 `BasePriceNoReferral` (50000), `BasePriceWithReferral` (10000), `MinSampleDiscount` (100),
-`MaxSampleDiscount` (500), `UpgradesEnabled`, one price per build-out, `CrewSize` (3),
-`BuildGridExtraTiles` (24), `InstantRepair`, `RepairTakesADay`. Editable in
+`MaxSampleDiscount` (500), `UpgradesEnabled`, one price per build-out and interior part,
+`CrewSize` (3), `BuildGridExtraTiles` (96), `InstantRepair`, `RepairTakesADay`. Editable in
 `UserData/MelonPreferences.cfg`.
 
 ## License

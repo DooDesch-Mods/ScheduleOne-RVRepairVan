@@ -113,11 +113,30 @@
     <ChassisProject Condition="'$(ChassisProject)' == ''">$(MSBuildThisFileDirectory)../Chassis/Chassis.csproj</ChassisProject>
   </PropertyGroup>
   <ItemGroup Condition="Exists('$(ChassisProject)')">
-    <ProjectReference Include="$(ChassisProject)" Private="false" />
+    <!-- Built for the reference only: Chassis deploys from its own build, never as a copy inside this mod's. -->
+    <ProjectReference Include="$(ChassisProject)" Private="false"
+                      AdditionalProperties="ModsDirectory=$(MSBuildThisFileDirectory)obj/chassis-ref/Mods;UserLibsDirectory=$(MSBuildThisFileDirectory)obj/chassis-ref/UserLibs;PluginsDirectory=$(MSBuildThisFileDirectory)obj/chassis-ref/Plugins;DeployVerifyDisable=true;S1PairInstallRoot=" />
   </ItemGroup>
   <ItemGroup Condition="!Exists('$(ChassisProject)')">
     <Reference Include="Chassis">
       <HintPath>$(WorkspaceLibPath)/$(Backend)/chassis/Chassis.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Marco's Bodyshop sells the furniture and the workshop floor. A sibling checkout builds it; otherwise the DLL
+       from the shared lib folder. BodyshopProject points at another checkout. -->
+  <PropertyGroup>
+    <BodyshopProject Condition="'$(BodyshopProject)' == ''">$(MSBuildThisFileDirectory)../MarcosBodyshop/MarcosBodyshop.csproj</BodyshopProject>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(BodyshopProject)')">
+    <!-- Built for the reference only: Marco's Bodyshop deploys from its own build, never as a copy inside this mod's. -->
+    <ProjectReference Include="$(BodyshopProject)" Private="false"
+                      AdditionalProperties="ModsDirectory=$(MSBuildThisFileDirectory)obj/bodyshop-ref/Mods;UserLibsDirectory=$(MSBuildThisFileDirectory)obj/bodyshop-ref/UserLibs;PluginsDirectory=$(MSBuildThisFileDirectory)obj/bodyshop-ref/Plugins;DeployVerifyDisable=true;S1PairInstallRoot=" />
+  </ItemGroup>
+  <ItemGroup Condition="!Exists('$(BodyshopProject)')">
+    <Reference Include="MarcosBodyshop">
+      <HintPath>$(WorkspaceLibPath)/$(Backend)/marcosbodyshop/MarcosBodyshop.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

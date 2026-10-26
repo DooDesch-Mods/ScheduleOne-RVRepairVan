@@ -6,7 +6,8 @@ name: Build and Release on Tag
 # Before the first run, set these up (same pattern as the Mimesis mods):
 #   - The private build-libs repo DooDesch/ScheduleOne-Workspace must contain: lib/il2cpp/game (game managed
 #     DLLs), lib/il2cpp/melonloader (MelonLoader, 0Harmony, Il2CppInterop.Runtime), lib/il2cpp/s1api
-#     (S1API.Il2Cpp.MelonLoader.dll).
+#     (S1API.Il2Cpp.MelonLoader.dll), lib/il2cpp/chassis (Chassis.dll), lib/il2cpp/marcosbodyshop
+#     (MarcosBodyshop.dll).
 #   - Repo (or org) secrets: WORKSPACE_TOKEN (SSH deploy key for the workspace repo), THUNDERSTORE_TOKEN,
 #     NEXUSMODS_API_KEY.
 
@@ -385,8 +386,10 @@ jobs:
           path: thunderstore-package
           deps: |
             LavaGang-MelonLoader-0.7.3
-            ifBars-S1API_Forked-3.1.1
-            DooDesch-Chassis-1.4.0
+            ifBars-S1API_Forked-3.2.1
+            DooDesch-Chassis-1.7.0
+            DooDesch-MarcosBodyshop-1.0.0
+            DooDesch-Sideload-1.35.0
           categories: |
             Mods
 

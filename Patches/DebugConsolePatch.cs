@@ -92,10 +92,35 @@ namespace RVRepairVan.Patches
             new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'arrest' arrests you, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
             new[] { "rvtilt", "how far each placed item in the RV leans against it; 'redo' sets every pose again, 'vanilla' toggles the fix, 'lean 8' rolls the parked RV", "rvtilt redo" },
             new[] { "rvcargo", "how the first loose body in the driving RV moves against it, per physics step and per frame; 'vanilla' toggles the fix, 'pin' holds it like a poured bag", "rvcargo probe 4" },
+            new[] { "rvinterior", "the RV's furniture: unlocked, out, box and refit block per part; 'rvinterior bed' takes a part out or puts it back, 'all out|in' every part", "rvinterior bed" },
+            new[] { "rvpaint", "the RV's outside paint: 'rvpaint' dumps every renderer and its materials, 'rvpaint FF0000,metallic' paints (host), 'rvpaint stock' takes it off, a trailing '2' means the trim", "rvpaint 2E6B3A,metallic" },
             new[] { "rvhatch", "the roof hatch; 'open' / 'close' set it, 'use' presses its prompt, 'look' stands you under it looking up", "rvhatch look" },
             new[] { "rvnav", "the RV's shell, floor and ground, and how the NavMesh and a police chase reach into it", "rvnav" },
             new[] { "rvharmony", "every method this mod patches; warns for a patch that is applied more than once", "rvharmony" },
         };
+
+        // Host: switch furniture without the bodyshop. A part switched here counts as paid for.
+        private static void Interior(string[] parts)
+        {
+            if (parts.Length < 2) { Base.RvInterior.DebugDump(); return; }
+            if (RVRepairVan.Net.NetworkBus.Online && !RVRepairVan.Net.NetworkBus.IsServer) { Core.Log.Warning("[Debug] rvinterior: run it on the host."); return; }
+            string what = parts[1].ToLowerInvariant();
+            if (what == "all")
+            {
+                bool outAll = parts.Length > 2 && parts[2].ToLowerInvariant() == "out";
+                Base.RvInterior.HostSet(Base.RvInterior.AllParts, outAll ? Base.RvInterior.AllParts : 0, "rvinterior all " + (outAll ? "out" : "in"));
+                return;
+            }
+            foreach (var p in Base.RvInterior.Parts)
+            {
+                if (p.ToString().ToLowerInvariant() != what) continue;
+                string blocked = Base.RvBuildGrid.RefitBlocked(p);
+                if (blocked != null) { Core.Log.Warning("[Debug] rvinterior: " + p + " cannot go back - " + blocked); return; }
+                Base.RvInterior.HostSet(Base.RvInterior.Unlocked | (int)p, Base.RvInterior.Removed ^ (int)p, "rvinterior " + what);
+                return;
+            }
+            Core.Log.Warning("[Debug] rvinterior <" + string.Join("|", Array.ConvertAll(Base.RvInterior.Parts, x => x.ToString().ToLowerInvariant())) + "|all out|all in>");
+        }
 
         private static bool Dispatch(string[] parts)
         {
@@ -106,7 +131,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach" && cmd != "rvhands" && cmd != "rvseat"
                 && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt" && cmd != "rvcargo"
-                && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony" && cmd != "rvhatch" && cmd != "rvnav")
+                && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony" && cmd != "rvinterior" && cmd != "rvpaint" && cmd != "rvhatch" && cmd != "rvnav")
                 return false;   // not ours - let the game handle it
 
             // Both overloads can fire for a single submission (the string body calls the List body), so run the
@@ -166,7 +191,7 @@ namespace RVRepairVan.Patches
                             Core.Log.Msg("[Debug] rvbuy " + bit + ": cash " + before + " -> " + S1API.Money.Money.GetCashBalance()
                                 + ", mask=" + RVRepairVan.Base.RvUpgrades.Mask);
                         }
-                        else Core.Log.Warning("[Debug] rvbuy <bit>  (1=GutInterior 2=WorkshopFloor 4=CrewQuarters 8=LoadingDock 16=Engine)");
+                        else Core.Log.Warning("[Debug] rvbuy <bit>  (2=WorkshopFloor 4=CrewQuarters 8=LoadingDock 16=Engine)");
                         break;
                     case "rvupg":     // 'rvupg' dumps the build-out state; 'rvupg <mask>' grants/revokes (host)
                         if (parts.Length > 1 && int.TryParse(parts[1], out int mask))
@@ -251,6 +276,12 @@ namespace RVRepairVan.Patches
                             Core.Log.Msg("[Debug] rvwreck: RV wrecked, stage -> Started.");
                         }
                         else Core.Log.Warning("[Debug] rvwreck: destroy call failed (is the RV loaded?).");
+                        break;
+                    case "rvinterior": Interior(parts); break;
+                    case "rvpaint":
+                        if (parts.Length < 2) Base.RvPaint.DebugDump();
+                        else if (RVRepairVan.Net.NetworkBus.Online && !RVRepairVan.Net.NetworkBus.IsServer) Core.Log.Warning("[Debug] rvpaint: run it on the host.");
+                        else Base.RvPaint.HostSet(Base.RvPaint.Normalize(parts[1]), "rvpaint", parts.Length > 2 && parts[2] == "2");
                         break;
                     case "rvparts":  RvDevTools.Parts(string.Join(" ", parts, 1, parts.Length - 1)); break;
                     case "rvtoggle":

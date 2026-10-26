@@ -547,6 +547,10 @@ namespace RVRepairVan.Base
             RvLights.Bind(_model);
 
             RvChassis.Attach(chassis, _model);
+            RvPaint.OnAttach(chassis);
+            // Whoever names the chassis (the bodyshop's menu, the owned-vehicle marker) means the RV.
+            try { chassis.vehicleName = L10n.T("RV"); }
+            catch (System.Exception e) { Core.Log.Warning("[Mobile] naming the chassis failed - menus call the RV 'Veeper': " + e.Message); }
 
             _driving = true;   // force the first SetDriving to run in full
             SetDriving(HasDriver(chassis));
@@ -702,6 +706,7 @@ namespace RVRepairVan.Base
             RvLights.Unbind();
             RvChassis.Detach(chassis);
             ReleaseStaticParts();
+            RvPaint.Show();
             if (_hull != null) { UnityEngine.Object.Destroy(_hull.gameObject); _hull = null; }
             if (_hitBox != null) { UnityEngine.Object.Destroy(_hitBox.gameObject); _hitBox = null; }
             _chassisColliders.Clear();
@@ -1029,6 +1034,21 @@ namespace RVRepairVan.Base
                 SetChassisColliders(false);
                 Core.Log.Msg("[Mobile] parked: chassis body off and frozen.");
             }
+        }
+
+        /// <summary>
+        /// The local player leaves the chassis. The game puts them at the stock car's exit point, which lies inside the
+        /// wider RV, a frame before the tick below freezes the body; the player's capsule then shoved the free chassis
+        /// about 0.7 m sideways on every exit. The body is held still before the game moves the player.
+        /// </summary>
+        internal static void BeforeLocalExit(LandVehicle v)
+        {
+            if (_chassis == null || v == null || v.Pointer != _chassis.Pointer) return;
+            Rigidbody rb = _chassis.Rb;
+            if (rb == null) { Core.Log.Warning("[Mobile] exit: the chassis has no body to hold still."); return; }
+            if (!rb.isKinematic) { rb.velocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+            rb.constraints = RigidbodyConstraints.FreezeAll;
+            Core.Log.Msg("[Mobile] exit: chassis held still before the player is set down.");
         }
 
         private static int _ignoreFailures;
@@ -1485,12 +1505,18 @@ namespace RVRepairVan.Base
 
         private static IEnumerator DrawStaticParts()
         {
-            int failures = 0;
+            int failures = 0, frame = 0;
             while (_static.Count > 0 && _model != null)
             {
                 Matrix4x4 delta = _model.localToWorldMatrix * _modelHomeInverse;
+                // The bodyshop paints the body through Chassis, which swaps the renderers' materials: the redraw
+                // re-reads the painted parts' materials a few times a second, so a paint or its preview shows.
+                bool repaint = ++frame % RepaintFrames == 0;
                 foreach (StaticPart p in _static)
                 {
+                    // A part the interior took out or the garage camera opened up stays hidden in the redraw too.
+                    if (p.Renderer == null || !p.Renderer.enabled || !p.Renderer.gameObject.activeInHierarchy) continue;
+                    if (repaint && RvPaint.IsTarget(p.Renderer)) Reread(p);
                     Matrix4x4 m = delta * RvSteps.Offset(p.Renderer) * RvWheels.Spin(p.Renderer) * RvChassis.Offset(p.Renderer) * p.HomeBase;
                     for (int i = 0; i < p.Materials.Length; i++)
                     {
@@ -1508,6 +1534,18 @@ namespace RVRepairVan.Base
             _draw = null;
         }
 
+        private const int RepaintFrames = 10;
+
+        /// <summary>
+        /// The matrix that takes a renderer's world bounds into the model's frame. A static-batched part keeps its bounds
+        /// at the home spot while it is redrawn elsewhere, so its bounds go through the model's home matrix.
+        /// </summary>
+        internal static Matrix4x4 WorldToModel(Renderer r, Transform model)
+        {
+            if (r != null && _static.Count > 0 && r.isPartOfStaticBatch) return _modelHomeInverse;
+            return model.worldToLocalMatrix;
+        }
+
         /// <summary>A redrawn static part picks up the materials its renderer has now (a lamp switched on or off).</summary>
         internal static void RefreshStatic(Renderer r)
         {
@@ -1515,10 +1553,16 @@ namespace RVRepairVan.Base
             foreach (StaticPart p in _static)
             {
                 if (p.Renderer == null || p.Renderer.Pointer != r.Pointer) continue;
-                var mats = r.sharedMaterials;
-                for (int i = 0; i < p.Materials.Length && i < mats.Length; i++) p.Materials[i] = mats[i];
+                Reread(p);
                 return;
             }
+        }
+
+        private static void Reread(StaticPart p)
+        {
+            if (p.Renderer == null) return;
+            var mats = p.Renderer.sharedMaterials;
+            for (int i = 0; i < p.Materials.Length && i < mats.Length; i++) p.Materials[i] = mats[i];
         }
 
         private static void ReleaseStaticParts()
@@ -1726,6 +1770,16 @@ namespace RVRepairVan.Base
         {
             try { RvMobile.OnVehicleStartClient(__instance); }
             catch (Exception e) { Core.Log.Error("[Mobile] hiding a freshly spawned veeper failed: " + e); }
+        }
+    }
+
+    [HarmonyLib.HarmonyPatch(typeof(LandVehicle), nameof(LandVehicle.OnLocalPlayerExit))]
+    internal static class RvMobileExitPatch
+    {
+        private static void Prefix(LandVehicle __instance)
+        {
+            try { RvMobile.BeforeLocalExit(__instance); }
+            catch (Exception e) { Core.Log.Error("[Mobile] holding the RV still for the exit failed - leaving it may shove it aside: " + e); }
         }
     }
 

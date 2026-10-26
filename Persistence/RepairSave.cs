@@ -56,9 +56,17 @@ namespace RVRepairVan.Persistence
             // In-game minute stamp of the last drive (Engine upgrade), and whether the battery went flat after standing.
             public int LastDriven;
             public bool BatteryDead;
+            // The RV's furniture (RvPart bits): paid for once at the bodyshop, and taken out right now.
+            public int InteriorUnlocked;
+            public int InteriorRemoved;
+            // The outside paint from the bodyshop, a Chassis "paint" value (RRGGBB,finish); empty = stock.
+            public string Paint = "";
+            // The second paint on the trim, a Chassis "paint2" value; empty = stock.
+            public string Paint2 = "";
         }
 
-        internal const int CurrentFormat = 1;
+        // 2: the "gut" upgrade became the two interior masks.
+        internal const int CurrentFormat = 2;
 
         // Names must not be "QuestData" (reserved by the API).
         [SaveableField("rv_state")] private State _state = new State();
@@ -92,6 +100,10 @@ namespace RVRepairVan.Persistence
         internal int RepairStartedAt { get => _state.RepairStartedAt; set => _state.RepairStartedAt = value; }
         internal int LastDriven { get => _state.LastDriven; set => _state.LastDriven = value; }
         internal bool BatteryDead { get => _state.BatteryDead; set => _state.BatteryDead = value; }
+        internal int InteriorUnlocked { get => _state.InteriorUnlocked; set => _state.InteriorUnlocked = value; }
+        internal int InteriorRemoved { get => _state.InteriorRemoved; set => _state.InteriorRemoved = value; }
+        internal string Paint { get => _state.Paint ?? ""; set => _state.Paint = value ?? ""; }
+        internal string Paint2 { get => _state.Paint2 ?? ""; set => _state.Paint2 = value ?? ""; }
 
         internal bool Away => _state.Away;
         internal Vector3 AwayPos => new Vector3(_state.AwayPx, _state.AwayPy, _state.AwayPz);
@@ -143,13 +155,15 @@ namespace RVRepairVan.Persistence
                 Core.Log.Warning("[State] rv_state.json held null - starting from defaults.");
                 _state = new State();
             }
-            if (_state.Format == 0)
+            int format = _state.Format;
+            if (format == 0)
                 MigrateOldFields();
             else if (ClearOldFields() > 0)
                 Core.Log.Warning("[State] old per-field files lie beside rv_state.json - rv_state.json wins, the old files go on the next save.");
+            if (format < 2) Base.RvInterior.MigrateGut(_state);
             _state.Format = CurrentFormat;
             _state.Stage = Quests.Questline.StageForLoad(_state.Repaired, _state.Stage);
-            Core.Log.Msg($"[State] loaded: repaired={_state.Repaired} stage={_state.Stage} samples={_state.Samples} discount={_state.Discount} upgrades={_state.Upgrades} away={_state.Away} lastDriven={_state.LastDriven} batteryDead={_state.BatteryDead}");
+            Core.Log.Msg($"[State] loaded: repaired={_state.Repaired} stage={_state.Stage} samples={_state.Samples} discount={_state.Discount} upgrades={_state.Upgrades} away={_state.Away} lastDriven={_state.LastDriven} batteryDead={_state.BatteryDead} interior={_state.InteriorUnlocked}/{_state.InteriorRemoved} paint='{_state.Paint}' paint2='{_state.Paint2}'");
         }
 
         /// <summary>
@@ -225,7 +239,7 @@ namespace RVRepairVan.Persistence
 
         protected override void OnSaved()
         {
-            Core.Log.Msg($"[State] saved rv_state.json: repaired={_state.Repaired} stage={_state.Stage} samples={_state.Samples} discount={_state.Discount} upgrades={_state.Upgrades}");
+            Core.Log.Msg($"[State] saved rv_state.json: repaired={_state.Repaired} stage={_state.Stage} samples={_state.Samples} discount={_state.Discount} upgrades={_state.Upgrades} interior={_state.InteriorUnlocked}/{_state.InteriorRemoved}");
         }
     }
 }
