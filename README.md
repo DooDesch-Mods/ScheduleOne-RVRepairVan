@@ -36,11 +36,14 @@
   each with its own short cinematic:
   - **Get the engine running** ($10,000): take the wheel and drive the RV anywhere. Parked
     away, it keeps its stations; the crew and deliveries wait until it is back on its spot.
+    The roof hatch opens with E from inside and shuts when you drive off.
   - **Make room for a crew** ($15,000): three employees work inside. Put a locker in. Needs
     the workshop floor.
   - **Build a loading dock** ($25,000): your supplier delivers to the RV.
 - **Marco's Bodyshop.** Drive the RV onto the lot in front of his garage and ask him
   to modify your vehicle:
+  - **Paint**: Marco's metallic, matte and chrome colours, and the trim in a second colour.
+    It stays after the trip home and a reload.
   - **Interior, part by part**: bed, kitchen bench, upper and lower cabinets, both walls,
     bedside table and the decor. Each part is paid once ($150 to $450); after that, taking
     it out or putting it back is free. A part goes back only on an empty floor.
