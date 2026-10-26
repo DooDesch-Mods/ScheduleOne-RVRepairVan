@@ -1029,6 +1029,21 @@ namespace RVRepairVan.Base
             }
         }
 
+        /// <summary>
+        /// The local player leaves the chassis. The game puts them at the stock car's exit point, which lies inside the
+        /// wider RV, a frame before the tick below freezes the body; the player's capsule then shoved the free chassis
+        /// about 0.7 m sideways on every exit. The body is held still before the game moves the player.
+        /// </summary>
+        internal static void BeforeLocalExit(LandVehicle v)
+        {
+            if (_chassis == null || v == null || v.Pointer != _chassis.Pointer) return;
+            Rigidbody rb = _chassis.Rb;
+            if (rb == null) { Core.Log.Warning("[Mobile] exit: the chassis has no body to hold still."); return; }
+            if (!rb.isKinematic) { rb.velocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+            rb.constraints = RigidbodyConstraints.FreezeAll;
+            Core.Log.Msg("[Mobile] exit: chassis held still before the player is set down.");
+        }
+
         private static int _ignoreFailures;
 
         /// <summary>The chassis' native pointer, for the physics patch that runs on every vehicle each physics step.</summary>
@@ -1736,6 +1751,16 @@ namespace RVRepairVan.Base
         {
             try { RvMobile.OnVehicleStartClient(__instance); }
             catch (Exception e) { Core.Log.Error("[Mobile] hiding a freshly spawned veeper failed: " + e); }
+        }
+    }
+
+    [HarmonyLib.HarmonyPatch(typeof(LandVehicle), nameof(LandVehicle.OnLocalPlayerExit))]
+    internal static class RvMobileExitPatch
+    {
+        private static void Prefix(LandVehicle __instance)
+        {
+            try { RvMobile.BeforeLocalExit(__instance); }
+            catch (Exception e) { Core.Log.Error("[Mobile] holding the RV still for the exit failed - leaving it may shove it aside: " + e); }
         }
     }
 
