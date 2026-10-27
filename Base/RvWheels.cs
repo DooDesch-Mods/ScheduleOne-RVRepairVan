@@ -41,6 +41,7 @@ namespace RVRepairVan.Base
         {
             public WheelCollider W;
             public Vector3 Rest;              // wheel centre at rest, chassis space
+            public Vector3 Centre;            // the collider's centre offset when the RV was put on, its own space
             public float Radius, Roll;        // Roll: the fallback spin, degrees
         }
 
@@ -149,7 +150,7 @@ namespace RVRepairVan.Base
                 float stock = w.radius;
                 w.radius = radius / s;
                 if (stock > 0.001f) grown += w.radius / stock;
-                var axle = new Axle { W = w, Rest = centreAtRest, Radius = radius };
+                var axle = new Axle { W = w, Rest = centreAtRest, Centre = w.center, Radius = radius };
                 _axles.Add(axle);
                 foreach (Tyre t in mine) t.Axle = axle;
                 moved++;
@@ -361,7 +362,10 @@ namespace RVRepairVan.Base
                 {
                     a.Roll = Mathf.Repeat(a.Roll + forward / a.Radius * Mathf.Rad2Deg, 360f);
                     Quaternion turn = Quaternion.AngleAxis(a.W.steerAngle, Vector3.up) * Quaternion.AngleAxis(a.Roll, Vector3.right);
-                    motion = Matrix4x4.Translate(a.Rest) * Matrix4x4.Rotate(turn) * Matrix4x4.Translate(-a.Rest);
+                    // A lowered suspension raises the collider's centre and the synced body rides lower: the tyre goes up
+                    // by as much, so it stays on the road.
+                    Vector3 lowered = ct.InverseTransformVector(a.W.transform.TransformVector(a.W.center - a.Centre));
+                    motion = Matrix4x4.Translate(a.Rest + lowered) * Matrix4x4.Rotate(turn) * Matrix4x4.Translate(-a.Rest);
                 }
                 foreach (Tyre t in _tyres)
                 {
