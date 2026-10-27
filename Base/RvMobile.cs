@@ -1474,10 +1474,13 @@ namespace RVRepairVan.Base
         private static int TakeStaticParts(Transform model)
         {
             _static.Clear();
-            int skipped = 0;
-            foreach (Renderer r in model.GetComponentsInChildren<Renderer>(false))
+            int skipped = 0, waiting = 0;
+            // Hidden parts are taken too: a piece of furniture that is out now (the sink of the kitchen bench) is put back
+            // later, and the redraw shows it once its renderer is on and its object active again.
+            foreach (Renderer r in model.GetComponentsInChildren<Renderer>(true))
             {
-                if (!r.enabled || r.forceRenderingOff || !r.isPartOfStaticBatch) continue;
+                if (r.forceRenderingOff || !r.isPartOfStaticBatch) continue;
+                if (!r.enabled || !r.gameObject.activeInHierarchy) waiting++;
                 MeshRenderer mr = r.TryCast<MeshRenderer>();
                 MeshFilter mf = r.GetComponent<MeshFilter>();
                 Mesh mesh = mf != null ? mf.sharedMesh : null;
@@ -1498,6 +1501,7 @@ namespace RVRepairVan.Base
                 _static.Add(part);
             }
             if (skipped > 0) Core.Log.Warning("[Mobile] " + skipped + " static part(s) without a MeshRenderer or mesh stay at home.");
+            if (waiting > 0) Core.LogDebug("[Mobile] " + waiting + " of " + _static.Count + " static part(s) hidden for now; they show in the redraw once fitted.");
             if (_draw != null) MelonCoroutines.Stop(_draw);
             _draw = _static.Count > 0 ? MelonCoroutines.Start(DrawStaticParts()) : null;
             return _static.Count;
