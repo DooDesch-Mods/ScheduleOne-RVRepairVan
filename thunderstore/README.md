@@ -44,7 +44,7 @@
 
 - **Schedule I** `0.4.7f12` (IL2CPP) with **MelonLoader 0.7.3+**.
 - **S1API 3.2.1+** (pulled in as a dependency).
-- **Chassis 1.7.0+**, **Marco's Bodyshop 1.0.0+** and **Sideload 1.35.0+** (pulled in as dependencies).
+- **Chassis 1.7.1+**, **Marco's Bodyshop 1.0.1+** and **Sideload 1.35.0+** (pulled in as dependencies).
 
 ## Settings
 
