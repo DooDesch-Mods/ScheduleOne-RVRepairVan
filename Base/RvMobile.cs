@@ -1507,6 +1507,13 @@ namespace RVRepairVan.Base
             return _static.Count;
         }
 
+        internal static bool Redrawn(Renderer r)
+        {
+            foreach (StaticPart p in _static)
+                if (p.Renderer != null && p.Renderer.Pointer == r.Pointer) return true;
+            return false;
+        }
+
         private static IEnumerator DrawStaticParts()
         {
             int failures = 0, frame = 0;

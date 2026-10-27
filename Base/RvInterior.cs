@@ -486,6 +486,33 @@ namespace RVRepairVan.Base
                 Core.Log.Msg("[Debug]   " + p + " pieces=" + n + " box=" + box + " price=" + Price(p) + " blocked=" + (RvBuildGrid.RefitBlocked(p) ?? "no"));
             }
         }
+
+        // One line per renderer of every part: whether it shows now. A static-batched renderer draws itself at home and
+        // through the redraw while the RV is on the chassis; "unseen" marks a fitted renderer that neither draws.
+        internal static void DebugRenderers()
+        {
+            Resolve();
+            int unseen = 0;
+            foreach (var p in Parts)
+            {
+                if (!_pieces.TryGetValue(p, out var list)) continue;
+                foreach (Piece piece in list)
+                {
+                    if (piece.T == null) continue;
+                    foreach (Renderer r in piece.T.GetComponentsInChildren<Renderer>(true))
+                    {
+                        bool active = r.enabled && r.gameObject.activeInHierarchy;
+                        bool stat = r.isPartOfStaticBatch;
+                        bool drawn = stat && RvMobile.Away ? RvMobile.Redrawn(r) : !r.forceRenderingOff;
+                        bool miss = active && !drawn;
+                        if (miss) unseen++;
+                        Core.Log.Msg("[Debug]   renderer " + p + " " + r.transform.name + " active=" + active + " static=" + stat
+                            + " drawn=" + drawn + (miss ? " UNSEEN" : ""));
+                    }
+                }
+            }
+            Core.Log.Msg("[Debug] interior renderers: " + unseen + " fitted renderer(s) unseen, away=" + RvMobile.Away + ".");
+        }
 #endif
     }
 }
