@@ -42,10 +42,11 @@ namespace RVRepairVan.Base
         /// <summary>FitSeat lays the passenger's hands this far under the thighs on the cushion; lifted, they rest on the knees.</summary>
         private const float LapLift = 0.16f;
         /// <summary>
-        /// The fitted eyes sit at the neck in the RV's high cab chairs, so first person looked into the rider's own
-        /// forearms. Up and forward by this much the view clears the head and keeps the hands on the wheel in sight.
+        /// The fitted eyes sit at the neck in the RV's high cab chairs: the camera stood level with the avatar's head bone,
+        /// the base of the skull, and looked at the dashboard from chest height. The eyes are about 0.1 m over that bone, so
+        /// the view goes up by that much; forward by a little it clears the head and keeps the hands on the wheel in sight.
         /// </summary>
-        private const float EyeLift = 0.045f, EyeForward = 0.05f;
+        private const float EyeLift = 0.145f, EyeForward = 0.05f;
         /// <summary>
         /// The wheel's hub and column hang below the rim and reach towards the dashboard, so the middle of the wheel's
         /// bounds sits this far under the rim's middle and this far behind it. The pivot goes to the rim's middle, so the
