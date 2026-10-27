@@ -1033,6 +1033,7 @@ namespace RVRepairVan.Base
                 }
                 SetChassisColliders(false);
                 Core.Log.Msg("[Mobile] parked: chassis body off and frozen.");
+                RvHatch.OnDriveStop();
             }
         }
 

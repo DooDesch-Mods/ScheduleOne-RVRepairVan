@@ -9,7 +9,7 @@ namespace RVRepairVan.Base
 {
     /// <summary>
     /// The roof hatch over the living area opens and closes from inside: look up at it and press the interact key.
-    /// It shuts when someone starts to drive and stays shut until somebody opens it again. The stock model has the
+    /// It shuts when someone starts to drive and opens again when the driver leaves the seat, if it was open before. The stock model has the
     /// lid propped open, so that pose is "open" and a loaded game starts with it.
     ///
     /// The lid carries its own box collider, so turning its transform about the hinge moves the collider. Its mesh
@@ -104,6 +104,7 @@ namespace RVRepairVan.Base
             _model = null;
             _prompt = null;
             _open = true;
+            _openBeforeDrive = false;
             _t = 1f;
         }
 
@@ -293,12 +294,25 @@ namespace RVRepairVan.Base
             HostSet(open != 0, "a client");
         }
 
+        /// <summary>The hatch was open when the RV started driving; it opens again when the driver leaves the seat.</summary>
+        private static bool _openBeforeDrive;
+
         /// <summary>The RV started driving: the hatch shuts. Host and offline send it; a client shuts its own copy at once.</summary>
         internal static void OnDriveStart()
         {
+            _openBeforeDrive = _open;
             if (!_open) return;
             if (NetworkBus.Online && !NetworkBus.IsServer) { SetLocal(false, "the RV started driving"); return; }
             HostSet(false, "the RV started driving");
+        }
+
+        /// <summary>The driver left the seat: the hatch goes back to how it was before the drive.</summary>
+        internal static void OnDriveStop()
+        {
+            if (!_openBeforeDrive) { Core.LogDebug("[Hatch] parked; the drive did not close the hatch, so it stays as it is."); return; }
+            _openBeforeDrive = false;
+            if (NetworkBus.Online && !NetworkBus.IsServer) { SetLocal(true, "the driver left the seat"); return; }
+            HostSet(true, "the driver left the seat");
         }
 
         private static void HostSet(bool open, string who)
