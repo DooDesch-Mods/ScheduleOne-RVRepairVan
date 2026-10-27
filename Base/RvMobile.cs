@@ -1474,10 +1474,13 @@ namespace RVRepairVan.Base
         private static int TakeStaticParts(Transform model)
         {
             _static.Clear();
-            int skipped = 0;
-            foreach (Renderer r in model.GetComponentsInChildren<Renderer>(false))
+            int skipped = 0, waiting = 0;
+            // Hidden parts are taken too: a piece of furniture that is out now (the sink of the kitchen bench) is put back
+            // later, and the redraw shows it once its renderer is on and its object active again.
+            foreach (Renderer r in model.GetComponentsInChildren<Renderer>(true))
             {
-                if (!r.enabled || r.forceRenderingOff || !r.isPartOfStaticBatch) continue;
+                if (r.forceRenderingOff || !r.isPartOfStaticBatch) continue;
+                if (!r.enabled || !r.gameObject.activeInHierarchy) waiting++;
                 MeshRenderer mr = r.TryCast<MeshRenderer>();
                 MeshFilter mf = r.GetComponent<MeshFilter>();
                 Mesh mesh = mf != null ? mf.sharedMesh : null;
@@ -1498,9 +1501,17 @@ namespace RVRepairVan.Base
                 _static.Add(part);
             }
             if (skipped > 0) Core.Log.Warning("[Mobile] " + skipped + " static part(s) without a MeshRenderer or mesh stay at home.");
+            if (waiting > 0) Core.LogDebug("[Mobile] " + waiting + " of " + _static.Count + " static part(s) hidden for now; they show in the redraw once fitted.");
             if (_draw != null) MelonCoroutines.Stop(_draw);
             _draw = _static.Count > 0 ? MelonCoroutines.Start(DrawStaticParts()) : null;
             return _static.Count;
+        }
+
+        internal static bool Redrawn(Renderer r)
+        {
+            foreach (StaticPart p in _static)
+                if (p.Renderer != null && p.Renderer.Pointer == r.Pointer) return true;
+            return false;
         }
 
         private static IEnumerator DrawStaticParts()
@@ -1544,6 +1555,44 @@ namespace RVRepairVan.Base
         {
             if (r != null && _static.Count > 0 && r.isPartOfStaticBatch) return _modelHomeInverse;
             return model.worldToLocalMatrix;
+        }
+
+        /// <summary>
+        /// A renderer's box in the model's frame. A world box of a turned RV is the box around the turned piece, so a thin
+        /// wall measures metres thick when the RV stands at an angle; the mesh's own box through the piece's matrix keeps
+        /// it thin. A static-batched piece has only the batch mesh, so its home-spot world box is used instead.
+        /// </summary>
+        internal static bool ModelBox(Renderer r, Transform model, out Bounds box)
+        {
+            box = default;
+            if (r == null || model == null) return false;
+            Matrix4x4 m;
+            Vector3 c, e;
+            var mf = r.isPartOfStaticBatch ? null : r.GetComponent<MeshFilter>();
+            Mesh mesh = mf != null ? mf.sharedMesh : null;
+            if (mesh != null)
+            {
+                Bounds lb = mesh.bounds;
+                c = lb.center;
+                e = lb.extents;
+                m = model.worldToLocalMatrix * r.transform.localToWorldMatrix;
+            }
+            else
+            {
+                Bounds w = r.bounds;
+                // A renderer without a mesh reports an empty box at the world origin.
+                if (w.size.sqrMagnitude < 1e-6f) return false;
+                c = w.center;
+                e = w.extents;
+                m = WorldToModel(r, model);
+            }
+            for (int i = 0; i < 8; i++)
+            {
+                var corner = new Vector3(c.x + ((i & 1) == 0 ? -e.x : e.x), c.y + ((i & 2) == 0 ? -e.y : e.y), c.z + ((i & 4) == 0 ? -e.z : e.z));
+                Vector3 p = m.MultiplyPoint3x4(corner);
+                if (i == 0) box = new Bounds(p, Vector3.zero); else box.Encapsulate(p);
+            }
+            return true;
         }
 
         /// <summary>A redrawn static part picks up the materials its renderer has now (a lamp switched on or off).</summary>

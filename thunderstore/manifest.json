@@ -6,8 +6,8 @@
   "dependencies": [
     "LavaGang-MelonLoader-0.7.3",
     "ifBars-S1API_Forked-3.2.1",
-    "DooDesch-Chassis-1.7.0",
-    "DooDesch-MarcosBodyshop-1.0.0",
+    "DooDesch-Chassis-1.7.1",
+    "DooDesch-MarcosBodyshop-1.0.1",
     "DooDesch-Sideload-1.35.0"
   ],
   "contributors": [

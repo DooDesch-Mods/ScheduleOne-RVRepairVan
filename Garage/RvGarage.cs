@@ -31,6 +31,10 @@ namespace RVRepairVan.Garage
         private const float RoofGap = 1.9f;
         // A wall piece: thinner than this across the RV, and at least this long.
         private const float WallThickness = 0.5f, WallLength = 2f;
+        // A piece whose inner side is this close to the furniture's edge sits in the wall; it counts once it reaches this
+        // high above the floor, or when it starts at the floor (the skirt liner). Wheels, mudguards and the step hang
+        // below the floor and stay.
+        private const float InWall = 0.15f, AboveFloor = 0.3f, OnFloor = 0.15f;
 
         private static readonly List<Renderer> _hidden = new List<Renderer>();
 
@@ -187,11 +191,19 @@ namespace RVRepairVan.Garage
 
         private static CameraShot? PartShot(RvPart p)
         {
-            if (!Frame(out Transform model, out _, out Vector3 side)) return null;
+            if (!Frame(out Transform model, out Bounds all, out Vector3 side)) return null;
             if (!RvInterior.Box(p, out Bounds b)) return Overview();
             Vector3 target = b.center;
             Vector3 eye = target + Vector3.up * 4f + side * 2.5f;
-            return new CameraShot(model.TransformPoint(eye), model.TransformPoint(target), 50f);
+            // A partition runs across the RV: seen from the side it is only its edge, so the camera also steps along the
+            // RV, towards the middle of the furniture, to see its face.
+            Vector3 length = side == Vector3.right ? Vector3.forward : Vector3.right;
+            if (Vector3.Dot(b.size, length) < WallThickness)
+            {
+                float towards = Vector3.Dot(all.center - b.center, length) >= 0f ? 1f : -1f;
+                eye = target + Vector3.up * 3f + side * 1.5f + length * (towards * 3f);
+            }
+            return new CameraShot(model.TransformPoint(eye), model.TransformPoint(target), 55f);
         }
 
         /// <summary>
@@ -215,13 +227,23 @@ namespace RVRepairVan.Garage
                     float across = Vector3.Dot(b.size, side);
                     float along = side == Vector3.right ? b.size.z : b.size.x;
                     bool isRoof = b.min.y - floor > RoofGap;
-                    bool isWall = !isRoof && across < WallThickness && along > WallLength && Vector3.Dot(b.center, side) > sideEdge;
+                    // The wall: long thin pieces on the camera's side, and everything set into it (windows, the door, the
+                    // liner panels) that stands above the floor. The cook gear hangs inside and stays.
+                    bool isWall = !isRoof && (b.max.y - floor > AboveFloor || b.min.y - floor > -OnFloor) && !RvEasterEggs.IsGear(r.transform)
+                        && ((across < WallThickness && along > WallLength && Vector3.Dot(b.center, side) > sideEdge)
+                            || Vector3.Dot(b.min, side) > sideEdge - InWall);
                     // The body is one mesh from the floor to the roof: it cannot be cut open, so it turns see-through.
                     // It runs most of the RV's length; furniture and partitions (parts the player buys) do not.
                     bool isShell = !isRoof && !isWall && b.min.y - floor < RoofGap && b.max.y - floor > RoofGap
                         && along > ShellShare * length && across > WallThickness;
                     if (isShell) { if (Ghost(r)) shell++; continue; }
-                    if (!isRoof && !isWall) continue;
+                    if (!isRoof && !isWall)
+                    {
+                        if (Vector3.Dot(b.center, side) > 0f)
+                            Core.LogDebug("[Garage] kept camera-side piece " + r.gameObject.name + " box " + b.min.ToString("F2") + " .. " + b.max.ToString("F2")
+                                + " across " + across.ToString("F2") + " along " + along.ToString("F2") + " (edge " + sideEdge.ToString("F2") + ")");
+                        continue;
+                    }
                     r.enabled = false;
                     _hidden.Add(r);
                     if (isRoof) roof++; else wall++;
@@ -345,32 +367,16 @@ namespace RVRepairVan.Garage
                 m.SetColor("_BaseColor", c);
             }
             else m.SetColor("_BaseColor", new Color(1f, 1f, 1f, ShellAlpha));
-            m.SetFloat("_Surface", 1f);
-            m.SetFloat("_Blend", 0f);
-            m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
-            m.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
-            m.SetFloat("_ZWrite", 0f);
-            m.SetOverrideTag("RenderType", "Transparent");
-            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            m.renderQueue = (int)RenderQueue.Transparent;
+            RvInterior.MakeTransparent(m);
             return m;
         }
 
         private static bool LocalBox(Transform model, Renderer r, out Bounds box)
         {
-            box = default;
-            Bounds w = r.bounds;
+            if (RvMobile.ModelBox(r, model, out box)) return true;
             // A renderer without a mesh reports an empty box at the world origin.
-            if (w.size.sqrMagnitude < 1e-6f) { Core.LogDebug("[Garage] " + r.gameObject.name + " has an empty box - neither roof nor wall."); return false; }
-            Vector3 c = w.center, e = w.extents;
-            Matrix4x4 toModel = RvMobile.WorldToModel(r, model);
-            for (int i = 0; i < 8; i++)
-            {
-                var corner = new Vector3(c.x + ((i & 1) == 0 ? -e.x : e.x), c.y + ((i & 2) == 0 ? -e.y : e.y), c.z + ((i & 4) == 0 ? -e.z : e.z));
-                Vector3 p = toModel.MultiplyPoint3x4(corner);
-                if (i == 0) box = new Bounds(p, Vector3.zero); else box.Encapsulate(p);
-            }
-            return true;
+            Core.LogDebug("[Garage] " + r.gameObject.name + " has an empty box - neither roof nor wall.");
+            return false;
         }
     }
 }

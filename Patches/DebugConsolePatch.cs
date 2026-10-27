@@ -92,7 +92,7 @@ namespace RVRepairVan.Patches
             new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'arrest' arrests you, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
             new[] { "rvtilt", "how far each placed item in the RV leans against it; 'redo' sets every pose again, 'vanilla' toggles the fix, 'lean 8' rolls the parked RV", "rvtilt redo" },
             new[] { "rvcargo", "how the first loose body in the driving RV moves against it, per physics step and per frame; 'vanilla' toggles the fix, 'pin' holds it like a poured bag", "rvcargo probe 4" },
-            new[] { "rvinterior", "the RV's furniture: unlocked, out, box and refit block per part; 'rvinterior bed' takes a part out or puts it back, 'all out|in' every part", "rvinterior bed" },
+            new[] { "rvinterior", "the RV's furniture: unlocked, out, box and refit block per part; 'rvinterior bed' takes a part out or puts it back, 'all out|in' every part, 'renderers' lists whether each piece draws", "rvinterior bed" },
             new[] { "rvpaint", "the RV's outside paint: 'rvpaint' dumps every renderer and its materials, 'rvpaint FF0000,metallic' paints (host), 'rvpaint stock' takes it off, a trailing '2' means the trim", "rvpaint 2E6B3A,metallic" },
             new[] { "rvhatch", "the roof hatch; 'open' / 'close' set it, 'use' presses its prompt, 'look' stands you under it looking up", "rvhatch look" },
             new[] { "rvnav", "the RV's shell, floor and ground, and how the NavMesh and a police chase reach into it", "rvnav" },
@@ -105,6 +105,7 @@ namespace RVRepairVan.Patches
             if (parts.Length < 2) { Base.RvInterior.DebugDump(); return; }
             if (RVRepairVan.Net.NetworkBus.Online && !RVRepairVan.Net.NetworkBus.IsServer) { Core.Log.Warning("[Debug] rvinterior: run it on the host."); return; }
             string what = parts[1].ToLowerInvariant();
+            if (what == "renderers") { Base.RvInterior.DebugRenderers(); return; }
             if (what == "all")
             {
                 bool outAll = parts.Length > 2 && parts[2].ToLowerInvariant() == "out";
@@ -280,6 +281,8 @@ namespace RVRepairVan.Patches
                     case "rvinterior": Interior(parts); break;
                     case "rvpaint":
                         if (parts.Length < 2) Base.RvPaint.DebugDump();
+                        else if (parts[1] == "dump") Base.RvStripes.DebugDumpTexture(System.IO.Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "rv_main.ppm"));
+                        else if (parts[1] == "stripes" && parts.Length > 2 && int.TryParse(parts[2], out int threshold)) { Base.RvStripes.DebugRebuild(threshold); Base.RvPaint.Show(); }
                         else if (RVRepairVan.Net.NetworkBus.Online && !RVRepairVan.Net.NetworkBus.IsServer) Core.Log.Warning("[Debug] rvpaint: run it on the host.");
                         else Base.RvPaint.HostSet(Base.RvPaint.Normalize(parts[1]), "rvpaint", parts.Length > 2 && parts[2] == "2");
                         break;
