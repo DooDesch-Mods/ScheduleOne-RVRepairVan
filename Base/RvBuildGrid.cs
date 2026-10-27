@@ -40,6 +40,7 @@ namespace RVRepairVan.Base
         {
             _applied = false;
             _clonedTiles = 0;
+            _keptBare = 0;
             if (_sweep != null) { MelonCoroutines.Stop(_sweep); _sweep = null; }
             ReleaseShadows();
         }
@@ -162,6 +163,8 @@ namespace RVRepairVan.Base
                 if (root == null) Core.Log.Warning("[Grid] no RV root - the floor is measured in world space.");
                 Bounds? cabin = CabinFloorBounds(frame);
                 Bounds? rear = root != null ? RearFloorLocal(frame) : null;
+                Transform model = RVManager.Model;
+                Bounds? floor = model != null ? FloorArea(model) : null;
                 int added = 0, skippedOutside = 0, skippedFurniture = 0;
                 for (int cx = template.x - reach; cx <= template.x + reach && added < extra; cx++)
                     for (int cz = template.y - reach; cz <= template.y + reach && added < extra; cz++)
@@ -179,6 +182,7 @@ namespace RVRepairVan.Base
                             : SafeInBounds(prop, world);
                         if (!inside && rear.HasValue)
                             inside = rear.Value.Contains(new Vector3(local.x, rear.Value.center.y, local.z));
+                        if (!inside && floor.HasValue) inside = OnFloor(floor.Value, model, world, local, size);
                         if (!inside) { skippedOutside++; continue; }
                         if (UnderFittedPart(world, size) != RvPart.None) { skippedFurniture++; continue; }
 
@@ -217,13 +221,61 @@ namespace RVRepairVan.Base
             return RvPart.None;
         }
 
+        /// <summary>
+        /// Does a tile at <paramref name="world"/> reach into one of the part's pieces that stands on the floor? Piece by
+        /// piece: the eight lower cabinets and the decor props spread over the whole cabin, and their joint box took the
+        /// floor between them as well.
+        /// </summary>
         private static bool Covers(Transform model, RvPart p, Vector3 world, float size)
         {
-            if (!RvInterior.Box(p, out Bounds box)) return false;
-            if (box.min.y - RvInterior.FloorY(model) > FloorContact) return false;
+            var boxes = RvInterior.PieceBoxes(p);
+            if (boxes.Count == 0) return false;
+            float floorY = RvInterior.FloorY(model);
             Vector3 l = model.InverseTransformPoint(world);
             float half = size * 0.5f - Overlap;
-            return l.x + half > box.min.x && l.x - half < box.max.x && l.z + half > box.min.z && l.z - half < box.max.z;
+            foreach (Bounds box in boxes)
+            {
+                if (box.min.y - floorY > FloorContact) continue;
+                if (l.x + half > box.min.x && l.x - half < box.max.x && l.z + half > box.min.z && l.z - half < box.max.z) return true;
+            }
+            return false;
+        }
+
+        // ---- the cabin floor -------------------------------------------------------------------------------------
+
+        // The model frame: x along the RV with the cab at -x, z across. Used when a wall or the bed cannot be measured.
+        private const float FallbackCabWallX = -3.43f, FallbackRearX = 5.93f, FallbackSideZ = 1.57f;
+        // How far a tile may reach past a wall's inner face; the walls are measured from their meshes, not their colliders.
+        private const float WallSlack = 0.05f;
+
+        /// <summary>
+        /// The cabin floor in the model frame: from the wall behind the driver to the rear wall, between the side walls.
+        /// The partition stays the front edge when it is taken out, so the driver's cab never gets tiles. The bed reaches
+        /// the rear wall and the partition spans the cabin, so their boxes (measured while they stood) give the walls.
+        /// </summary>
+        private static Bounds FloorArea(Transform model)
+        {
+            float front = FallbackCabWallX, back = FallbackRearX, left = -FallbackSideZ, right = FallbackSideZ;
+            if (RvInterior.Box(RvPart.CabWall, out Bounds cab)) { front = cab.max.x; left = cab.min.z; right = cab.max.z; }
+            else Core.Log.Warning("[Grid] the wall behind the driver is not measured - the floor starts at x " + front + ".");
+            if (RvInterior.Box(RvPart.Bed, out Bounds bed)) back = bed.max.x;
+            else Core.Log.Warning("[Grid] the bed is not measured - the floor ends at x " + back + ".");
+            float y = RvInterior.FloorY(model);
+            var area = new Bounds();
+            area.SetMinMax(new Vector3(front, y - 10f, left), new Vector3(back, y + 10f, right));
+            return area;
+        }
+
+        /// <summary>
+        /// Does a whole tile at <paramref name="world"/> lie on the cabin floor? <paramref name="root"/> is the same point
+        /// in the RV root's home frame, where the rear and side walls were measured: the bed reaches into the rear wall.
+        /// </summary>
+        private static bool OnFloor(Bounds area, Transform model, Vector3 world, Vector3 root, float size)
+        {
+            Vector3 l = model.InverseTransformPoint(world);
+            float half = size * 0.5f - WallSlack;
+            if (l.x - half < area.min.x || l.x + half > area.max.x || l.z - half < area.min.z || l.z + half > area.max.z) return false;
+            return root.z + half <= RearWallZ && Mathf.Abs(root.x) + half <= SideWallX;
         }
 
         /// <summary>
@@ -362,7 +414,17 @@ namespace RVRepairVan.Base
                 }
 
                 bool active = g.gameObject.activeSelf;
-                if (items > 0)
+                int bare = items > 0 ? 0 : Uncovered(g, floor, reach);
+                if (bare > 0)
+                {
+                    // Switching it off would take floor away: the workshop floor has no tile there.
+                    if (!active) g.gameObject.SetActive(true);
+                    SetTileColliders(g, true);
+                    if (!active || _keptBare != bare)
+                        Core.Log.Warning("[Grid] '" + g.name + "' stays on: " + bare + " of its tile(s) have no workshop-floor tile beside them.");
+                    _keptBare = bare;
+                }
+                else if (items > 0)
                 {
                     if (!active) g.gameObject.SetActive(true);
                     int switched = SetTileColliders(g, false);
@@ -373,6 +435,7 @@ namespace RVRepairVan.Base
                 else
                 {
                     SetTileColliders(g, true);
+                    _keptBare = 0;
                     if (active)
                     {
                         g.gameObject.SetActive(false);
@@ -403,6 +466,30 @@ namespace RVRepairVan.Base
             if (added > 0 || removed > 0)
                 Core.Log.Msg("[Grid] floor tiles under items on the second grid: " + wanted.Count + " held ("
                     + added + " taken, " + removed + " freed).");
+        }
+
+        private static int _keptBare;
+
+        /// <summary>How many tiles of <paramref name="g"/> have no tile of the floor grid over them.</summary>
+        private static int Uncovered(Grid g, Grid floor, float reach)
+        {
+            int bare = 0;
+            for (int k = 0; k < g.Tiles.Count; k++)
+            {
+                Tile t = g.Tiles[k];
+                if (t == null) continue;
+                Vector3 local = floor.transform.InverseTransformPoint(t.transform.position);
+                bool covered = false;
+                for (int f = 0; f < floor.Tiles.Count && !covered; f++)
+                {
+                    Tile ft = floor.Tiles[f];
+                    if (ft == null) continue;
+                    Vector3 d = floor.transform.InverseTransformPoint(ft.transform.position) - local;
+                    covered = Mathf.Abs(d.x) < reach && Mathf.Abs(d.z) < reach;
+                }
+                if (!covered) bare++;
+            }
+            return bare;
         }
 
         /// <summary>Hand every held floor tile back. Tiles of a scene that is already gone are skipped.</summary>
@@ -644,7 +731,12 @@ namespace RVRepairVan.Base
             float size = Grid.TileSize;
             Bounds? cabin = CabinFloorBounds(cabinFrame);
             Bounds? rear = RearFloorLocal(rearFrame);
-            int inside = 0, behind = 0;
+            Transform model = RVManager.Model;
+            Bounds? floor = model != null ? FloorArea(model) : null;
+            if (floor.HasValue)
+                Core.Log.Msg("[Grid] plan " + how + ": cabin floor x " + floor.Value.min.x.ToString("F2") + ".." + floor.Value.max.x.ToString("F2")
+                    + " z " + floor.Value.min.z.ToString("F2") + ".." + floor.Value.max.z.ToString("F2") + " (model frame).");
+            int inside = 0, behind = 0, furniture = 0;
             const int reach = 24;
             for (int cx = template.x - reach; cx <= template.x + reach; cx++)
                 for (int cz = template.y - reach; cz <= template.y + reach; cz++)
@@ -653,11 +745,13 @@ namespace RVRepairVan.Base
                     Vector3 c = cabinFrame.MultiplyPoint3x4(world), r = rearFrame.MultiplyPoint3x4(world);
                     bool ok = cabin.HasValue ? cabin.Value.Contains(new Vector3(c.x, cabin.Value.center.y, c.z)) : SafeInBounds(prop, world);
                     if (!ok && rear.HasValue) ok = rear.Value.Contains(new Vector3(r.x, rear.Value.center.y, r.z));
+                    if (!ok && floor.HasValue) ok = OnFloor(floor.Value, model, world, r, size);
                     if (!ok) continue;
+                    if (UnderFittedPart(world, size) != RvPart.None) { furniture++; continue; }
                     inside++;
                     if (BehindWall(judge.MultiplyPoint3x4(world))) behind++;
                 }
-            Core.Log.Msg("[Grid] plan " + how + ": " + inside + " tile spot(s) on the floor, " + behind + " of them behind a wall.");
+            Core.Log.Msg("[Grid] plan " + how + ": " + inside + " free tile spot(s) on the floor, " + behind + " of them behind a wall; " + furniture + " under fitted furniture.");
         }
 #endif
 
