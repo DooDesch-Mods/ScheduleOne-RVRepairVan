@@ -45,12 +45,13 @@ namespace RVRepairVan.Base
         private static float _armDrop = 84f;
         private static float _armShare = 0.08f;
 
-        // The empty suit: squeezed front to back (1 = as worn), its height in metres, how far its collar hangs
-        // below the peg on a wire hook, how much higher than the old spot it hangs so the hem swings clear of the
-        // floor, and its lean in degrees, top out on the hook, hem back against the wall.
+        // The empty suit: squeezed front to back (1 = as worn), its height in metres, how far its collar top sits
+        // below the peg (negative: above it, so the peg goes into the collar and the suit hangs on it), how much
+        // higher than the old spot it hangs so the hem swings clear of the floor, and its lean in degrees, top out on
+        // the hook, hem back against the wall.
         private static float _suitFlat = 0.3f;
         private static float _suitSize = 1.35f;
-        private static float _suitDrop = 0.06f;
+        private static float _suitDrop = -0.015f;
         private static float _suitLift = 0.15f;
         private static float _suitTilt = 3f;
 
@@ -101,6 +102,17 @@ namespace RVRepairVan.Base
                 EnsurePizza(main);
             }
             catch (Exception e) { Core.Log.Error("[Eggs] placing the props failed: " + e); }
+        }
+
+        /// <summary>Is this piece part of the cook gear (suit, respirator, their hooks)? It hangs inside, on the wall.</summary>
+        internal static bool IsGear(Transform t)
+        {
+            for (; t != null; t = t.parent)
+            {
+                if (t.name == Gear.Name) return true;
+                if (t.name == RootName) return false;
+            }
+            return false;
         }
 
         private static void SyncGear(Transform root)
@@ -218,7 +230,7 @@ namespace RVRepairVan.Base
             int hung = 0;
             if (Hang(g, "HazmatSuit", "avatar/accessories/waist/hazmatsuit/HazmatSuit", new Vector3(0f, _suitLift - _suitDrop, 0.08f), _suitSize, true)) hung++;
             else Core.Log.Warning("[Eggs] no suit, so no wire hook either.");
-            Box(g, "WireHook", new Vector3(0f, _suitLift - 0.5f * _suitDrop, 0.05f), new Vector3(0.006f, _suitDrop + 0.01f, 0.006f), steel);
+            if (_suitDrop > 0.005f) Box(g, "WireHook", new Vector3(0f, _suitLift - 0.5f * _suitDrop, 0.05f), new Vector3(0.006f, _suitDrop + 0.01f, 0.006f), steel);
             if (Hang(g, "Respirator", "avatar/accessories/head/respirator/Respirator", new Vector3(0.7f, -0.26f, 0.07f), 0.24f, false)) hung++;
             Core.Log.Msg("[Eggs] cook gear: " + hung + " of 2 accessories hung.");
             return hung > 0;

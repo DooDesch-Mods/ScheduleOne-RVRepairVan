@@ -14,7 +14,7 @@ namespace RVRepairVan.Base
     /// names as that chassis' paint targets: the RV's own body. The chassis is gone at home, so the value lives in the
     /// RV's save and is painted on the RV's renderers directly whenever the RV is home or loads.
     ///
-    /// Paint values are Chassis "paint" values (RRGGBB,finish). The trim around the shell takes the second paint
+    /// Paint values are Chassis "paint" values (RRGGBB,finish). The stripes and accents take the second paint
     /// ("paint2"). The host stores and replicates both with <see cref="RvOp.PaintSync"/>.
     /// </summary>
     internal static class RvPaint
@@ -28,11 +28,11 @@ namespace RVRepairVan.Base
             "rv_StorageHatch mat",   // the luggage hatches along the sides
         };
 
-        // The trim band around the shell (rv/Main/Trim) takes the second paint, flat: its texture is two shades of dark
-        // grey, and a paint on top of it would show only a third as bright.
+        // The second paint goes on the green stripes and accents of the shell: their own layer (RvStripes), whose
+        // texture is the stripe mask, so it is painted with the texture kept.
         private static readonly HashSet<string> TrimMaterials = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "rv_Trim mat",
+            RvStripes.MaterialName,
         };
 
         // Painted slots all carry Chassis' copy named "Chassis_Paint", so the role of a slot is remembered from its
@@ -57,13 +57,14 @@ namespace RVRepairVan.Base
             Core.Log.Msg("[Paint] listening for paint on the RV's chassis.");
         }
 
-        /// <summary>Every material slot of the intact RV that shows a paint; the trim's are <see cref="PaintTarget.Secondary"/>.</summary>
+        /// <summary>Every material slot of the intact RV that shows a paint; the stripes' are <see cref="PaintTarget.Secondary"/>.</summary>
         internal static List<PaintTarget> Targets()
         {
             var list = new List<PaintTarget>();
             _targetPtrs.Clear();
             Transform model = RVManager.Model;
             if (model == null) return list;
+            RvStripes.Ensure(model);
             foreach (Renderer r in model.GetComponentsInChildren<Renderer>(true))
             {
                 if (r == null) continue;
@@ -71,7 +72,7 @@ namespace RVRepairVan.Base
                 for (int i = 0; i < mats.Length; i++)
                 {
                     if (!Role(r, i, mats[i], out bool trim)) continue;
-                    list.Add(new PaintTarget(r, i, trim) { Flat = trim });
+                    list.Add(new PaintTarget(r, i, trim));
                     _targetPtrs.Add(r.Pointer);
                 }
             }

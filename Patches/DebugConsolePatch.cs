@@ -280,6 +280,8 @@ namespace RVRepairVan.Patches
                     case "rvinterior": Interior(parts); break;
                     case "rvpaint":
                         if (parts.Length < 2) Base.RvPaint.DebugDump();
+                        else if (parts[1] == "dump") Base.RvStripes.DebugDumpTexture(System.IO.Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "rv_main.ppm"));
+                        else if (parts[1] == "stripes" && parts.Length > 2 && int.TryParse(parts[2], out int threshold)) { Base.RvStripes.DebugRebuild(threshold); Base.RvPaint.Show(); }
                         else if (RVRepairVan.Net.NetworkBus.Online && !RVRepairVan.Net.NetworkBus.IsServer) Core.Log.Warning("[Debug] rvpaint: run it on the host.");
                         else Base.RvPaint.HostSet(Base.RvPaint.Normalize(parts[1]), "rvpaint", parts.Length > 2 && parts[2] == "2");
                         break;

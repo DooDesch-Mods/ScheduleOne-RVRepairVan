@@ -276,6 +276,7 @@ namespace RVRepairVan.Base
             RvDeliveryDock.Reset();
             RvMobile.Reset();
             RvEasterEggs.Reset();
+            RvStripes.Reset();
         }
 
 #if DEBUG

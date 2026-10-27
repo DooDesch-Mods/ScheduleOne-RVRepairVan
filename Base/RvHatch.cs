@@ -43,6 +43,11 @@ namespace RVRepairVan.Base
         // In the lid parent's space: the stock (open) pose, the shut pose, the hinge point and the turn from shut to open.
         private static Vector3 _openPos, _closedPos, _pivot;
         private static Quaternion _openRot = Quaternion.identity, _closedRot = Quaternion.identity, _swing = Quaternion.identity;
+        // The stock hinge line lies at the roof skin, so a lid turned shut about it sinks into the frame. The shut lid is
+        // moved up by the height of the frame rim and away from the hinge until it overhangs the opening evenly, both
+        // measured on the stock model. The move fades out as the lid opens, so the open pose stays the stock one.
+        private static float _seatUp = 0.15f, _seatOut = 0.055f;
+        private static Vector3 _seat;   // that move in the lid parent's space
         private static Bounds _shutInMain;   // the shut lid in rv/Main, for the prompt under it
         private static InteractableObject _prompt;
         private static object _loop;
@@ -157,9 +162,12 @@ namespace RVRepairVan.Base
             _closedRot = shutParent * _openRot;
             _closedPos = _pivot + shutParent * (_openPos - _pivot);
             _swing = Quaternion.Inverse(shutParent);
-
             Vector3 alongShut = shutMain * along;
-            Vector3 centreShut = pivotMain + shutMain * (centre - pivotMain);
+            Vector3 seatMain = new Vector3(0f, 0f, _seatUp) + new Vector3(alongShut.x, alongShut.y, 0f).normalized * _seatOut;
+            _seat = mainToParent * seatMain;
+            _closedPos += _seat;
+
+            Vector3 centreShut = pivotMain + shutMain * (centre - pivotMain) + seatMain;
             _shutInMain = new Bounds(centreShut, new Vector3(
                 Mathf.Abs(alongShut.x) * length + Mathf.Abs(hinge.x) * width,
                 Mathf.Abs(alongShut.y) * length + Mathf.Abs(hinge.y) * width, thickness));
@@ -356,7 +364,7 @@ namespace RVRepairVan.Base
             float e = _t * _t * (3f - 2f * _t);
             Quaternion q = Quaternion.Slerp(Quaternion.identity, _swing, e);
             _hatch.localRotation = q * _closedRot;
-            _hatch.localPosition = _pivot + q * (_closedPos - _pivot);
+            _hatch.localPosition = _pivot + q * (_closedPos - _seat - _pivot) + _seat * (1f - e);
         }
 
         private static void Draw()
@@ -378,7 +386,7 @@ namespace RVRepairVan.Base
 #if DEBUG
         // --- console --------------------------------------------------------------------------------------
 
-        /// <summary>rvhatch [open|close|look|use]: report, set, view or press the hatch.</summary>
+        /// <summary>rvhatch [open|close|look|use|seat up out]: report, set, view, press or re-seat the hatch.</summary>
         internal static void DebugCmd(string[] args)
         {
             string a = args.Length > 0 ? args[0].ToLowerInvariant() : "";
@@ -390,6 +398,20 @@ namespace RVRepairVan.Base
             }
             else if (a == "use") { if (_prompt == null) Core.Log.Warning("[Hatch] use: no prompt."); else { _prompt.onInteractStart.Invoke(); Core.Log.Msg("[Hatch] use: prompt pressed."); } }
             else if (a == "look") { Look(); return; }
+            else if (a == "seat" && args.Length > 2
+                && float.TryParse(args[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float up)
+                && float.TryParse(args[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float outward))
+            {
+                // rvhatch seat <up> <out>: measure the shut lid again with another seat on the frame.
+                bool wasOpen = _open;
+                _seatUp = up;
+                _seatOut = outward;
+                Release();
+                _model = null;
+                Ensure(true);
+                if (!wasOpen) HostSet(false, "the console");
+                Core.Log.Msg("[Hatch] shut lid seated " + up.ToString("0.000") + " m up, " + outward.ToString("0.000") + " m out from the hinge.");
+            }
             Report();
         }
 

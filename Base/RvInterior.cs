@@ -5,6 +5,8 @@ using RVRepairVan.Config;
 using RVRepairVan.Managers;
 using RVRepairVan.Net;
 using RVRepairVan.Persistence;
+using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace RVRepairVan.Base
 {
@@ -87,9 +89,24 @@ namespace RVRepairVan.Base
         private static readonly Dictionary<RvPart, Bounds> _boxes = new Dictionary<RvPart, Bounds>();
         private static IntPtr _resolvedFor;
         private static int _shownRemoved = -1;
-        // Parts the bodyshop shows the other way round while the player looks at them. Only the look; the masks and
-        // the grid stay as they are.
-        private static int _previewFlip;
+        // The part the bodyshop shows while the player looks at it: in place either way, tinted red when buying takes
+        // it out and green when buying puts it back, like the game's build ghost. Only the look; the masks and the grid
+        // stay as they are.
+        private static RvPart _preview;
+
+        private sealed class Tinted
+        {
+            internal Renderer R;
+            internal Material[] Original, Mine;
+            internal ShadowCastingMode Shadows;
+        }
+
+        private static readonly List<Tinted> _tinted = new List<Tinted>();
+        private static RvPart _tintedPart;
+        private static bool _tintedOut;
+        private static Shader _lit;
+        private static readonly Color GoesOut = new Color(1f, 0.22f, 0.18f, 0.55f);
+        private static readonly Color GoesIn = new Color(0.25f, 1f, 0.35f, 0.55f);
 
         /// <summary>
         /// Per-scene reset. The pieces stay cached while their model lives: a part that is out is inactive, and
@@ -98,7 +115,9 @@ namespace RVRepairVan.Base
         internal static void Reset()
         {
             _shownRemoved = -1;
-            _previewFlip = 0;
+            _preview = RvPart.None;
+            _tinted.Clear();
+            _tintedPart = RvPart.None;
             if (!Alive()) { _pieces.Clear(); _boxes.Clear(); _resolvedFor = IntPtr.Zero; }
         }
 
@@ -178,10 +197,10 @@ namespace RVRepairVan.Base
             try
             {
                 if (!Resolve()) return;
-                int removed = Removed ^ _previewFlip;
+                int removed = Removed;
                 foreach (var kv in _pieces)
                 {
-                    bool show = (removed & (int)kv.Key) == 0;
+                    bool show = (removed & (int)kv.Key) == 0 || kv.Key == _preview;
                     foreach (var piece in kv.Value)
                     {
                         if (piece.T == null) continue;
@@ -194,23 +213,106 @@ namespace RVRepairVan.Base
                     _shownRemoved = removed;
                     Core.Log.Msg("[Interior] in place: " + (RvPart)(AllParts & ~removed) + "; out: " + (RvPart)removed + ".");
                 }
+                Tint();
                 RvEasterEggs.Ensure();
             }
             catch (Exception e) { Core.Log.Error("[Interior] showing the parts failed: " + e); }
         }
 
-        /// <summary>Show a part the other way round (in when it is out, out when it is in) until <see cref="EndPreview"/>.</summary>
+        /// <summary>Show a part in place and tinted (red: buying takes it out, green: buying puts it back) until <see cref="EndPreview"/>.</summary>
         internal static void Preview(RvPart p)
         {
-            _previewFlip = (int)p;
+            _preview = p;
             Sync();
         }
 
         internal static void EndPreview()
         {
-            if (_previewFlip == 0) return;
-            _previewFlip = 0;
+            if (_preview == RvPart.None) return;
+            _preview = RvPart.None;
             Sync();
+        }
+
+        /// <summary>
+        /// Give the previewed part its tint, or the renderers of the last one their own materials back. Runs from every
+        /// <see cref="Sync"/>, so a purchase that moves the part in or out turns the tint with it.
+        /// </summary>
+        private static void Tint()
+        {
+            bool goesOut = (Removed & (int)_preview) == 0;
+            if (_preview == _tintedPart && (_preview == RvPart.None || goesOut == _tintedOut)) return;
+            Untint();
+            if (_preview == RvPart.None) return;
+            if (!_pieces.TryGetValue(_preview, out var pieces)) { Core.Log.Warning("[Interior] " + _preview + " has no pieces on the model - nothing to preview."); return; }
+            if (_lit == null) _lit = Shader.Find("Universal Render Pipeline/Lit");
+            if (_lit == null) { Core.Log.Warning("[Interior] no URP Lit shader - the preview of " + _preview + " stays untinted."); return; }
+            Color tint = goesOut ? GoesOut : GoesIn;
+            foreach (var piece in pieces)
+            {
+                if (piece.T == null) continue;
+                foreach (var r in piece.T.GetComponentsInChildren<Renderer>(false))
+                {
+                    if (r == null || !r.enabled) continue;
+                    var t = new Tinted { R = r, Original = r.sharedMaterials, Shadows = r.shadowCastingMode };
+                    t.Mine = new Material[t.Original.Length];
+                    for (int i = 0; i < t.Mine.Length; i++) t.Mine[i] = Ghost(t.Original[i], tint);
+                    r.sharedMaterials = t.Mine;
+                    r.shadowCastingMode = ShadowCastingMode.Off;
+                    RvMobile.RefreshStatic(r);
+                    _tinted.Add(t);
+                }
+            }
+            _tintedPart = _preview;
+            _tintedOut = goesOut;
+            Core.LogDebug("[Interior] preview of " + _preview + ": " + _tinted.Count + " renderer(s) tinted " + (goesOut ? "red (goes out)" : "green (goes in)") + ".");
+        }
+
+        private static void Untint()
+        {
+            foreach (var t in _tinted)
+            {
+                try
+                {
+                    if (t.R == null) continue;
+                    t.R.sharedMaterials = t.Original;
+                    t.R.shadowCastingMode = t.Shadows;
+                    RvMobile.RefreshStatic(t.R);
+                }
+                catch (Exception e) { Core.Log.Warning("[Interior] giving a previewed piece its own materials back failed: " + e.Message); }
+                finally { foreach (var m in t.Mine) if (m != null) UnityEngine.Object.Destroy(m); }
+            }
+            _tinted.Clear();
+            _tintedPart = RvPart.None;
+        }
+
+        // A transparent URP Lit copy: the piece's texture under the tint, a little of the tint as glow so it reads in a
+        // dark cabin, no shadow.
+        private static Material Ghost(Material src, Color tint)
+        {
+            var m = new Material(_lit) { name = "RVRepairVan_PartPreview" };
+            Texture tex = null;
+            if (src != null && src.HasProperty("_BaseMap")) tex = src.GetTexture("_BaseMap");
+            if (tex == null && src != null && src.HasProperty("_MainTex")) tex = src.GetTexture("_MainTex");
+            if (tex != null) m.SetTexture("_BaseMap", tex);
+            Color c = src != null && src.HasProperty("_BaseColor") ? src.GetColor("_BaseColor") : Color.white;
+            m.SetColor("_BaseColor", new Color(Mathf.Lerp(c.r, tint.r, 0.65f), Mathf.Lerp(c.g, tint.g, 0.65f), Mathf.Lerp(c.b, tint.b, 0.65f), tint.a));
+            m.EnableKeyword("_EMISSION");
+            m.SetColor("_EmissionColor", new Color(tint.r, tint.g, tint.b) * 0.6f);
+            MakeTransparent(m);
+            return m;
+        }
+
+        /// <summary>Alpha-blended URP Lit: no depth write, drawn in the transparent queue.</summary>
+        internal static void MakeTransparent(Material m)
+        {
+            m.SetFloat("_Surface", 1f);
+            m.SetFloat("_Blend", 0f);
+            m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+            m.SetFloat("_ZWrite", 0f);
+            m.SetOverrideTag("RenderType", "Transparent");
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.renderQueue = (int)RenderQueue.Transparent;
         }
 
         /// <summary>
@@ -329,17 +431,9 @@ namespace RVRepairVan.Base
             foreach (var r in t.GetComponentsInChildren<Renderer>(false))
             {
                 if (r == null || !r.enabled) continue;
-                Bounds w = r.bounds;
                 // A renderer without a mesh reports an empty box at the world origin, far outside the RV.
-                if (w.size.sqrMagnitude < 1e-6f) { Core.LogDebug("[Interior] " + r.gameObject.name + " has an empty box - left out of the measure."); continue; }
-                Vector3 c = w.center, e = w.extents;
-                Matrix4x4 toModel = RvMobile.WorldToModel(r, model);
-                for (int i = 0; i < 8; i++)
-                {
-                    var corner = new Vector3(c.x + ((i & 1) == 0 ? -e.x : e.x), c.y + ((i & 2) == 0 ? -e.y : e.y), c.z + ((i & 4) == 0 ? -e.z : e.z));
-                    Vector3 p = toModel.MultiplyPoint3x4(corner);
-                    if (!any) { box = new Bounds(p, Vector3.zero); any = true; } else box.Encapsulate(p);
-                }
+                if (!RvMobile.ModelBox(r, model, out Bounds b)) { Core.LogDebug("[Interior] " + r.gameObject.name + " has an empty box - left out of the measure."); continue; }
+                if (!any) { box = b; any = true; } else box.Encapsulate(b);
             }
             return any;
         }
