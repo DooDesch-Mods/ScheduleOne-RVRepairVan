@@ -100,6 +100,7 @@ namespace RVRepairVan.Quests
                     case RvOp.BatterySwap: Base.RvBattery.HostOnSwap(); break;
                     case RvOp.ArrestHome: Base.RvMobile.HostOnArrestHome(m.A); break;
                     case RvOp.HatchRequest: Base.RvHatch.HostOnRequest(m.A); break;
+                    case RvOp.RiderPose: Base.RvRiders.OnPose(m); break;
 #if DEBUG
                     case RvOp.Ping: Core.Log.Msg("[Net] host <- Ping " + m.A); break;
 #endif
@@ -135,6 +136,7 @@ namespace RVRepairVan.Quests
                     case RvOp.MobileSync: Base.RvMobile.ApplySync(m.A); break;
                     case RvOp.BatterySync: Base.RvBattery.ApplySync(m.A); break;
                     case RvOp.HatchSync: Base.RvHatch.ApplySync(m.A); break;
+                    case RvOp.RiderPose: Base.RvRiders.OnPose(m); break;
                     case RvOp.RepairApplied: ApplyRepair(); break;
                     case RvOp.PaymentSettled: if (!NetworkBus.IsServer) ClientPayment.Settle(m.A, m.B != 0); break;
 #if DEBUG

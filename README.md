@@ -36,7 +36,7 @@
   each with its own short cinematic:
   - **Get the engine running** ($10,000): take the wheel and drive the RV anywhere. Parked
     away, it keeps its stations; the crew and deliveries wait until it is back on its spot.
-    The roof hatch opens with E from inside and shuts when you drive off.
+    The roof hatch opens with E from inside. It shuts while you drive and opens again when you get up.
   - **Make room for a crew** ($15,000): three employees work inside. Put a locker in. Needs
     the workshop floor.
   - **Build a loading dock** ($25,000): your supplier delivers to the RV.

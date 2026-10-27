@@ -87,6 +87,9 @@ namespace RVRepairVan.Base
         private static readonly Dictionary<RvPart, List<Piece>> _pieces = new Dictionary<RvPart, List<Piece>>();
         // Each part's box in the model's local frame, measured while the part was standing.
         private static readonly Dictionary<RvPart, Bounds> _boxes = new Dictionary<RvPart, Bounds>();
+        // The box of every single piece, same frame. The cabinets and the decor are spread over the whole cabin, and
+        // their joint box covers floor that none of them stands on.
+        private static readonly Dictionary<RvPart, List<Bounds>> _pieceBoxes = new Dictionary<RvPart, List<Bounds>>();
         private static IntPtr _resolvedFor;
         private static int _shownRemoved = -1;
         // The part the bodyshop shows while the player looks at it: in place either way, tinted red when buying takes
@@ -325,6 +328,13 @@ namespace RVRepairVan.Base
             return _boxes.TryGetValue(p, out box);
         }
 
+        /// <summary>The boxes of the part's single pieces in the model's local frame; empty before the model was resolved.</summary>
+        internal static List<Bounds> PieceBoxes(RvPart p)
+        {
+            Resolve();
+            return _pieceBoxes.TryGetValue(p, out var list) ? list : new List<Bounds>();
+        }
+
         /// <summary>Is a world point inside a part that is fitted? Used for props that would stand in furniture.</summary>
         internal static bool InFittedPart(Vector3 world, float margin)
         {
@@ -354,6 +364,7 @@ namespace RVRepairVan.Base
             if (!model.gameObject.activeInHierarchy) { Core.LogDebug("[Interior] the intact RV model is not shown yet - will retry."); return false; }
             _pieces.Clear();
             _boxes.Clear();
+            _pieceBoxes.Clear();
             _shownRemoved = -1;
 
             Transform interior = model.Find(InteriorPath);
@@ -400,9 +411,11 @@ namespace RVRepairVan.Base
             {
                 bool any = false;
                 Bounds all = default;
+                var each = new List<Bounds>();
                 foreach (var piece in kv.Value)
-                    if (LocalBox(model, piece.T, out Bounds b)) { if (!any) { all = b; any = true; } else all.Encapsulate(b); }
+                    if (LocalBox(model, piece.T, out Bounds b)) { each.Add(b); if (!any) { all = b; any = true; } else all.Encapsulate(b); }
                 if (any) _boxes[kv.Key] = all;
+                _pieceBoxes[kv.Key] = each;
                 Core.Log.Msg("[Interior] " + kv.Key + ": " + kv.Value.Count + " piece(s)"
                     + (any ? ", box " + all.min.ToString("F2") + " .. " + all.max.ToString("F2") : ", no box") + ".");
             }

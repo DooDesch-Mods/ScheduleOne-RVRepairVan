@@ -118,6 +118,7 @@ namespace RVRepairVan.Base
             RvLights.Reset();
             RvAway.Reset();
             RvRide.Reset();
+            RvRiders.Reset();
             RvChassis.Reset();
             RvHatch.Reset();
             RvNavWalls.Reset();
@@ -1033,6 +1034,7 @@ namespace RVRepairVan.Base
                 }
                 SetChassisColliders(false);
                 Core.Log.Msg("[Mobile] parked: chassis body off and frozen.");
+                RvHatch.OnDriveStop();
             }
         }
 
