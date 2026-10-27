@@ -7,14 +7,16 @@ project adheres to Semantic Versioning.
 ## [4.0.0] - 2026-10-27
 
 ### Added
-- Marco paints the RV in his metallic, matte and chrome colours, the trim in a second colour. The paint stays after
+- Marco paints the RV in his metallic, matte and chrome colours, the stripes and accents in a second colour. The paint stays after
   the trip home and a reload.
 - The interior is sold part by part at Marco's Bodyshop. Take out only what you need, put it back later for free.
 - The workshop floor is sold at the bodyshop too, with no other upgrade needed. It covers every free bit of floor.
 - The roof hatch opens and closes with E from inside, and it shuts when you drive off.
+- In the bodyshop menu, a part glows red when it comes out and green when it goes back in.
 
 ### Changed
-- Needs Marco's Bodyshop and Sideload. Old saves with the gutted interior keep every part out and unlocked.
+- Needs Marco's Bodyshop 1.0.1, Chassis 1.7.1 and Sideload. Old saves with the gutted interior keep every part
+  out and unlocked.
 
 ### Fixed
 - The RV no longer slides sideways when you get out.
