@@ -58,7 +58,7 @@ namespace RVRepairVan.Net
                 var qm = Qm;
                 if (qm == null) { Core.Log.Warning("[Net] no QuestManager - intent " + op + " dropped."); return; }
                 qm.SendQuestState(RvMsg.Encode(op, a, b, c), EQuestState.Inactive);
-                Core.LogDebug("[Net] -> host " + op + "(" + a + "," + b + "," + c + ")");
+                if (Traced(op)) Core.LogDebug("[Net] -> host " + op + "(" + a + "," + b + "," + c + ")");
             }
             catch (Exception e) { Core.Log.Warning("[Net] SendToHost failed: " + e.Message); }
         }
@@ -71,21 +71,24 @@ namespace RVRepairVan.Net
                 var qm = Qm;
                 if (qm == null) return;
                 qm.ReceiveQuestState(null, RvMsg.Encode(op, a, b, c), EQuestState.Inactive);
-                Core.LogDebug("[Net] broadcast " + op + "(" + a + "," + b + "," + c + ")");
+                if (Traced(op)) Core.LogDebug("[Net] broadcast " + op + "(" + a + "," + b + "," + c + ")");
             }
             catch (Exception e) { Core.Log.Warning("[Net] BroadcastToAll failed: " + e.Message); }
         }
 
+        // A rider's place in the RV goes out eight times a second; tracing it would bury every other message.
+        private static bool Traced(RvOp op) => op != RvOp.RiderPose;
+
         // Called by the Harmony patches when our private "RVRV:" guid is seen on the wire.
         internal static void DispatchServerIntent(RvMsg m)
         {
-            Core.LogDebug("[Net] host <- " + m);
+            if (Traced(m.Op)) Core.LogDebug("[Net] host <- " + m);
             try { OnServerIntent?.Invoke(m); } catch (Exception e) { Core.Log.Warning("[Net] server dispatch failed: " + e.Message); }
         }
 
         internal static void DispatchClientState(RvMsg m)
         {
-            Core.LogDebug("[Net] " + (IsServer ? "host <- (relayed) " : "client <- ") + m);
+            if (Traced(m.Op)) Core.LogDebug("[Net] " + (IsServer ? "host <- (relayed) " : "client <- ") + m);
             try
             {
                 // On a listen-server the game relays a client's SendQuestState (our intents) to ALL observers via

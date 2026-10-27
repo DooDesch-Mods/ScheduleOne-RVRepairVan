@@ -118,6 +118,7 @@ namespace RVRepairVan.Base
             RvLights.Reset();
             RvAway.Reset();
             RvRide.Reset();
+            RvRiders.Reset();
             RvChassis.Reset();
             RvHatch.Reset();
             RvNavWalls.Reset();

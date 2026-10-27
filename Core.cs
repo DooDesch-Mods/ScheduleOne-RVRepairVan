@@ -72,6 +72,10 @@ namespace RVRepairVan
         {
             try { Base.RvCargo.LateStep(); }
             catch (Exception e) { Swallowed("cargo frame", e); }
+            try { Base.RvRide.LateStep(); }
+            catch (Exception e) { Swallowed("ride frame", e); }
+            try { Base.RvRiders.Draw(); }
+            catch (Exception e) { Swallowed("riders frame", e); }
         }
 
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)

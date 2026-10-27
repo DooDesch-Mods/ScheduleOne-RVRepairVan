@@ -57,6 +57,7 @@ namespace RVRepairVan.Base
             LandVehicle chassis = RvMobile.Chassis;
             if (chassis == null)
             {
+                RvRiders.Send(false, null);
                 if (_onBoard) Core.Log.Msg("[Ride] the RV is home - the player is no longer carried.");
                 if (_cam) Core.Log.Msg("[Ride] the RV is home - station camera released.");
                 _have = _onBoard = _cam = false;
@@ -83,16 +84,9 @@ namespace RVRepairVan.Base
                     Core.Log.Msg(onBoard ? "[Ride] the player stands in the RV - carried while it moves." : "[Ride] the player left the RV.");
                     _onBoard = onBoard;
                 }
-                if (onBoard && _have)
-                {
-                    Vector3 from = pt.position;
-                    Vector3 to = now.MultiplyPoint3x4(_prevInv.MultiplyPoint3x4(from));
-                    float turn = Mathf.DeltaAngle(_prevYaw, yaw);
-                    // autoSyncTransforms is on in this game, so the controller picks the new position up before it moves.
-                    if ((to - from).sqrMagnitude > 1e-8f) pt.position = to;
-                    if (Mathf.Abs(turn) > 1e-4f && local != null) local.transform.Rotate(0f, turn, 0f, Space.World);
-                }
+                if (onBoard && _have) Carry(pt, local, now, yaw);
                 if (_cam) PinCamera(ct);
+                RvRiders.Send(onBoard, ct);
 
                 _prevInv = now.inverse;
                 _prevYaw = yaw;
@@ -103,6 +97,53 @@ namespace RVRepairVan.Base
             {
                 if (_failures++ == 0) Core.Log.Error("[Ride] carrying the player failed: " + e);
                 _have = false;
+            }
+        }
+
+        // Moves the player by the chassis' motion since the pose last carried to.
+        private static void Carry(Transform pt, Player local, Matrix4x4 now, float yaw)
+        {
+            Vector3 from = pt.position;
+            Vector3 to = now.MultiplyPoint3x4(_prevInv.MultiplyPoint3x4(from));
+            float turn = Mathf.DeltaAngle(_prevYaw, yaw);
+            // autoSyncTransforms is on in this game, so the controller picks the new position up before it moves.
+            if ((to - from).sqrMagnitude > 1e-8f) pt.position = to;
+            if (Mathf.Abs(turn) > 1e-4f && local != null) local.transform.Rotate(0f, turn, 0f, Space.World);
+        }
+
+        private static int _lateFailures;
+
+        /// <summary>
+        /// After every Update of the frame, before it renders. Where another player drives, the network moves the chassis
+        /// after the player's own update already carried them, so the view lagged the interior by one frame and stuttered
+        /// against it. This carries the player by what the chassis moved since then, so the frame shows both in step.
+        /// </summary>
+        internal static void LateStep()
+        {
+            if (!_onBoard || !_have) return;
+#if DEBUG
+            if (DebugNoLateCarry) return;
+#endif
+            LandVehicle chassis = RvMobile.Chassis;
+            if (chassis == null || chassis.Pointer != _chassisPtr) return;
+            try
+            {
+                var pm = PlayerSingleton<PlayerMovement>.Instance;
+                Player local = Player.Local;
+                CharacterController cc = pm != null ? pm.Controller : null;
+                if (cc == null || !cc.enabled || (local != null && local.CurrentVehicle != null)) return;
+                Transform ct = chassis.transform;
+                Matrix4x4 now = ct.localToWorldMatrix;
+                float yaw = Yaw(ct);
+                Carry(cc.transform, local, now, yaw);
+                if (_cam) PinCamera(ct);
+                _prevInv = now.inverse;
+                _prevYaw = yaw;
+                _lateFailures = 0;
+            }
+            catch (Exception e)
+            {
+                if (_lateFailures++ == 0) Core.Log.Error("[Ride] carrying the player after the chassis moved failed - the view may stutter on board: " + e);
             }
         }
 
@@ -278,6 +319,9 @@ namespace RVRepairVan.Base
         /// <summary>rvdrive ride oldbody: remote players' controllers collide with the chassis again, as before the fix.</summary>
         internal static bool DebugRemoteBodyCollides;
 
+        /// <summary>rvdrive ride oldcarry: the player is carried only in their own update, as before the late carry.</summary>
+        internal static bool DebugNoLateCarry;
+
         /// <summary>rvdrive ride oldcam: the station camera is set in chassis space but no longer hangs on the chassis, as before the fix.</summary>
         internal static bool DebugCameraLoose;
 
@@ -306,6 +350,51 @@ namespace RVRepairVan.Base
                 + (RvMobile.Chassis != null ? " speed=" + RvMobile.Chassis.Speed_Kmh.ToString("0.0") : ""));
         }
 
+        // How far each other player's drawn body moves against the RV from one rendered frame to the next, and how far
+        // it drifts in all. A player standing still in the cabin should not move against it at all.
+        private static System.Collections.IEnumerator OthersShake(float seconds)
+        {
+            float until = Time.time + seconds;
+            var last = new System.Collections.Generic.Dictionary<IntPtr, Vector3>();
+            var first = new System.Collections.Generic.Dictionary<IntPtr, Vector3>();
+            var worst = new System.Collections.Generic.Dictionary<IntPtr, float>();
+            var sum = new System.Collections.Generic.Dictionary<IntPtr, float>();
+            var span = new System.Collections.Generic.Dictionary<IntPtr, float>();
+            var names = new System.Collections.Generic.Dictionary<IntPtr, string>();
+            int frames = 0;
+            while (Time.time < until)
+            {
+                yield return new WaitForEndOfFrame();
+                LandVehicle chassis = RvMobile.Chassis;
+                var players = Player.PlayerList;
+                if (chassis == null || players == null) continue;
+                frames++;
+                foreach (Player p in players)
+                {
+                    if (p == null || p.IsLocalPlayer) continue;
+                    Transform body = p.Avatar != null ? p.Avatar.transform : p.transform;
+                    Vector3 now = chassis.transform.InverseTransformPoint(body.position);
+                    IntPtr key = p.Pointer;
+                    names[key] = p.PlayerName;
+                    if (last.TryGetValue(key, out Vector3 was))
+                    {
+                        float d = (now - was).magnitude;
+                        worst[key] = Mathf.Max(worst.TryGetValue(key, out float w) ? w : 0f, d);
+                        sum[key] = (sum.TryGetValue(key, out float t) ? t : 0f) + d;
+                        span[key] = Mathf.Max(span.TryGetValue(key, out float sp) ? sp : 0f, (now - first[key]).magnitude);
+                    }
+                    else first[key] = now;
+                    last[key] = now;
+                }
+            }
+            if (names.Count == 0) { Core.Log.Msg("[Ride] others: no other player seen in " + frames + " frame(s)."); yield break; }
+            foreach (var kv in names)
+                Core.Log.Msg("[Ride] others: " + kv.Value + " moved " + ((sum.TryGetValue(kv.Key, out float s) ? s : 0f) / Mathf.Max(1, frames - 1) * 1000f).ToString("0.0")
+                    + " mm per frame on average, " + ((worst.TryGetValue(kv.Key, out float w) ? w : 0f) * 1000f).ToString("0.0") + " mm at most, drifted up to "
+                    + ((span.TryGetValue(kv.Key, out float sp) ? sp : 0f) * 100f).ToString("0") + " cm against the RV over " + frames + " frame(s)"
+                    + (RvMobile.Chassis != null ? ", speed=" + RvMobile.Chassis.Speed_Kmh.ToString("0.0") : "") + ".");
+        }
+
         /// <summary>rvdrive ride [seconds]: log where the player and the camera stand in chassis space, twice a second.</summary>
         internal static void DebugWatch(string arg)
         {
@@ -320,6 +409,24 @@ namespace RVRepairVan.Base
             {
                 float secs = float.TryParse(arg.Substring(5), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float ss) && ss > 0f ? ss : 5f;
                 MelonLoader.MelonCoroutines.Start(Shake(secs));
+                return;
+            }
+            if (arg == "oldcarry")
+            {
+                DebugNoLateCarry = !DebugNoLateCarry;
+                Core.Log.Msg("[Ride] the player is carried " + (DebugNoLateCarry ? "only in their own update" : "again after the chassis moved") + " (debug).");
+                return;
+            }
+            if (arg == "oldothers")
+            {
+                RvRiders.DebugOff = !RvRiders.DebugOff;
+                Core.Log.Msg("[Ride] other riders are placed " + (RvRiders.DebugOff ? "by the network alone" : "at the place they send in the RV") + " (debug).");
+                return;
+            }
+            if (arg.StartsWith("others"))
+            {
+                float secs = float.TryParse(arg.Substring(6), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float os) && os > 0f ? os : 5f;
+                MelonLoader.MelonCoroutines.Start(OthersShake(secs));
                 return;
             }
             if (arg == "oldbody")
