@@ -65,8 +65,8 @@
 | Schedule I | `0.4.7f12` (IL2CPP, current Steam public build) |
 | MelonLoader | `0.7.3+` |
 | S1API | [ifBars/S1API_Forked](https://thunderstore.io/c/schedule-i/p/ifBars/S1API_Forked/) **3.2.1+** (dialogue, items, dead drops, money, save system) |
-| Chassis | [DooDesch/Chassis](https://thunderstore.io/c/schedule-i/p/DooDesch/Chassis/) **1.7.1+** (driver in the seat, first person, horn, indicators) |
-| Marco's Bodyshop | [DooDesch/MarcosBodyshop](https://thunderstore.io/c/schedule-i/p/DooDesch/MarcosBodyshop/) **1.0.1+** (the garage menu for the interior and the workshop floor) |
+| Chassis | [DooDesch/Chassis](https://thunderstore.io/c/schedule-i/p/DooDesch/Chassis/) **1.8.0+** (driver in the seat, first person, horn, indicators) |
+| Marco's Bodyshop | [DooDesch/MarcosBodyshop](https://thunderstore.io/c/schedule-i/p/DooDesch/MarcosBodyshop/) **1.1.0+** (the garage menu for the interior and the workshop floor) |
 | Sideload | [DooDesch/Sideload](https://thunderstore.io/c/schedule-i/p/DooDesch/Sideload/) **1.35.0+** (draws the garage menu) |
 
 ## Installation

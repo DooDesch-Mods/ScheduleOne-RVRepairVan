@@ -4,6 +4,20 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [4.1.0] - 2026-10-27
+
+### Added
+- The roof hatch opens again when you leave the driver's seat, if it was open before you drove off.
+- With the workshop floor you can build on all free floor: where the kitchen and the decor were, around the bed, and on the left side.
+- Lowered suspension and nitro flames show on the RV.
+
+### Changed
+- Needs Chassis 1.8.0 and Marco's Bodyshop 1.1.0.
+
+### Fixed
+- The driver's view sits at eye height, not at chest height.
+- In co-op, a passenger standing in the moving RV no longer sways for the others, and their view no longer shakes.
+
 ## [4.0.0] - 2026-10-27
 
 ### Added
