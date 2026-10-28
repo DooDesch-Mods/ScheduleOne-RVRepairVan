@@ -47,6 +47,9 @@ namespace RVRepairVan.Base
     internal static class RvInterior
     {
         internal const int AllParts = 255;
+        // The cook gear (RvEasterEggs) is no furniture part, but rides in the removed mask on a bit of its own so it
+        // is saved and synced with the parts. It is free and needs no unlock.
+        internal const int GearOut = 1 << 16;
 
         // The order the bodyshop lists them in.
         internal static readonly RvPart[] Parts =
@@ -140,6 +143,7 @@ namespace RVRepairVan.Base
         internal static bool IsUnlocked(RvPart p) => (Unlocked & (int)p) != 0;
         internal static bool IsRemoved(RvPart p) => (Removed & (int)p) != 0;
         internal static bool AnyRemoved => (Removed & AllParts) != 0;
+        internal static bool GearRemoved => (Removed & GearOut) != 0;
 
         internal static bool IsValid(RvPart p)
         {
@@ -172,11 +176,12 @@ namespace RVRepairVan.Base
         internal static void HostSet(int unlocked, int removed, string why)
         {
             unlocked &= AllParts;
-            removed &= AllParts & unlocked;   // a part that was never unlocked stays in
+            removed = (removed & AllParts & unlocked) | (removed & GearOut);   // a part that was never unlocked stays in
             RepairStateStore.SetInteriorUnlocked(unlocked);
             RepairStateStore.SetInteriorRemoved(removed);
             if (NetworkBus.Online && NetworkBus.IsServer) NetworkBus.BroadcastToAll(RvOp.InteriorSync, unlocked, removed);
-            Core.Log.Msg("[Interior] " + why + " - unlocked " + (RvPart)unlocked + ", out " + (RvPart)removed + ".");
+            Core.Log.Msg("[Interior] " + why + " - unlocked " + (RvPart)unlocked + ", out " + (RvPart)(removed & AllParts)
+                + ", cook gear " + ((removed & GearOut) != 0 ? "out" : "in") + ".");
             Sync();
             RvBuildGrid.PartsChanged();
         }
@@ -186,7 +191,7 @@ namespace RVRepairVan.Base
         {
             if (NetworkBus.IsServer) return;
             RepairStateStore.SetInteriorUnlocked(unlocked & AllParts);
-            RepairStateStore.SetInteriorRemoved(removed & AllParts);
+            RepairStateStore.SetInteriorRemoved(removed & (AllParts | GearOut));
             Core.LogDebug("[Interior] client adopted unlocked=" + unlocked + " out=" + removed);
             Sync();
             RvBuildGrid.PartsChanged();
@@ -214,7 +219,8 @@ namespace RVRepairVan.Base
                 if (removed != _shownRemoved)
                 {
                     _shownRemoved = removed;
-                    Core.Log.Msg("[Interior] in place: " + (RvPart)(AllParts & ~removed) + "; out: " + (RvPart)removed + ".");
+                    Core.Log.Msg("[Interior] in place: " + (RvPart)(AllParts & ~removed) + "; out: " + (RvPart)(removed & AllParts)
+                        + "; cook gear " + ((removed & GearOut) != 0 ? "out" : "in") + ".");
                 }
                 Tint();
                 RvEasterEggs.Ensure();

@@ -60,7 +60,7 @@ namespace RVRepairVan.Patches
             new[] { "rvclear", "clear the staged test state", "rvclear" },
             new[] { "rvgiveclient", "hand the client its half of a co-op errand", "rvgiveclient" },
             new[] { "rvdiag", "what the questline thinks is going on", "rvdiag" },
-            new[] { "rvpick", "fire one dialogue choice by its rvdiag index", "rvpick marco 3" },
+            new[] { "rvpick", "fire one dialogue choice by its rvdiag index; 'open' starts the dialogue", "rvpick marco 3" },
             new[] { "rvghost", "aim at a floor point in the RV, then log why each build tile is red; 'pickup' lifts what stands on the second grid", "rvghost aim 0.5 -1" },
             new[] { "rvhold", "equip a hotbar slot, 'talk' locks equipping the way a conversation does", "rvhold 2 talk" },
             new[] { "rvreinject", "rebuild the quest objects after a reload", "rvreinject" },
@@ -109,7 +109,8 @@ namespace RVRepairVan.Patches
             if (what == "all")
             {
                 bool outAll = parts.Length > 2 && parts[2].ToLowerInvariant() == "out";
-                Base.RvInterior.HostSet(Base.RvInterior.AllParts, outAll ? Base.RvInterior.AllParts : 0, "rvinterior all " + (outAll ? "out" : "in"));
+                Base.RvInterior.HostSet(Base.RvInterior.AllParts, (outAll ? Base.RvInterior.AllParts : 0) | (Base.RvInterior.Removed & Base.RvInterior.GearOut),
+                    "rvinterior all " + (outAll ? "out" : "in"));
                 return;
             }
             foreach (var p in Base.RvInterior.Parts)
@@ -168,9 +169,11 @@ namespace RVRepairVan.Patches
                         else Core.Log.Warning("[Debug] rvhold <slot 0-8> [talk]");
                         break;
                     case "rvpick":    // fire one dialogue choice by its rvdiag index: rvpick marco 3
-                        if (parts.Length > 2 && int.TryParse(parts[2], out int pick))
+                        if (parts.Length > 2 && parts[2].Equals("open", StringComparison.OrdinalIgnoreCase))
+                            RVRepairVan.Quests.Questline.DebugOpen(parts[1].ToLowerInvariant());
+                        else if (parts.Length > 2 && int.TryParse(parts[2], out int pick))
                             RVRepairVan.Quests.Questline.DebugPick(parts[1].ToLowerInvariant(), pick);
-                        else Core.Log.Warning("[Debug] rvpick <donna|ming|marco> <index>  (index from rvdiag)");
+                        else Core.Log.Warning("[Debug] rvpick <donna|ming|marco> <index|open>  (index from rvdiag)");
                         break;
                     case "rvprobe":   // measure the RV property: idle points, capacity, docks, grids, NavMesh
                         RvProbe.Run();

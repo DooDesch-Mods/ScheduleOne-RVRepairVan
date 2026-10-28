@@ -96,7 +96,7 @@ namespace RVRepairVan.Dialogue
                     Enabled = true,
                     ChoiceText = BuildChoiceText(),
                     Conversation = null,
-                    Priority = 100
+                    Priority = Questline.MarcoPriorityTop
                 };
 
                 // Only show the choice while the RV is actually destroyed.
@@ -107,7 +107,7 @@ namespace RVRepairVan.Dialogue
                 choice.onChoosen = new UnityEvent();
                 choice.onChoosen.AddListener((Action)OnRepairChosen);
 
-                dc.AddDialogueChoice(choice, 100);
+                dc.AddDialogueChoice(choice, Questline.MarcoPriorityTop);
                 _repairChoice = choice;
 
                 // The build-outs are sold in Simple mode too - only the REPAIR is simple here, not the RV.
@@ -119,13 +119,13 @@ namespace RVRepairVan.Dialogue
                         Enabled = true,
                         ChoiceText = Base.RvUpgrades.ChoiceText(up),
                         Conversation = null,
-                        Priority = 93 - u
+                        Priority = Questline.MarcoPriorityTop - 7 - u
                     };
                     Func<bool, bool> show = (_) => { try { return Base.RvUpgrades.Available(up); } catch (Exception e) { Core.Swallowed("MarcoRepairDialogue.UpgradeShowCheck", e); return false; } };
                     uc.shouldShowCheck = DelegateSupport.ConvertDelegate<DialogueController.DialogueChoice.ShouldShowCheck>(show);
                     uc.onChoosen = new UnityEvent();
                     uc.onChoosen.AddListener((Action)(() => Base.RvUpgrades.Buy(up)));
-                    dc.AddDialogueChoice(uc, 93 - u);
+                    dc.AddDialogueChoice(uc, Questline.MarcoPriorityTop - 7 - u);
                     _upgradeChoices[u] = uc;
                 }
 
@@ -134,13 +134,13 @@ namespace RVRepairVan.Dialogue
                     Enabled = true,
                     ChoiceText = L10n.T("Can you do more to the RV?"),
                     Conversation = null,
-                    Priority = 89
+                    Priority = Questline.MarcoPriorityTop - 11
                 };
                 Func<bool, bool> moreShow = (_) => { try { return Garage.RvGarage.AskMoreVisible(); } catch (Exception e) { Core.Swallowed("MarcoRepairDialogue.MoreShowCheck", e); return false; } };
                 more.shouldShowCheck = DelegateSupport.ConvertDelegate<DialogueController.DialogueChoice.ShouldShowCheck>(moreShow);
                 more.onChoosen = new UnityEvent();
                 more.onChoosen.AddListener((Action)(() => WorldSay(FindMarco(), Garage.RvGarage.AskMoreLine())));
-                dc.AddDialogueChoice(more, 89);
+                dc.AddDialogueChoice(more, Questline.MarcoPriorityTop - 11);
 
                 _injected = true;
                 Core.Log.Msg("[Marco] RV repair dialogue injected.");

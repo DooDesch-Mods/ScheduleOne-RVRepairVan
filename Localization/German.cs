@@ -135,6 +135,8 @@ namespace RVRepairVan.Localization
                 ["Wall Behind Driver"] = "Wand hinter dem Fahrer",
                 ["Bedside Table"] = "Nachttisch",
                 ["Decor"] = "Deko",
+                ["Cook Gear"] = "Koch-Ausrüstung",
+                ["Taking it out or putting it back is free."] = "Aus- und Einbau kosten nichts.",
                 ["Drive"] = "Fahren",
                 ["Seat taken"] = "Platz belegt",
                 ["Sit"] = "Hinsetzen",
