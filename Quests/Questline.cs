@@ -94,6 +94,11 @@ namespace RVRepairVan.Quests
         private static readonly DialogueController.DialogueChoice[] _upgradeChoices =
             new DialogueController.DialogueChoice[UpgradeOrder.Length];
 
+        // Vanilla lists an NPC's shown choices by Priority, highest first (DialogueController.GetActiveChoices).
+        // Marco's own choices sit at 0 and his customer choices run from 10 ([Complete Deal]) down to -20 (free
+        // sample), so every RV choice stays below -20: number key 1 keeps the vanilla choice, never a purchase.
+        internal const int MarcoPriorityTop = -100;
+
         private const int MAX_SAMPLE_CHOICES = 1;   // only the product in the player's hand
         private static readonly DialogueController.DialogueChoice[] _sampleChoices = new DialogueController.DialogueChoice[MAX_SAMPLE_CHOICES];
         private static readonly System.Collections.Generic.List<ItemSlot> _sampleSlots = new System.Collections.Generic.List<ItemSlot>();
@@ -490,28 +495,28 @@ namespace RVRepairVan.Quests
 
             // Mrs. Ming's name is in the first line the player can say, so the quote they hear is already the
             // referral price. Saves made before this change can sit at MarcoMet; they get the same choice.
-            AddChoice(marco, L10n.T("Mrs. Ming sent me. Can you fix my RV?"), 100,
+            AddChoice(marco, L10n.T("Mrs. Ming sent me. Can you fix my RV?"), MarcoPriorityTop,
                 () => Active && (Stage == Referred || Stage == MarcoMet), OnMarcoReferral);
-            _marcoRepairChoice = AddChoice(marco, RepairChoiceText(), 97,
+            _marcoRepairChoice = AddChoice(marco, RepairChoiceText(), MarcoPriorityTop - 3,
                 () => Active && ReferralUsed && Stage < Paid, OnMarcoRepair);
 
             // "Can you go any lower?" is one question with two answers: before the package run Marco names the
             // package (and starts the run), after it he names what knocks the bill down. Only one is ever visible.
-            AddChoice(marco, L10n.T("Can you go any lower?"), 96,
+            AddChoice(marco, L10n.T("Can you go any lower?"), MarcoPriorityTop - 4,
                 () => Active && Stage == ReadyToPay && !_pickupActive, OnMarcoFavour, favourC);
-            AddChoice(marco, L10n.T("Can you go any lower?"), 96,
+            AddChoice(marco, L10n.T("Can you go any lower?"), MarcoPriorityTop - 4,
                 () => Active && Trusted_ && Stage < Paid && HeldPackagedSlot() == null && CurrentPrice() > RVRepairVanPreferences.RepairPrice,
                 bringInfoC != null ? null : (Action)(() => WorldSay(_marcoT, BringInfoLine())),
                 bringInfoC);
 
-            AddChoice(marco, L10n.T("Here's your package."), 96,
+            AddChoice(marco, L10n.T("Here's your package."), MarcoPriorityTop - 4,
                 () => Active && _pickupActive && _hasPackage && PlayerHasItem(PackageId), OnGotPackage, gotpkgC);
 
             // Loss fallback: collected the drop but no longer holding the package -> admit it, pay the fee or defer.
             OnPick(npc, "MARCO_PAY", OnMarcoPayLoss);
             // Without the sub-menu this choice would be a dead click - name the fee in the label and pay directly.
             AddChoice(marco,
-                lostpkgC != null ? L10n.T("I lost your package.") : L10n.T("I lost your package. (Pay ${0})", LostPackageFee), 96,
+                lostpkgC != null ? L10n.T("I lost your package.") : L10n.T("I lost your package. (Pay ${0})", LostPackageFee), MarcoPriorityTop - 4,
                 () => Active && _pickupActive && _hasPackage && !PlayerHasItem(PackageId),
                 lostpkgC != null ? null : (Action)(() => { WorldSay(_marcoT, L10n.T(MarcoAngry)); OnMarcoPayLoss(); }),
                 lostpkgC);
@@ -522,7 +527,7 @@ namespace RVRepairVan.Quests
             for (int s = 0; s < MAX_SAMPLE_CHOICES; s++)
             {
                 int idx = s;
-                _sampleChoices[idx] = AddChoice(marco, L10n.T("Give Marco a packaged sample"), 95 - idx,
+                _sampleChoices[idx] = AddChoice(marco, L10n.T("Give Marco a packaged sample"), MarcoPriorityTop - 5 - idx,
                     () => SampleChoiceVisible(idx), () => OnGiveSample(idx));
             }
 
@@ -531,10 +536,10 @@ namespace RVRepairVan.Quests
             for (int u = 0; u < UpgradeOrder.Length; u++)
             {
                 Base.RvUpgrade up = UpgradeOrder[u];
-                _upgradeChoices[u] = AddChoice(marco, Base.RvUpgrades.ChoiceText(up), 93 - u,
+                _upgradeChoices[u] = AddChoice(marco, Base.RvUpgrades.ChoiceText(up), MarcoPriorityTop - 7 - u,
                     () => Base.RvUpgrades.Available(up), () => Base.RvUpgrades.Buy(up));
             }
-            AddChoice(marco, L10n.T("Can you do more to the RV?"), 89,
+            AddChoice(marco, L10n.T("Can you do more to the RV?"), MarcoPriorityTop - 11,
                 () => Garage.RvGarage.AskMoreVisible(), () => SayMarco(Garage.RvGarage.AskMoreLine()));
             Core.LogDebug("[Questline] Marco dialogue injected" + (degraded ? " (degraded)." : "."));
             return true;
