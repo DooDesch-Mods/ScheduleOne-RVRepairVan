@@ -4,6 +4,14 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [4.2.0] - 2026-10-28
+
+### Added
+- The hazmat suit and respirator in the RV can be taken out or hung back for free in the bodyshop (Interior, "Cook Gear").
+
+### Fixed
+- Number key 1 at Marco no longer buys an RV upgrade: his own choices come first again, the RV choices below them.
+
 ## [4.1.0] - 2026-10-27
 
 ### Added
