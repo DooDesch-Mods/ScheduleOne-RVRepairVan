@@ -56,6 +56,9 @@ namespace RVRepairVan.Base
         internal static bool Away => _chassis != null;
         internal static LandVehicle Chassis => _chassis;
 
+        /// <summary>True while someone sits at the RV's wheel.</summary>
+        internal static bool Driving => _chassis != null && _driving;
+
         /// <summary>How the RV is turned and tilted against its pose at home. Identity at home.</summary>
         internal static Quaternion AwayRotation => _chassis != null ? _chassis.transform.rotation * Quaternion.Inverse(_homeRot) : Quaternion.identity;
         internal static BoxCollider Hull => _hull;
@@ -655,6 +658,20 @@ namespace RVRepairVan.Base
         {
             foreach (Rigidbody rb in _bodies) if (rb != null) UnityEngine.Object.Destroy(rb);
             _bodies.Clear();
+        }
+
+        /// <summary>
+        /// Host: put the RV back on its spot now, wherever it is. A driver at the wheel is taken out first. False on a
+        /// client, where the host owns the chassis.
+        /// </summary>
+        internal static bool HostSendHome(string why)
+        {
+            if (NetworkBus.Online && !NetworkBus.IsServer) { Core.Log.Warning("[Mobile] send home (" + why + "): host only."); return false; }
+            if (_chassis == null) { Core.Log.Msg("[Mobile] send home (" + why + "): the RV is home already."); return true; }
+            if (_chassis.LocalPlayerIsInVehicle) _chassis.ExitVehicle();
+            Core.Log.Msg("[Mobile] send home (" + why + "): the RV goes back to its spot.");
+            Detach();
+            return true;
         }
 
         /// <summary>Put everything back on its spot. Host: then despawn the chassis.</summary>
