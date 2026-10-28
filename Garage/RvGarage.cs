@@ -135,6 +135,27 @@ namespace RVRepairVan.Garage
                     Camera = _ => PartShot(p),
                 };
             }
+            yield return GearEntry();
+        }
+
+        private static BodyshopEntry GearEntry() => new BodyshopEntry
+        {
+            Id = "cookgear",
+            Label = L10n.T("Cook Gear"),
+            Text = L10n.T("Taking it out or putting it back is free."),
+            Price = 0,
+            Toggle = true,
+            Installed = _ => !RvInterior.GearRemoved,
+            Apply = _ => ApplyGear(),
+        };
+
+        /// <summary>Host: take the cook gear off its hooks or hang it back.</summary>
+        private static string ApplyGear()
+        {
+            if (!RepairStateStore.GetRepaired()) return L10n.T("Repair the RV first.");
+            RvInterior.HostSet(RvInterior.Unlocked, RvInterior.Removed ^ RvInterior.GearOut,
+                "cook gear " + (RvInterior.GearRemoved ? "hung back" : "taken out") + " at the bodyshop");
+            return null;
         }
 
         /// <summary>Host: flip the part and mark it paid for.</summary>

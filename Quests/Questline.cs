@@ -299,9 +299,19 @@ namespace RVRepairVan.Quests
                 bool shown = false;
                 try { shown = c.shouldShowCheck == null || c.shouldShowCheck.Invoke(false); }
                 catch (Exception e) { Core.Log.Warning("[Debug] shouldShowCheck threw for '" + c.ChoiceText + "': " + e.Message); }
-                Core.Log.Msg("    [" + i + "] '" + c.ChoiceText + "' shown=" + shown + " enabled=" + c.Enabled
+                Core.Log.Msg("    [" + i + "] '" + c.ChoiceText + "' prio=" + c.Priority + " shown=" + shown + " enabled=" + c.Enabled
                     + " conv=" + (c.Conversation != null) + " onChoosen=" + (c.onChoosen != null));
             }
+        }
+
+        /// <summary>Debug: open an NPC's dialogue the way the talk key does, so the choice list shows in its real
+        /// order. The bridge's interact command reaches Marco's pickpocket interaction instead.</summary>
+        internal static void DebugOpen(string who)
+        {
+            DialogueController dc = who == "donna" ? _donnaDC : who == "ming" ? _mingDC : who == "marco" ? _marcoDC : null;
+            if (dc == null) { Core.Log.Warning("[Debug] rvpick open: no dialogue for '" + who + "'."); return; }
+            dc.StartGenericDialogue();
+            Core.Log.Msg("[Debug] rvpick open: " + who + "'s dialogue started.");
         }
 
         /// <summary>Debug: fire the i-th choice of an NPC (as listed by rvdiag) the way a click would - its action
