@@ -29,7 +29,12 @@ namespace RVRepairVan.Persistence
         internal static void ResetClient() { _cRepaired = false; _cStage = 0; _cSamples = 0; _cDiscount = 0; _cUpgrades = 0; _cInteriorUnlocked = 0; _cInteriorRemoved = 0; _cPaint = ""; _cPaint2 = ""; }
 
         internal static bool GetRepaired() => ClientMode ? _cRepaired : (S != null && S.Repaired);
-        internal static void SetRepaired(bool repaired) { if (ClientMode) _cRepaired = repaired; else if (S != null) S.Repaired = repaired; }
+        internal static void SetRepaired(bool repaired)
+        {
+            bool was = GetRepaired();
+            if (ClientMode) _cRepaired = repaired; else if (S != null) S.Repaired = repaired;
+            if (repaired && !was && GetRepaired()) Api.RvRepairVanApi.RaiseRepaired();
+        }
 
         internal static int GetStage() => ClientMode ? _cStage : (S != null ? S.Stage : 0);
         internal static void SetStage(int stage) { if (ClientMode) _cStage = stage; else if (S != null) S.Stage = stage; }
@@ -41,7 +46,13 @@ namespace RVRepairVan.Persistence
         internal static void SetDiscountTotal(int discount) { if (ClientMode) _cDiscount = discount; else if (S != null) S.Discount = discount; }
 
         internal static int GetUpgrades() => ClientMode ? _cUpgrades : (S != null ? S.Upgrades : 0);
-        internal static void SetUpgrades(int mask) { if (ClientMode) _cUpgrades = mask; else if (S != null) S.Upgrades = mask; }
+        internal static void SetUpgrades(int mask)
+        {
+            int was = GetUpgrades();
+            if (ClientMode) _cUpgrades = mask; else if (S != null) S.Upgrades = mask;
+            int now = GetUpgrades();
+            if (now != was) Api.RvRepairVanApi.RaiseUpgradesChanged(was, now);
+        }
 
         internal static int GetInteriorUnlocked() => ClientMode ? _cInteriorUnlocked : (S != null ? S.InteriorUnlocked : 0);
         internal static void SetInteriorUnlocked(int mask) { if (ClientMode) _cInteriorUnlocked = mask; else if (S != null) S.InteriorUnlocked = mask; }
