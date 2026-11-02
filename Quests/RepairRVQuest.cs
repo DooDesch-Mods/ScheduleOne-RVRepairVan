@@ -24,12 +24,19 @@ namespace RVRepairVan.Quests
 
         protected override bool AutoBegin => true;
 
+        // The journal's steps by their fixed position. A save stores step states by index, so a new step goes at the
+        // end of this list, not where the story would place it.
+        internal const int StepDonna = 0, StepMing = 1, StepCrate = 2, StepBring = 3, StepTell = 4, StepPay = 5,
+                           StepPickup = 6, StepDeliver = 7, StepWait = 8, StepSee = 9, StepCount = 10;
+
+        protected override Sprite QuestIcon => SharedIcon;
+
         // A wrench icon (a PNG embedded in this DLL) instead of S1API's default phone-contacts icon.
         // Unity destroys runtime sprites when a save is left for the menu, and a destroyed sprite shows as a white
         // square in the HUD. Unity's '== null' is true for a destroyed object, so the next load builds a fresh one.
         private static Sprite _icon;
         private static bool _iconAbsent;
-        protected override Sprite QuestIcon
+        internal static Sprite SharedIcon
         {
             get
             {
@@ -79,15 +86,26 @@ namespace RVRepairVan.Quests
             base.OnCreated();
             try
             {
-                // Initial objective = the first real step (NOT the same text as the quest title, or the
-                // journal shows it twice). The questline immediately re-syncs this to the current stage.
-                QuestEntry entry = AddEntry(L10n.T("Ask Donna at the motel about your RV"));
-
                 // The game's QuestEntry.Start() registers a compass element from PoILocation. S1API leaves
-                // PoILocation null, and on this build (0.4.5f2) CompassManager then dereferences null every
-                // frame (the "0m flicker"). Fix: give the entry a VALID fixed POI - the RV's own position as
-                // a neutral default; the questline's SyncEntry then points it at the right NPC per stage.
-                entry.POIPosition = RVManager.TryGetPosition(out Vector3 rvPos) ? rvPos : Vector3.zero;
+                // PoILocation null, and CompassManager then dereferences null every frame (the "0m flicker").
+                // Fix: give every step a VALID fixed POI - the RV's own position as a neutral default; the
+                // questline's SyncEntry then points the active steps at the right NPC or dead drop.
+                Vector3 rv = RVManager.TryGetPosition(out Vector3 rvPos) ? rvPos : Vector3.zero;
+                string[] titles =
+                {
+                    L10n.T("Ask Donna at the motel about your RV"),
+                    L10n.T("Talk to Mrs. Ming at the Chinese restaurant"),
+                    L10n.T("Pick up Mrs. Ming's crate from the dead drop"),
+                    L10n.T("Bring the crate to Mrs. Ming"),
+                    L10n.T("Tell Marco at the docks that Mrs. Ming sent you"),
+                    L10n.T("Pay Marco for the repair ({0})", ""),   // SyncEntry sets the live price
+                    L10n.T("Pick up Marco's package from the dead drop"),
+                    L10n.T("Bring the package to Marco"),
+                    L10n.T("Wait for Marco's text"),
+                    L10n.T("Go see your RV"),
+                };
+                foreach (string title in titles)
+                    AddEntry(title).POIPosition = rv;
             }
             catch (Exception e)
             {

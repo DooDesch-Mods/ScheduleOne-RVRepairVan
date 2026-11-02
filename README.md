@@ -4,8 +4,8 @@
 
 > Your RV got blown up in the intro? Now you can fix it. A tracked side quest sends you
 > from Donna at the motel to Mrs. Ming to Marco the mechanic, with dead-drop errands, a
-> haggled price and a repair cinematic. After that, Marco turns the RV into a workshop. Built on
-> [S1API](https://github.com/ifBars/S1API).
+> haggled price and a repair cinematic. A second quest then takes you through the engine and the
+> workshop floor. Built on [S1API](https://github.com/ifBars/S1API).
 
 ![Version](https://img.shields.io/badge/version-3.6.4-blue)
 ![Game](https://img.shields.io/badge/game-Schedule%20I-purple)
@@ -23,8 +23,11 @@
 - **"Back on the Road" questline** (default). After the RV is wrecked in the intro, the
   quest starts on its own. Donna at the motel sends you to **Mrs. Ming**. She wants a crate
   from a **dead drop** first, then she calls **Marco** at the docks.
-- **Native dialogue** via S1API: choices inside the normal conversation, plus journal
-  entries and the on-screen quest tracker.
+- **"Home on Wheels" questline.** Once you have seen your repaired RV, the second quest starts:
+  ask Marco what else he can do, get the engine running, drive the RV onto his lot and put in the
+  workshop floor. Crew room and loading dock stay normal offers in his dialogue.
+- **Native dialogue** via S1API: Marco's and Mrs. Ming's answers stay in the conversation, plus
+  journal entries that tick off step by step and the on-screen quest tracker.
 - **Haggling.** Marco normally charges **$50,000**. Tell him Mrs. Ming sent you and it is
   **$10,000**. Ask *"Can you go any lower?"* and he sends you for a package of his. After
   that, every packaged product you hold out to him takes up to $500 off, down to a floor.
@@ -147,8 +150,9 @@ in development builds and are not shipped in the release.
 4. Optional: ask him to go lower, fetch his package, then hold out packaged product to
    him for more off the bill.
 5. **Pay**, watch the repair, then go **see your RV**. Marco texts you about his build-outs.
-6. For the interior and the workshop floor: buy the engine, drive the RV onto the lot
-   in front of Marco's garage, get out and ask him to modify your vehicle.
+6. The **"Home on Wheels"** quest appears: ask Marco what else he can do, buy the engine, drive
+   the RV onto the lot in front of his garage, get out and ask him to modify your vehicle. The
+   workshop floor ends the quest.
 
 Prefer no story? Set `QuestMode = Simple` and just pay Marco directly.
 

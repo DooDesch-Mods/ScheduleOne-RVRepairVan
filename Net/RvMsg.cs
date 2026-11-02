@@ -31,6 +31,7 @@ namespace RVRepairVan.Net
         ArrestHome = 18,     // client was arrested after driving the RV - A = chassis it drove; the host sends the RV home instead of the impound
         HatchRequest = 19,   // client wants the roof hatch open (A = 1) or shut (A = 0)
         RiderPose = 20,      // a rider's place in the moving RV: A = their player ObjectId, B/C = packed pose, B = -1 left (RvRiders); relayed to everyone
+        AskedBuildOuts = 21, // client asked Marco what more he can do to the RV
         // RequestSnapshot carries A = the client's mod version (NetworkBus.VersionCode), 0 from builds before it existed.
         // Paid intents (PayRepair, MingPayLoss, MarcoPayLoss, BuyUpgrade) also carry B = ticket, C = amount paid.
 

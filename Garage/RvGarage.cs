@@ -100,9 +100,29 @@ namespace RVRepairVan.Garage
             return !InGarage();
         }
 
-        internal static string AskMoreLine() => RvUpgrades.Owned(RvUpgrade.Engine)
-            ? L10n.T("Park her on the lot out front, then ask me to modify your vehicle.")
-            : L10n.T("I can't work on her where she sits. Get the engine in first, then drive her over.");
+        internal static string AskMoreLine()
+        {
+            if (!RvUpgrades.Owned(RvUpgrade.Engine))
+                return L10n.T("I can't work on her where she sits. Get the engine in first, then drive her over.");
+            if (!RvUpgrades.Owned(RvUpgrade.WorkshopFloor))
+                return L10n.T("Park her on the lot out front, then tell me to pimp your ride. The workshop floor goes in there.");
+            return L10n.T("Paint and furniture on the lot out front, crew room and loading dock right here. Just say the word.");
+        }
+
+        /// <summary>Where the journal points for "drive onto the lot": the yard bay of Marco's garage.</summary>
+        internal static Vector3 LotPoint(Vector3 fallback)
+        {
+            try
+            {
+                var garage = BodyshopApi.Garage(BodyshopApi.MarcoGarage);
+                if (garage?.Bays != null)
+                    foreach (var bay in garage.Bays)
+                        if (bay.Id == "yard") return bay.Center;
+                Core.LogDebug("[Garage] Marco's yard bay is not registered yet.");
+            }
+            catch (Exception e) { Core.Swallowed("RvGarage.LotPoint", e); }
+            return fallback;
+        }
 
         // ---- interior --------------------------------------------------------------------------------------------
 

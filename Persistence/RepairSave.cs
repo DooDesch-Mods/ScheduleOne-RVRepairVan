@@ -63,6 +63,9 @@ namespace RVRepairVan.Persistence
             public string Paint = "";
             // The second paint on the trim, a Chassis "paint2" value; empty = stock.
             public string Paint2 = "";
+            // Marco's package run: 0 none, 1 taken on, 2 the player has the package. Which drop holds it is found
+            // again on load, so the run survives a reload without a second package.
+            public int PackageErrand;
         }
 
         // 2: the "gut" upgrade became the two interior masks.
@@ -104,6 +107,7 @@ namespace RVRepairVan.Persistence
         internal int InteriorRemoved { get => _state.InteriorRemoved; set => _state.InteriorRemoved = value; }
         internal string Paint { get => _state.Paint ?? ""; set => _state.Paint = value ?? ""; }
         internal string Paint2 { get => _state.Paint2 ?? ""; set => _state.Paint2 = value ?? ""; }
+        internal int PackageErrand { get => _state.PackageErrand; set => _state.PackageErrand = value; }
 
         internal bool Away => _state.Away;
         internal Vector3 AwayPos => new Vector3(_state.AwayPx, _state.AwayPy, _state.AwayPz);

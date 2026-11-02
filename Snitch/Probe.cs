@@ -33,6 +33,7 @@ namespace RVRepairVan.Profiling
                 case 8:  return "Trusted";
                 case 9:  return "Paid";
                 case 10: return "Done";
+                case 11: return "BuildOutsAsked";
                 default: return "?";
             }
         }

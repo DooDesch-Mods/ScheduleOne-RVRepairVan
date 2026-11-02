@@ -4,3 +4,5 @@ obj
 release
 *.zip
 thunderstore-package
+tests/out
+__pycache__

@@ -73,6 +73,10 @@ namespace RVRepairVan.Persistence
         internal static bool GetBatteryDead() => S != null && S.BatteryDead;
         internal static void SetBatteryDead(bool dead) { if (!ClientMode && S != null) S.BatteryDead = dead; }
 
+        // Host/offline only: Marco's package run. A client mirrors it through the transient sync.
+        internal static int GetPackageErrand() => S != null ? S.PackageErrand : 0;
+        internal static void SetPackageErrand(int errand) { if (!ClientMode && S != null) S.PackageErrand = errand; }
+
         // Host/offline only: where the RV was driven to (RvMobile). A client never saves the world.
         internal static bool TryGetAwayPose(out Vector3 pos, out Quaternion rot)
         {

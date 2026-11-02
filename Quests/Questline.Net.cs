@@ -94,6 +94,7 @@ namespace RVRepairVan.Quests
                     case RvOp.CheckedRv: HostCheckedRv(); break;       // a client reached the post-repair RV
                     case RvOp.ErrandItemPicked: HostErrandItemPicked(); break;  // a client picked up the crate/package
                     case RvOp.BuyUpgrade: Settle(m, Base.RvUpgrades.HostBuy((Base.RvUpgrade)m.A, false, PaidAmount(m))); break;   // client is already playing its own cinematic
+                    case RvOp.AskedBuildOuts: HostAskedBuildOuts(); break;
                     case RvOp.RequestSnapshot: NetworkBus.LogClientVersion(m.A); HostSendSnapshot(); break;
                     case RvOp.DriveRequest: Base.RvMobile.HostOnDriveRequest(); break;
                     case RvOp.MobileReport: Base.RvMobile.HostOnClientReport(m.A, m.B); break;
@@ -201,7 +202,7 @@ namespace RVRepairVan.Quests
             RepairStateStore.SetStage(stage);
             RepairStateStore.SetDiscountTotal(discount);
             if (stage >= Done) { RepairQuest.CompleteIfActive(); }   // closing beat reached host-side
-            else if (Active && stage >= Started) EnsureQuest();      // make sure the client has the journal
+            else if (RVRepairVanPreferences.Enabled && stage >= Started) EnsureQuest();   // make sure the client has the journal
             SyncEntry();
             RefreshRepairChoice();
             Core.LogDebug("[Net] client applied StageSync: Stage=" + stage + " Discount=" + discount);
@@ -302,6 +303,14 @@ namespace RVRepairVan.Quests
             Core.Log.Msg("[Questline] quest complete (RV checked).");
         }
 
+        /// <summary>Host: a player asked Marco about the build-outs. Only moves a finished or never-played story.</summary>
+        private static void HostAskedBuildOuts()
+        {
+            if (Stage != None && Stage != Done) { Core.LogDebug("[Questline] build-out question at stage " + Stage + " changes nothing."); return; }
+            Stage = BuildOutsAsked;
+            Core.Log.Msg("[Questline] player asked Marco about the build-outs.");
+        }
+
         /// <summary>Client: the host repaired the shared RV - swap the visual + mirror the repaired flag.</summary>
         private static void ApplyRepair()
         {
@@ -309,7 +318,9 @@ namespace RVRepairVan.Quests
             RVManager.MarkRepairedByHost();    // first: the visual swap builds the wheel, which asks whether the RV is wrecked
             RVManager.RepairVisualOnly();
             RepairStateStore.SetRepaired(true);
-            RepairQuest.CompleteIfActive();
+            // The story ends at the RV for everyone, so the journal only moves on here.
+            if (RVRepairVanPreferences.QuestlineEnabled) SyncEntry();
+            else RepairQuest.CompleteIfActive();
             Core.LogDebug("[Net] client applied RepairApplied (visual swap).");
         }
 
@@ -352,8 +363,9 @@ namespace RVRepairVan.Quests
                 // rather than leaving the player out of pocket with nothing happening.
                 if (RVRepairVanPreferences.RepairTakesADay && Base.RvRepairJob.Begin())
                 {
-                    if (RVRepairVanPreferences.QuestlineEnabled) { Stage = Paid; SyncEntry(); }
-                    WorldSay(_marcoT, L10n.T("Alright, I'll send the boys over to your RV. Give me a day - I'll text ya when she's done."));
+                    if (RVRepairVanPreferences.QuestlineEnabled) EnterPaid();
+                    // A client that booked hears the line on its own screen, after its cinematic.
+                    if (withCinematic) ReplyMarco(BookedLine());
                     Core.Log.Msg("[Net] host booked Marco's repair job for " + MoneyManager.FormatAmount(paid) + ".");
                     return true;
                 }
@@ -364,17 +376,20 @@ namespace RVRepairVan.Quests
                     {
                         RepairStateStore.SetRepaired(true);
                         NetworkBus.BroadcastToAll(RvOp.RepairApplied);
-                        if (RVRepairVanPreferences.QuestlineEnabled) { Stage = Paid; SyncEntry(); }   // setter broadcasts StageSync
+                        if (RVRepairVanPreferences.QuestlineEnabled) EnterPaid();   // setter broadcasts StageSync
                         else RepairQuest.CompleteIfActive();
                         Core.Log.Msg("[Net] host repaired the RV for " + MoneyManager.FormatAmount(paid) + " (broadcast to clients).");
                     }
                 };
 
                 if (withCinematic)
+                {
+                    if (RVRepairVanPreferences.QuestlineEnabled) SayMarco(L10n.T("Alright, let me grab my tools."));
                     RVRepairVan.Effects.RepairCinematic.Play(
                         () => commit(),
-                        () => WorldSay(_marcoT, L10n.T("There she is, good as new. Try not to blow her up again, buddy.")),
+                        () => MarcoOpens(RepairDoneLine()),
                         () => GruntNpc(FindNpc(MarcoId)));
+                }
                 else
                     commit();   // a client acted; do it now and let our broadcast swap their RV during their cinematic
                 return true;

@@ -20,7 +20,6 @@ namespace RVRepairVan.Localization
                     "Dein Wohnmobil ist Schrott. Irgendwer in Hyland Point kennt doch sicher jemanden.",
 
                 // Objectives
-                ["Find a way to repair your RV"] = "Finde einen Weg, dein Wohnmobil zu reparieren",
                 ["Ask Donna at the motel about your RV"] = "Frag Donna im Motel nach deinem Wohnmobil",
                 ["Talk to Mrs. Ming at the Chinese restaurant"] = "Sprich mit Mrs. Ming im Chinarestaurant",
                 ["Pick up Mrs. Ming's crate from the dead drop"] = "Hol Mrs. Mings Kiste am Toten Briefkasten ab",
@@ -28,8 +27,21 @@ namespace RVRepairVan.Localization
                 ["Tell Marco at the docks that Mrs. Ming sent you"] = "Sag Marco am Hafen, dass Mrs. Ming dich schickt",
                 ["Pick up Marco's package from the dead drop"] = "Hol Marcos Paket am Toten Briefkasten ab",
                 ["Bring the package to Marco"] = "Bring das Paket zu Marco",
-                ["Pay Marco for the repair"] = "Bezahl Marco für die Reparatur",
+                ["Pay Marco for the repair ({0})"] = "Bezahl Marco für die Reparatur ({0})",
+                ["Wait for Marco's text"] = "Warte auf Marcos Nachricht",
                 ["Go see your RV"] = "Sieh dir dein Wohnmobil an",
+
+                // Second quest: from the repaired RV to the workshop floor
+                ["Home on Wheels"] = "Zuhause auf Rädern",
+                ["Marco can do more to the RV."] = "Marco kann noch mehr aus dem Wohnmobil machen.",
+                ["Ask Marco about the build-outs"] = "Frag Marco nach den Ausbauten",
+                ["Have Marco put the engine in"] = "Lass Marco den Motor einbauen",
+                ["Have Marco put the engine in ({0})"] = "Lass Marco den Motor einbauen ({0})",
+                ["Drive the RV onto Marco's lot"] = "Fahr das Wohnmobil auf Marcos Hof",
+                ["Have Marco put in the workshop floor there"] = "Lass Marco dort den Werkstattboden einbauen",
+                ["Have Marco put in the workshop floor there ({0})"] = "Lass Marco dort den Werkstattboden einbauen ({0})",
+                ["Floor's in. You can set up shop in there now. Crew room and a loading dock I can do too, just ask."] =
+                    "Boden ist drin. Jetzt kannst du da drin aufbauen. Crew-Raum und Laderampe mach ich dir auch, frag einfach.",
 
                 // Donna
                 ["My RV got blown up. Know anyone who can fix it?"] =
@@ -61,6 +73,8 @@ namespace RVRepairVan.Localization
                 ["Ming sent ya? Well, any friend of hers. That RV's a burnt-out shell, buddy - another week and she'd have gone to the crusher. Normally that's {0}. For you, {1}."] =
                     "Ming schickt dich? Na, ihre Freunde sind auch meine Freunde. Das Ding ist ein ausgebranntes Wrack, Kumpel - noch eine Woche und es wär in der Schrottpresse gelandet. Normal kostet das {0}. Für dich {1}.",
                 ["Repair my RV ({0})"] = "Mein Wohnmobil reparieren ({0})",
+                ["Repair it ({0})"] = "Repariere es ({0})",
+                ["Later."] = "Später.",
                 ["Can you go any lower?"] = "Geht's noch billiger?",
                 ["Tell ya what. There's a package of mine in a dead drop. Bring it here and we'll talk."] =
                     "Ich sag dir was. In einem Toten Briefkasten liegt ein Paket von mir. Bring's her, dann reden wir.",
@@ -80,6 +94,8 @@ namespace RVRepairVan.Localization
                 ["Alright, let me grab my tools."] = "Alles klar, ich hol mein Werkzeug.",
                 ["There she is, good as new. Try not to blow her up again, buddy."] =
                     "Da steht sie, wie neu. Jag sie nicht gleich wieder in die Luft, Kumpel.",
+                ["There she is, good as new. Go take a look, and try not to blow her up again, buddy."] =
+                    "Da steht sie, wie neu. Geh sie dir ansehen, und jag sie nicht gleich wieder in die Luft, Kumpel.",
                 ["Hope she runs fine. If you want more out of her, come see me - I do build-outs too."] =
                     "Hoffe, sie läuft. Wenn du mehr aus ihr rausholen willst, komm vorbei - ich mach auch Ausbauten.",
                 ["Hope she runs fine, buddy."] = "Hoffe, sie läuft, Kumpel.",
@@ -110,12 +126,16 @@ namespace RVRepairVan.Localization
                 ["Dock's done. Deliveries can come straight to the RV now."] =
                     "Rampe steht. Lieferungen kommen jetzt direkt zum Wohnmobil.",
                 ["She runs. Just don't leave the keys in."] = "Sie läuft. Lass bloß den Schlüssel nicht stecken.",
+                ["She runs. Just don't leave the keys in. Drive her onto the lot out front and tell me to pimp your ride - the workshop floor goes in there."] =
+                    "Sie läuft. Lass bloß den Schlüssel nicht stecken. Fahr sie vorne auf den Parkplatz und sag mir, ich soll deine Karre aufmotzen - da kommt der Werkstattboden rein.",
 
                 // Marco's bodyshop: the RV's furniture and the workshop floor
                 ["RV"] = "Wohnmobil",
                 ["Can you do more to the RV?"] = "Kannst du noch mehr am Wohnmobil machen?",
-                ["Park her on the lot out front, then ask me to modify your vehicle."] =
-                    "Stell sie vorne auf den Parkplatz und sag mir dann, dass ich dein Fahrzeug umbauen soll.",
+                ["Park her on the lot out front, then tell me to pimp your ride. The workshop floor goes in there."] =
+                    "Stell sie vorne auf den Parkplatz und sag mir dann, ich soll deine Karre aufmotzen. Da kommt der Werkstattboden rein.",
+                ["Paint and furniture on the lot out front, crew room and loading dock right here. Just say the word."] =
+                    "Lack und Möbel vorne auf dem Parkplatz, Crew-Raum und Laderampe direkt hier. Sag einfach Bescheid.",
                 ["I can't work on her where she sits. Get the engine in first, then drive her over."] =
                     "Da, wo sie steht, kann ich nicht an ihr arbeiten. Erst kommt der Motor rein, dann fährst du sie rüber.",
                 ["Interior"] = "Innenraum",

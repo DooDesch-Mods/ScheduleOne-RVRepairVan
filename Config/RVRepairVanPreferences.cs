@@ -39,6 +39,18 @@ namespace RVRepairVan.Config
         private static MelonPreferences_Entry<bool> _netPingDebug;
 #endif
 
+#if DEBUG
+        /// <summary>Sets a bool or string setting in memory, for a test.</summary>
+        internal static void DebugSet(string name, string value)
+        {
+            MelonPreferences_Entry entry = _category?.GetEntry(name);
+            if (entry is MelonPreferences_Entry<bool> flag && bool.TryParse(value, out bool on)) flag.Value = on;
+            else if (entry is MelonPreferences_Entry<string> text) text.Value = value;
+            else { Core.Log.Warning("[Debug] rvpref: no bool or string setting '" + name + "' takes '" + value + "'."); return; }
+            Core.Log.Msg("[Debug] rvpref: " + name + " = " + value);
+        }
+#endif
+
         internal static void Initialize()
         {
             if (_category != null)
@@ -50,7 +62,7 @@ namespace RVRepairVan.Config
             _enabled = CreateEntry("Enabled", true, "Enabled", "Enable the RV repair feature.");
             _repairPrice = CreateEntry("RepairPrice", 1500, "Repair Price", "Cash required to repair the RV (Simple mode, and the price floor).");
             _questMode = CreateEntry("QuestMode", "Questline", "Quest Mode",
-                "Questline (default) = the full Donna -> Ming -> Marco story (see docs/QUESTLINE.md). Simple = just talk to Marco and pay.");
+                "Questline (default) = the full Donna -> Ming -> Marco story. Simple = just talk to Marco and pay.");
             _basePriceNoReferral = CreateEntry("BasePriceNoReferral", 50000, "Questline: Price without referral",
                 "Marco's price in Questline mode if you go straight to him.");
             _basePriceWithReferral = CreateEntry("BasePriceWithReferral", 10000, "Questline: Price with Ming's referral",

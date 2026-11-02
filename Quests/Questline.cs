@@ -9,24 +9,27 @@ using RVRepairVan.Managers;
 using RVRepairVan.Net;
 using RVRepairVan.Persistence;
 using S1API.Quests;
+using S1API.Quests.Constants;
 using UnityEngine.Events;
 
 namespace RVRepairVan.Quests
 {
     /// <summary>
     /// "Back on the Road" - the configurable RV-repair questline (QuestMode = Questline). See
-    /// docs/QUESTLINE.md (player) and docs/QUEST-SCRIPT.md (exact trace).
+    /// Workspace/docs/RVRepairVan/QUESTLINE.md (player) and QUEST-SCRIPT.md (exact trace).
     /// Donna -> Ming (crate dead-drop errand) -> Marco (referral price + optional trust pickup + packaged
-    /// samples) -> pay -> check the RV. A single stage value drives the objective AND the price tier
+    /// samples) -> pay -> check the RV. A single stage value drives the journal AND the price tier
     /// (ReferralUsed / Trusted are derived from Stage). Progress persists per save via RepairStateStore.
     /// </summary>
     internal static partial class Questline
     {
         // Persisted stages (RepairStateStore.GetStage/SetStage). The stage encodes ALL progression, so the
         // price tier is derived from it: the 10k referral price (ReferralUsed) at >= ReadyToPay, the sample
-        // discount (Trusted_) at >= Trusted.
+        // discount (Trusted_) at >= Trusted. BuildOutsAsked comes after the story: the player has asked Marco what
+        // more he can do, which is all "Home on Wheels" needs to remember beyond the upgrade mask.
         private const int None = 0, Started = 1, AskedDonna = 2, MingErrand = 3, MingCrate = 4,
-                          Referred = 5, MarcoMet = 6, ReadyToPay = 7, Trusted = 8, Paid = 9, Done = 10;
+                          Referred = 5, MarcoMet = 6, ReadyToPay = 7, Trusted = 8, Paid = 9, Done = 10,
+                          BuildOutsAsked = 11;
 
         /// <summary>
         /// The stage a freshly loaded save should run at. A repaired RV with the story stored mid-way (Simple mode
@@ -41,7 +44,15 @@ namespace RVRepairVan.Quests
         }
 
         // NPC ids in the game's registry (same ids S1API uses). Reliable lookup; see FindNpc().
-        private const string DonnaId = "donna_martin", MingId = "ming", MarcoId = "marco_baron";
+        private const string DonnaId = "donna_martin", MingId = "ming";
+        internal const string MarcoId = "marco_baron";
+
+        // Containers whose one node is rewritten before it opens: the way a choice answers without ending the talk.
+        private const string MarcoSayName = "rv_marco_say", MingSayName = "rv_ming_say", MoreEngineName = "rv_marco_more_engine";
+
+        // S1API restores a saved quest during the load, somewhere around the moment our own save state arrives. The
+        // build-out quest waits this many seconds past that, so it never starts a second copy of a restored one.
+        private const int BuildOutTickDelay = 5;
 
         // Custom carried items placed in the dead drops, and the fee if the player loses one.
         private const string CrateId = "rv_ming_crate", PackageId = "rv_marco_package";
@@ -71,7 +82,9 @@ namespace RVRepairVan.Quests
         private static bool _cratePlaced, _pkgPlaced;   // a real item was placed in that drop (else proximity fallback)
         private static bool _itemsRegistered;
         private static bool _clientCheckedRv;    // co-op client: reported reaching the post-repair RV once
+        private static bool _errandRestored;     // the saved package run is back, so SyncEntry may store it again
         private static int _gen;                 // scene generation - stops stale coroutines after a reload
+        private static Conversation _marcoSay, _mingSay, _marcoQuote, _marcoMoreEngine;   // null = bubbles instead
 
         private static Transform _donnaT, _mingT, _marcoT;
         private static DialogueController _donnaDC, _mingDC, _marcoDC;   // kept for the rvdiag dump
@@ -175,6 +188,9 @@ namespace RVRepairVan.Quests
             _pickupActive = false;
             _hasPackage = false;
             _clientCheckedRv = false;
+            _errandRestored = false;
+            _marcoSay = _mingSay = _marcoQuote = _marcoMoreEngine = null;
+            QuestSteps.ResetScene();
             _drop = null;
             _crateDrop = null;
             _cratePlaced = _pkgPlaced = false;   // _itemsRegistered stays - registration persists across resets
@@ -282,6 +298,29 @@ namespace RVRepairVan.Quests
             catch (Exception e) { Core.Log.Warning("[Debug] rvdiag failed: " + e.Message); }
         }
 
+        /// <summary>Debug (rvquest): both journal quests step by step, plus the values they are derived from.</summary>
+        internal static void DebugQuests()
+        {
+            Core.Log.Msg("[rvquest] stage=" + Stage + " mask=" + Base.RvUpgrades.Mask + " repaired=" + RepairStateStore.GetRepaired()
+                + " pickup=" + _pickupActive + " hasPackage=" + _hasPackage + " errand=" + RepairStateStore.GetPackageErrand()
+                + " inGarage=" + Garage.RvGarage.InGarage() + " price=" + CurrentPrice());
+            Vector3 rv = RVManager.TryGetPosition(out Vector3 rvAt) ? rvAt : Vector3.zero;
+            Core.Log.Msg("[rvquest] at donna=" + Where(_donnaT) + " ming=" + Where(_mingT) + " marco=" + Where(_marcoT)
+                + " rv=" + rv.x.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)
+                + "," + rv.y.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)
+                + "," + rv.z.ToString("F1", System.Globalization.CultureInfo.InvariantCulture));
+            QuestSteps.Dump(RepairQuest.Title);
+            QuestSteps.Dump(BuildOutQuest.Title);
+        }
+
+        private static string Where(Transform t)
+        {
+            if (t == null) return "-";
+            var c = System.Globalization.CultureInfo.InvariantCulture;
+            Vector3 p = t.position;
+            return p.x.ToString("F1", c) + "," + p.y.ToString("F1", c) + "," + p.z.ToString("F1", c);
+        }
+
         // Reads the choices back off the live DialogueController (not our own bookkeeping) so the dump shows what
         // the game actually has - including anything another mod added to the same NPC.
         private static void DumpChoices(string who, DialogueController dc)
@@ -309,6 +348,8 @@ namespace RVRepairVan.Quests
         internal static void DebugOpen(string who)
         {
             DialogueController dc = who == "donna" ? _donnaDC : who == "ming" ? _mingDC : who == "marco" ? _marcoDC : null;
+            // Simple mode never looks up the quest NPCs, and Marco still greets the player there.
+            if (dc == null && who == "marco") dc = ControllerOf(FindNpc(MarcoId), out _);
             if (dc == null) { Core.Log.Warning("[Debug] rvpick open: no dialogue for '" + who + "'."); return; }
             dc.StartGenericDialogue();
             Core.Log.Msg("[Debug] rvpick open: " + who + "'s dialogue started.");
@@ -334,7 +375,8 @@ namespace RVRepairVan.Quests
             // On a co-op CLIENT the local save is not authoritative - the host's snapshot (RequestSnapshot ->
             // StageSync/RepairApplied) drives our journal instead, so don't restore from stale local state.
             if (NetworkBus.Online && !NetworkBus.IsServer) yield break;
-            try { if (Active && Stage >= Started && Stage < Done) EnsureQuest(); }
+            // Enabled, not Active: at Paid the RV can stand repaired again, and "Go see your RV" is still open.
+            try { if (RVRepairVanPreferences.Enabled && Stage >= Started && Stage < Done) EnsureQuest(); }
             catch (Exception e) { Core.Log.Warning("[Questline] restore failed: " + e.Message); }
         }
 
@@ -369,7 +411,7 @@ namespace RVRepairVan.Quests
                 // real positions (host/offline only; a co-op client's POI is driven by the host snapshot).
                 try
                 {
-                    if (!(NetworkBus.Online && !NetworkBus.IsServer) && Active && Stage >= Started && Stage < Done)
+                    if (!(NetworkBus.Online && !NetworkBus.IsServer) && RVRepairVanPreferences.Enabled && Stage >= Started && Stage < Done)
                     {
                         EnsureQuest();
                         Core.LogDebug("[Questline] post-inject POI re-sync (Marco resolved=" + (_marcoT != null) + ").");
@@ -457,7 +499,9 @@ namespace RVRepairVan.Quests
                           .Add("MING_DEFER_LOSS", L10n.T("I'll come back with the money."), "MING_LOSS_DEFER"))
                 .AddNode("MING_LOSS_DEFER", L10n.T(MingShort)));
 
-            if (!degraded && (offer == null || deliver == null || lost == null)) return false;
+            _mingSay = S1Container(npc, MingSayName, b => b.AddNode("ENTRY", "..."));
+
+            if (!degraded && (offer == null || deliver == null || lost == null || _mingSay == null)) return false;
 
             OnPick(npc, "MING_ACCEPT", OnAcceptErrand);
             // Without its sub-menu this choice carries neither a Conversation nor an action, so picking it does
@@ -501,12 +545,34 @@ namespace RVRepairVan.Quests
             var bringInfoC = S1Container(npc, "rv_marco_bring", b => b
                 .AddNode("ENTRY", BringInfoLine()));
 
-            if (!degraded && (favourC == null || gotpkgC == null || lostpkgC == null || bringInfoC == null)) return false;
+            _marcoSay = S1Container(npc, MarcoSayName, b => b.AddNode("ENTRY", "..."));
+            // The quote and its next steps, so "Mrs. Ming sent me" does not end the talk. PrepareQuote fills in the
+            // numbers when the choice is picked.
+            _marcoQuote = S1Container(npc, "rv_marco_quote", b => b
+                .AddNode("ENTRY", "...",
+                    c => c.Add("MARCO_QUOTE_REPAIR", "...", null)
+                          .Add("MARCO_QUOTE_LOWER", L10n.T("Can you go any lower?"), "MARCO_QUOTE_FAVOUR")
+                          .Add("MARCO_QUOTE_LATER", L10n.T("Later."), "MARCO_QUOTE_BYE"))
+                .AddNode("MARCO_QUOTE_FAVOUR", L10n.T("Tell ya what. There's a package of mine in a dead drop. Bring it here and we'll talk."))
+                .AddNode("MARCO_QUOTE_BYE", L10n.T(MarcoShort)));
+            _marcoMoreEngine = S1Container(npc, MoreEngineName, b => b
+                .AddNode("ENTRY", L10n.T("I can't work on her where she sits. Get the engine in first, then drive her over."),
+                    c => c.Add("MARCO_MORE_ENGINE", "...", null)
+                          .Add("MARCO_MORE_LATER", L10n.T("Later."), "MARCO_MORE_BYE"))
+                .AddNode("MARCO_MORE_BYE", L10n.T(MarcoShort)));
+
+            if (!degraded && (favourC == null || gotpkgC == null || lostpkgC == null || bringInfoC == null
+                              || _marcoSay == null || _marcoQuote == null || _marcoMoreEngine == null)) return false;
+
+            OnPick(npc, "MARCO_QUOTE_REPAIR", OnMarcoRepair);
+            OnPick(npc, "MARCO_QUOTE_LOWER", OnMarcoFavour);
+            OnPick(npc, "MARCO_MORE_ENGINE", () => Base.RvUpgrades.Buy(Base.RvUpgrade.Engine));
 
             // Mrs. Ming's name is in the first line the player can say, so the quote they hear is already the
             // referral price. Saves made before this change can sit at MarcoMet; they get the same choice.
             AddChoice(marco, L10n.T("Mrs. Ming sent me. Can you fix my RV?"), MarcoPriorityTop,
-                () => Active && (Stage == Referred || Stage == MarcoMet), OnMarcoReferral);
+                () => Active && (Stage == Referred || Stage == MarcoMet),
+                () => { PrepareQuote(); OnMarcoReferral(); }, _marcoQuote);
             _marcoRepairChoice = AddChoice(marco, RepairChoiceText(), MarcoPriorityTop - 3,
                 () => Active && ReferralUsed && Stage < Paid, OnMarcoRepair);
 
@@ -550,7 +616,7 @@ namespace RVRepairVan.Quests
                     () => Base.RvUpgrades.Available(up), () => Base.RvUpgrades.Buy(up));
             }
             AddChoice(marco, L10n.T("Can you do more to the RV?"), MarcoPriorityTop - 11,
-                () => Garage.RvGarage.AskMoreVisible(), () => SayMarco(Garage.RvGarage.AskMoreLine()));
+                () => Garage.RvGarage.AskMoreVisible(), OnMarcoMore);
             Core.LogDebug("[Questline] Marco dialogue injected" + (degraded ? " (degraded)." : "."));
             return true;
         }
@@ -788,8 +854,9 @@ namespace RVRepairVan.Quests
             {
                 // Co-op client: the fee comes out of this player's cash, the host advances the stage.
                 int ticket = ClientPayment.Charge(LostPackageFee, "Ming's fee");
-                if (ticket == 0) { WorldSay(_mingT, L10n.T(MingShort)); return; }
+                if (ticket == 0) { ReplyMing(L10n.T(MingShort)); return; }
                 NetworkBus.SendToHost(RvOp.MingPayLoss, 0, ticket, LostPackageFee);
+                ReplyMing(L10n.T(MingPaid));
                 return;
             }
             HostMingPayLoss(-1);
@@ -804,7 +871,7 @@ namespace RVRepairVan.Quests
             if (Stage != MingCrate) { Core.LogDebug("[Questline] Ming fee ignored - stage " + Stage + "."); return false; }
             if (clientPaid < 0)
             {
-                if (S1API.Money.Money.GetCashBalance() < LostPackageFee) { WorldSay(_mingT, L10n.T(MingShort)); return false; }
+                if (S1API.Money.Money.GetCashBalance() < LostPackageFee) { ReplyMing(L10n.T(MingShort)); return false; }
                 S1API.Money.Money.ChangeCashBalance(-LostPackageFee, true, true);
             }
             else if (clientPaid != LostPackageFee)
@@ -813,7 +880,7 @@ namespace RVRepairVan.Quests
                 return false;
             }
             Stage = Referred;
-            WorldSay(_mingT, L10n.T(MingPaid));
+            if (clientPaid < 0) ReplyMing(L10n.T(MingPaid));   // a paying client says this line on its own screen
             SyncEntry();
             return true;
         }
@@ -832,9 +899,54 @@ namespace RVRepairVan.Quests
             }
             Stage = ReadyToPay;          // ReferralUsed -> the referral price applies
             RefreshRepairChoice();
-            WorldSay(_marcoT, L10n.T("Ming sent ya? Well, any friend of hers. That RV's a burnt-out shell, buddy - another week and she'd have gone to the crusher. Normally that's {0}. For you, {1}.",
-                MoneyManager.FormatAmount(RVRepairVanPreferences.BasePriceNoReferral), MoneyManager.FormatAmount(CurrentPrice())));
+            // Only without the quote container: with it, the line is already on screen.
+            if (_marcoQuote == null) WorldSay(_marcoT, QuoteLine(CurrentPrice()));
             SyncEntry();
+        }
+
+        private static string QuoteLine(int price) =>
+            L10n.T("Ming sent ya? Well, any friend of hers. That RV's a burnt-out shell, buddy - another week and she'd have gone to the crusher. Normally that's {0}. For you, {1}.",
+                MoneyManager.FormatAmount(RVRepairVanPreferences.BasePriceNoReferral), MoneyManager.FormatAmount(price));
+
+        // Runs right before the quote opens. The referral price is worked out here instead of read from Stage: on a
+        // co-op client the stage only moves when the host answers, after the quote is already on screen.
+        private static void PrepareQuote()
+        {
+            if (_marcoQuote == null) return;
+            int price = Mathf.Max(RVRepairVanPreferences.RepairPrice, RVRepairVanPreferences.BasePriceWithReferral - DiscountTotal);
+            var node = _marcoQuote.GetDialogueNodeByLabel("ENTRY");
+            if (node == null) { Core.Log.Warning("[Questline] Marco's quote has no ENTRY node - it opens with its placeholder."); return; }
+            node.DialogueText = QuoteLine(price);
+            if (node.choices != null && node.choices.Length > 0)
+                node.choices[0].ChoiceText = L10n.T("Repair it ({0})", MoneyManager.FormatAmount(price));
+        }
+
+        // "Can you do more to the RV?": Marco answers in the conversation, and without an engine he offers it there.
+        private static void OnMarcoMore()
+        {
+            if ((Stage == None || Stage == Done) && !RouteIntent(RvOp.AskedBuildOuts)) HostAskedBuildOuts();
+            if (!Base.RvUpgrades.Owned(Base.RvUpgrade.Engine) && OpenMoreEngine()) return;
+            ReplyMarco(Garage.RvGarage.AskMoreLine());
+        }
+
+        private static bool OpenMoreEngine()
+        {
+            try
+            {
+                if (_marcoMoreEngine == null) return false;
+                var node = _marcoMoreEngine.GetDialogueNodeByLabel("ENTRY");
+                var s1 = S1API.Entities.NPC.Get(MarcoId);
+                if (node == null || node.choices == null || node.choices.Length == 0 || s1 == null)
+                {
+                    Core.Log.Warning("[Questline] Marco's engine offer cannot open - he answers without it.");
+                    return false;
+                }
+                node.choices[0].ChoiceText = Base.RvUpgrades.ChoiceText(Base.RvUpgrade.Engine);
+                if (s1.Dialogue.JumpTo(MoreEngineName, "ENTRY", false)) return true;
+                Core.Log.Warning("[Questline] Marco's engine offer was refused by the dialogue - he answers without it.");
+            }
+            catch (Exception e) { Core.Log.Warning("[Questline] Marco's engine offer failed: " + e.Message); }
+            return false;
         }
 
         private static string ShortLine(int price) =>
@@ -849,55 +961,54 @@ namespace RVRepairVan.Quests
         {
             try
             {
-                if (!RVManager.IsDestroyed()) { WorldSay(_marcoT, L10n.T("Your RV looks fine to me.")); return; }
+                bool client = NetworkBus.Online && !NetworkBus.IsServer;
+                // A client's IsDestroyed can be stale (see Active), so only the host may answer "looks fine".
+                if (!client && !RVManager.IsDestroyed()) { ReplyMarco(L10n.T("Your RV looks fine to me.")); return; }
                 int price = CurrentPrice();
                 if (S1API.Money.Money.GetCashBalance() < price)
                 {
-                    WorldSay(_marcoT, ShortLine(price));
+                    ReplyMarco(ShortLine(price));
                     return;
                 }
-                WorldSay(_marcoT, L10n.T("Alright, let me grab my tools."));
 
                 // Co-op CLIENT: the repair (RV state + persistence) runs on the HOST, since RV.IsDestroyed is
                 // host-authoritative. The money is this player's own cash, so it is taken here and the host refunds
                 // it if it refuses. Play the cinematic locally; the host's RepairApplied swaps the RV during the black.
-                if (NetworkBus.Online && !NetworkBus.IsServer)
+                if (client)
                 {
                     int ticket = ClientPayment.Charge(price, "repair");
-                    if (ticket == 0) { WorldSay(_marcoT, ShortLine(price)); return; }
+                    if (ticket == 0) { ReplyMarco(ShortLine(price)); return; }
+                    WorldSay(_marcoT, L10n.T("Alright, let me grab my tools."));
                     NetworkBus.SendToHost(RvOp.PayRepair, 0, ticket, price);
                     RVRepairVan.Effects.RepairCinematic.Play(
                         null,   // no local field write - the host drives the visual via RepairApplied
-                        () => WorldSay(_marcoT, L10n.T("There she is, good as new. Try not to blow her up again, buddy.")),
+                        () => MarcoOpens(RepairStateStore.GetRepaired() ? RepairDoneLine() : BookedLine()),
                         () => GruntNpc(FindNpc(MarcoId)));
                     return;
                 }
 
-                // Co-op HOST: authoritative repair WITH the cinematic (the host player is the one acting).
-                if (NetworkBus.IsServer) { HostPayRepair(true); return; }
-
-                // Offline single-player: unchanged. Commit payment synchronously (so an interrupted cinematic can
-                // never double-charge), then play the repair cinematic and swap the RV while hidden.
-                S1API.Money.Money.ChangeCashBalance(-price, true, true);
-                int paid = price;
-                RVRepairVan.Effects.RepairCinematic.Play(
-                    () =>   // at the darkest point, with the swap hidden
-                    {
-                        if (RVManager.Repair())
-                        {
-                            RepairStateStore.SetRepaired(true);
-                            Stage = Paid;
-                            SyncEntry();   // objective -> Check on the RV
-                            Core.Log.Msg("[Questline] RV repaired for " + MoneyManager.FormatAmount(paid) + ".");
-#if SNITCH
-                            Snitch.Api.Profiler.Log("RVRepairVan", "RV repaired for " + MoneyManager.FormatAmount(paid) + " (stage -> Paid).");
-#endif
-                        }
-                    },
-                    () => WorldSay(_marcoT, L10n.T("There she is, good as new. Try not to blow her up again, buddy.")),
-                    () => GruntNpc(FindNpc(MarcoId)));   // mid-repair: Marco hurts himself
+                // Host, which is also what single player runs as: authoritative repair WITH the cinematic.
+                HostPayRepair(true);
             }
             catch (Exception e) { Core.Log.Error("[Questline] repair failed: " + e); }
+        }
+
+        private static string BookedLine() =>
+            L10n.T("Alright, I'll send the boys over to your RV. Give me a day - I'll text ya when she's done.");
+
+        // Questline mode has one step left, seeing the RV, and the line says so.
+        private static string RepairDoneLine() => RVRepairVanPreferences.QuestlineEnabled
+            ? L10n.T("There she is, good as new. Go take a look, and try not to blow her up again, buddy.")
+            : L10n.T("There she is, good as new. Try not to blow her up again, buddy.");
+
+        // Marco has the money: the errand is over whether or not it was finished, and the journal says so.
+        private static void EnterPaid()
+        {
+            _pickupActive = false;
+            _hasPackage = false;
+            _drop = null;
+            Stage = Paid;
+            SyncEntry();
         }
 
         private static void OnMarcoFavour()
@@ -940,8 +1051,9 @@ namespace RVRepairVan.Quests
             {
                 // Co-op client: the fee comes out of this player's cash, the host advances the stage.
                 int ticket = ClientPayment.Charge(LostPackageFee, "Marco's fee");
-                if (ticket == 0) { WorldSay(_marcoT, L10n.T(MarcoShort)); return; }
+                if (ticket == 0) { ReplyMarco(L10n.T(MarcoShort)); return; }
                 NetworkBus.SendToHost(RvOp.MarcoPayLoss, 0, ticket, LostPackageFee);
+                ReplyMarco(L10n.T(MarcoPaid));
                 return;
             }
             HostMarcoPayLoss(-1);
@@ -953,7 +1065,7 @@ namespace RVRepairVan.Quests
             if (!(_pickupActive && _hasPackage)) { Core.LogDebug("[Questline] Marco fee ignored - no lost package."); return false; }
             if (clientPaid < 0)
             {
-                if (S1API.Money.Money.GetCashBalance() < LostPackageFee) { WorldSay(_marcoT, L10n.T(MarcoShort)); return false; }
+                if (S1API.Money.Money.GetCashBalance() < LostPackageFee) { ReplyMarco(L10n.T(MarcoShort)); return false; }
                 S1API.Money.Money.ChangeCashBalance(-LostPackageFee, true, true);
             }
             else if (clientPaid != LostPackageFee)
@@ -965,7 +1077,7 @@ namespace RVRepairVan.Quests
             _hasPackage = false;
             _drop = null;
             Stage = Trusted;
-            WorldSay(_marcoT, L10n.T(MarcoPaid));
+            if (clientPaid < 0) ReplyMarco(L10n.T(MarcoPaid));   // a paying client says this line on its own screen
             SyncEntry();
             return true;
         }
@@ -982,7 +1094,7 @@ namespace RVRepairVan.Quests
                 ProductItemInstance product = slot?.ItemInstance?.TryCast<ProductItemInstance>();
                 if (product == null || product.AppliedPackaging == null)
                 {
-                    WorldSay(_marcoT, L10n.T("That ain't packaged, buddy. Bring it sealed."));
+                    ReplyMarco(L10n.T("That ain't packaged, buddy. Bring it sealed."));
                     return;
                 }
                 int discount = SampleUnitDiscount(product);
@@ -1006,7 +1118,7 @@ namespace RVRepairVan.Quests
                 // send the discount it computed and let the host apply + replicate the new price.
                 if (RouteIntent(RvOp.GiveSample, discount))
                 {
-                    WorldSay(_marcoT, thanks);
+                    ReplyMarco(thanks);
                     return;
                 }
                 HostGiveSample(discount, thanks);   // host or offline
@@ -1077,7 +1189,8 @@ namespace RVRepairVan.Quests
             Samples = Samples + 1;
             DiscountTotal = DiscountTotal + discount;   // setter broadcasts the new price (StageSync) to all clients
             RefreshRepairChoice();
-            WorldSay(_marcoT, thanks ?? L10n.T("Thanks, buddy. That's {0} off.", MoneyManager.FormatAmount(discount)));
+            if (thanks != null) ReplyMarco(thanks);   // null: a client gave it and hears the line on its own screen
+            SyncEntry();                              // the journal shows the price
         }
 
         // Premium or better meth gets Marco's chemistry line instead of the plain thanks.
@@ -1238,6 +1351,32 @@ namespace RVRepairVan.Quests
             catch (Exception e) { Core.Log.Warning("[ITEMDUMP] failed: " + e.Message); }
         }
 
+        // Where an errand item is after a load: in the player's hands, in a drop from an earlier session (the game saves
+        // drops), or nowhere yet. Earlier builds placed a new one on every load, so extras in other drops go here too.
+        private static S1API.DeadDrops.DeadDropInstance AdoptOrPlace(string id, Vector3 origin, out bool placed)
+        {
+            if (PlayerHasItem(id)) { placed = true; return null; }
+            S1API.DeadDrops.DeadDropInstance found = null;
+            try
+            {
+                var all = S1API.DeadDrops.DeadDropManager.All;
+                for (int i = 0; all != null && i < all.Length; i++)
+                {
+                    var d = all[i];
+                    if (d == null || d.IsEmpty) continue;
+                    int removed = d.Storage.RemoveAllOfDefinition(id);
+                    if (removed <= 0) continue;
+                    Core.Log.Msg("[Questline] '" + id + "' found in drop '" + d.Name + "' (" + removed + ")" + (found == null ? "." : " - extra copy removed."));
+                    if (found == null) found = d;
+                }
+            }
+            catch (Exception e) { Core.Log.Warning("[Questline] looking for '" + id + "' in the drops failed: " + e.Message); }
+
+            var drop = found ?? ReserveDeadDrop(origin);
+            placed = PlaceItem(drop, id);
+            return drop;
+        }
+
         // Place one unit of the item into the drop's storage. Returns true on success.
         private static bool PlaceItem(S1API.DeadDrops.DeadDropInstance drop, string id)
         {
@@ -1314,6 +1453,7 @@ namespace RVRepairVan.Quests
         {
             int myGen = _gen;
             int waitedForLoad = 0;
+            int loadedTicks = 0;
             while (myGen == _gen)
             {
                 yield return new WaitForSeconds(1f);
@@ -1329,6 +1469,13 @@ namespace RVRepairVan.Quests
                     if (waitedForLoad == 10) Core.Log.Warning("[Questline] save state not loaded after 10s - proceeding with current values.");
                 }
 
+                // Host and clients alike: this quest is derived from replicated values and owned by nobody.
+                if (++loadedTicks >= BuildOutTickDelay)
+                {
+                    try { BuildOutQuest.Tick(Stage == None || Stage >= Done, Stage >= BuildOutsAsked); }
+                    catch (Exception e) { Core.Log.Warning("[Quest] build-out tick failed: " + e.Message); }
+                }
+
                 // Co-op CLIENT: the HOST owns all stage advancement (auto-start, dead-drop pickups, the closing
                 // beat) and replicates it via StageSync/TransientSync. A client only renders - it must never write
                 // Stage/transient here, or it would fight the host's authoritative state. The ONE exception is the
@@ -1336,7 +1483,8 @@ namespace RVRepairVan.Quests
                 // finish the quest, and the host validates + completes for everyone. Offline + host run it all.
                 if (NetworkBus.Online && !NetworkBus.IsServer)
                 {
-                    if (Stage == Paid && !_clientCheckedRv
+                    // Only a repaired RV counts: while Marco's job runs the host ignores this report, and there is one.
+                    if (Stage == Paid && RepairStateStore.GetRepaired() && !_clientCheckedRv
                         && RVManager.TryGetPosition(out Vector3 crvp) && Dist(PlayerPos(), crvp) < 14f)
                     {
                         _clientCheckedRv = true;
@@ -1352,6 +1500,8 @@ namespace RVRepairVan.Quests
                     }
                     continue;
                 }
+
+                if (!_errandRestored) RestorePackageErrand();
 
                 // Auto-start: an ACTUAL wrecked RV must exist (IsDestroyed) AND the story must be past the explosion
                 // beat ("Getting Started" active / "Welcome to Hyland Point" completed). Requiring IsDestroyed means
@@ -1383,7 +1533,7 @@ namespace RVRepairVan.Quests
                         Core.Log.Msg("[Questline] RV is already repaired at stage " + Stage + " - finishing the story.");
                         Stage = Done;
                     }
-                    if (Stage == Done && RepairQuest.HasOpenEntry())
+                    if (Stage >= Done && RepairQuest.HasOpenEntry())
                     {
                         Core.Log.Msg("[Questline] story is finished but the journal entry is still open - closing it.");
                         RepairQuest.CompleteIfActive();
@@ -1403,9 +1553,8 @@ namespace RVRepairVan.Quests
                     {
                         if (_cratePoint == Vector3.zero && _mingT != null)
                         {
-                            _crateDrop = ReserveDeadDrop(_mingT.position);
+                            _crateDrop = AdoptOrPlace(CrateId, _mingT.position, out _cratePlaced);
                             _cratePoint = _crateDrop != null ? _crateDrop.Position : _mingT.position + new Vector3(8f, 0f, 8f);
-                            _cratePlaced = PlaceItem(_crateDrop, CrateId);
                             SyncEntry();
                         }
                         // "Collected" = a player now HOLDS the crate (robust + works for either player), NOT the drop's
@@ -1420,8 +1569,15 @@ namespace RVRepairVan.Quests
                     // Marco's package: collected once the player empties the drop (real item), else proximity.
                     if (_pickupActive && !_hasPackage)
                     {
+                        // After a reload the run is back but its drop is not known yet. Same wait for Marco as the crate.
+                        if (_dropPoint == Vector3.zero && _marcoT != null)
+                        {
+                            _drop = AdoptOrPlace(PackageId, _marcoT.position, out _pkgPlaced);
+                            _dropPoint = _drop != null ? _drop.Position : _marcoT.position + new Vector3(10f, 0f, 10f);
+                            SyncEntry();
+                        }
                         bool got = _pkgPlaced ? PlayerHasItem(PackageId)
-                                              : (Dist(p, _dropPoint) < 5f);
+                                              : (_dropPoint != Vector3.zero && Dist(p, _dropPoint) < 5f);
                         if (got) { _hasPackage = true; SyncEntry(); }
                     }
                 }
@@ -1434,42 +1590,100 @@ namespace RVRepairVan.Quests
         private static void EnsureQuest()
         {
             RepairQuest.StartIfNeeded();
+            if (RepairQuest.HasEntry()) SyncEntry();
+            else MelonCoroutines.Start(SyncWhenBuilt());
+        }
+
+        // The steps are added a frame or two after CreateQuest.
+        private static IEnumerator SyncWhenBuilt()
+        {
+            int myGen = _gen;
+            for (int i = 0; i < 60 && !RepairQuest.HasEntry(); i++) yield return null;
+            if (myGen == _gen) SyncEntry();
+        }
+
+        /// <summary>Marco's job ended outside the story's own handlers, and the journal shows that.</summary>
+        internal static void RefreshEntries() => SyncEntry();
+
+        // The saved package run comes back at the first host tick after the load. A run whose stage has moved on is
+        // over (older builds never stored one, so this only meets values this build wrote).
+        private static void RestorePackageErrand()
+        {
+            _errandRestored = true;
+            int errand = RepairStateStore.GetPackageErrand();
+            if (errand == 0) return;
+            if (Stage != ReadyToPay)
+            {
+                Core.Log.Msg("[Questline] saved package run dropped - stage " + Stage + ".");
+                RepairStateStore.SetPackageErrand(0);
+                return;
+            }
+            _pickupActive = true;
+            _hasPackage = errand == 2;
+            Core.Log.Msg("[Questline] package run restored (has package: " + _hasPackage + ").");
             SyncEntry();
+        }
+
+        private static int CurrentStep(int stage)
+        {
+            switch (stage)
+            {
+                case None:
+                case Started:    return RepairRVQuest.StepDonna;
+                case AskedDonna: return RepairRVQuest.StepMing;
+                case MingErrand: return RepairRVQuest.StepCrate;
+                case MingCrate:  return RepairRVQuest.StepBring;
+                case Referred:
+                case MarcoMet:   return RepairRVQuest.StepTell;
+                case ReadyToPay:
+                case Trusted:    return RepairRVQuest.StepPay;
+                case Paid:       return RepairStateStore.GetRepaired() ? RepairRVQuest.StepSee : RepairRVQuest.StepWait;
+                default:         return RepairRVQuest.StepCount;
+            }
+        }
+
+        private static QuestState StoryStep(int step, int current) =>
+            step < current ? QuestState.Completed : step == current ? QuestState.Active : QuestState.Inactive;
+
+        // The package run is optional, so it shows only if the player took it. After the payment what is done stays
+        // done and anything unfinished leaves the journal.
+        private static QuestState PackageStep(QuestState now, int stage, bool active, bool completed)
+        {
+            if (stage >= Paid) return now == QuestState.Completed ? QuestState.Completed : QuestState.Inactive;
+            return active ? QuestState.Active : completed ? QuestState.Completed : QuestState.Inactive;
         }
 
         private static void SyncEntry()
         {
-            string title;
-            string npcId = null;   // set when the marker should follow an NPC live instead of a fixed point
-            Vector3 poi;
+            if (_errandRestored) RepairStateStore.SetPackageErrand(_pickupActive ? (_hasPackage ? 2 : 1) : 0);
 
-            if (_pickupActive)
+            // From Done on, the quest is finished by RepairQuest.CompleteIfActive and has no step left to set.
+            int stage = Stage;
+            if (stage < Done && QuestSteps.TryOpen(RepairQuest.Title, RepairRVQuest.StepCount, out QuestSteps s))
             {
-                title = _hasPackage ? L10n.T("Bring the package to Marco") : L10n.T("Pick up Marco's package from the dead drop");
-                if (_hasPackage) { npcId = MarcoId; poi = MarcoPos(); } else poi = _dropPoint;
+                int current = CurrentStep(stage);
+                Vector3 marco = MarcoPos();
+                s.Set(RepairRVQuest.StepDonna, StoryStep(RepairRVQuest.StepDonna, current), null, DonnaId, DonnaPos());
+                s.Set(RepairRVQuest.StepMing, StoryStep(RepairRVQuest.StepMing, current), null, MingId, MingPos());
+                s.Set(RepairRVQuest.StepCrate, StoryStep(RepairRVQuest.StepCrate, current), null, null,
+                    _cratePoint != Vector3.zero ? _cratePoint : MingPos());
+                s.Set(RepairRVQuest.StepBring, StoryStep(RepairRVQuest.StepBring, current), null, MingId, MingPos());
+                s.Set(RepairRVQuest.StepTell, StoryStep(RepairRVQuest.StepTell, current), null, MarcoId, marco);
+                s.Set(RepairRVQuest.StepPay, StoryStep(RepairRVQuest.StepPay, current),
+                    L10n.T("Pay Marco for the repair ({0})", MoneyManager.FormatAmount(CurrentPrice())), MarcoId, marco);
+                s.Set(RepairRVQuest.StepPickup,
+                    PackageStep(s.State(RepairRVQuest.StepPickup), stage, _pickupActive && !_hasPackage, (_pickupActive && _hasPackage) || stage == Trusted),
+                    null, null, _dropPoint != Vector3.zero ? _dropPoint : marco);
+                s.Set(RepairRVQuest.StepDeliver,
+                    PackageStep(s.State(RepairRVQuest.StepDeliver), stage, _pickupActive && _hasPackage, stage == Trusted),
+                    null, MarcoId, marco);
+                // Waiting only happens when the repair takes a day. Past it, a skipped wait stays out of the journal.
+                QuestState wait = current == RepairRVQuest.StepWait ? QuestState.Active
+                    : current > RepairRVQuest.StepWait && s.State(RepairRVQuest.StepWait) != QuestState.Inactive ? QuestState.Completed
+                    : QuestState.Inactive;
+                s.Set(RepairRVQuest.StepWait, wait, null, null, RvPos());
+                s.Set(RepairRVQuest.StepSee, StoryStep(RepairRVQuest.StepSee, current), null, null, RvPos());
             }
-            else
-            {
-                switch (Stage)
-                {
-                    case Started:    title = L10n.T("Ask Donna at the motel about your RV"); npcId = DonnaId; poi = DonnaPos(); break;
-                    case AskedDonna: title = L10n.T("Talk to Mrs. Ming at the Chinese restaurant"); npcId = MingId; poi = MingPos(); break;
-                    case MingErrand: title = L10n.T("Pick up Mrs. Ming's crate from the dead drop"); poi = _cratePoint; break;
-                    case MingCrate:  title = L10n.T("Bring the crate to Mrs. Ming"); npcId = MingId; poi = MingPos(); break;
-                    case Referred:
-                    case MarcoMet:   title = L10n.T("Tell Marco at the docks that Mrs. Ming sent you"); npcId = MarcoId; poi = MarcoPos(); break;
-                    case ReadyToPay:
-                    case Trusted:    title = L10n.T("Pay Marco for the repair"); npcId = MarcoId; poi = MarcoPos(); break;
-                    case Paid:       title = L10n.T("Go see your RV"); poi = RvPos(); break;
-                    default:         title = L10n.T("Find a way to repair your RV"); poi = RvPos(); break;
-                }
-            }
-
-            // NPC stages: bind the marker to the NPC's live transform so it tracks them while they roam,
-            // instead of freezing wherever they happened to be when the stage advanced. poi is the fallback
-            // if the NPC can't be resolved yet.
-            if (npcId != null) RepairQuest.UpdateEntry(title, FindNpc(npcId), poi);
-            else RepairQuest.UpdateEntry(title, poi);
 
             // Host: re-broadcast the transient pickup/drop state on every entry change so clients render the same
             // objective text + dead-drop marker (clients reuse this exact SyncEntry, driven by the synced flags).
@@ -1530,7 +1744,100 @@ namespace RVRepairVan.Quests
 
         /// <summary>Say a line as Marco in the world. Used by the upgrade shop, which lives outside this class but
         /// speaks with Marco's voice and needs his transform, resolved here during NPC injection.</summary>
-        internal static void SayMarco(string line) => WorldSay(_marcoT, line);
+        internal static void SayMarco(string line) => WorldSay(MarcoTransform(), line);
+
+        // In Simple mode the questline never injects, so Marco's transform is looked up when needed.
+        private static Transform MarcoTransform()
+        {
+            if (_marcoT != null) return _marcoT;
+            NPC marco = FindNpc(MarcoId);
+            return marco != null ? ((Component)marco).transform : null;
+        }
+
+        /// <summary>Marco answers inside the open conversation. A choice that only acts would otherwise end the talk:
+        /// the dialogue closes unless the picked choice moved it to another node, and this moves it.</summary>
+        internal static void ReplyMarco(string line)
+        {
+            if (!RVRepairVanPreferences.QuestlineEnabled) { SayMarco(line); return; }
+            Say(MarcoId, MarcoSayName, _marcoSay, MarcoTransform(), line, false);
+        }
+
+        private static void ReplyMing(string line) => Say(MingId, MingSayName, _mingSay, _mingT, line, false);
+
+        /// <summary>Marco starts a conversation with a line, for after a repair or upgrade effect: the player's input
+        /// just came back and nobody is talking.</summary>
+        internal static void MarcoOpens(string line)
+        {
+            if (!RVRepairVanPreferences.QuestlineEnabled || _marcoSay == null) { SayMarco(line); return; }
+            MelonCoroutines.Start(MarcoOpensCoroutine(line));
+        }
+
+        private static IEnumerator MarcoOpensCoroutine(string line)
+        {
+            int myGen = _gen;
+            // The effect's done callback runs before ScreenTransition gives the movement and look locks back, which
+            // would release them under an open conversation. So the talk opens once that has happened.
+            yield return null;
+            yield return null;
+            if (myGen == _gen) Say(MarcoId, MarcoSayName, _marcoSay, MarcoTransform(), line, true);
+        }
+
+        /// <summary>Marco's first-contact greeting is a conversation of its own that closes after its line. Once Mrs.
+        /// Ming has sent the player his choices follow it, so the first talk already reaches the referral.</summary>
+        internal static void OnMarcoGreeted()
+        {
+            if (!RVRepairVanPreferences.QuestlineEnabled || Stage < Referred)
+            {
+                Core.Log.Msg("[Questline] Marco's greeting stays on its own (questline=" + RVRepairVanPreferences.QuestlineEnabled + " stage=" + Stage + ").");
+                return;
+            }
+            if (_marcoDC == null) { Core.Log.Warning("[Questline] Marco's greeting ran before his dialogue was found, no choices follow it."); return; }
+            var handler = _marcoDC.GetComponent<Il2CppScheduleOne.Dialogue.DialogueHandler>();
+            if (handler == null) { Core.Log.Warning("[Questline] Marco has no dialogue handler, no choices follow his greeting."); return; }
+            // Without this the end of the greeting releases him for a moment and he turns away before the choices show.
+            handler.SkipNextDialogueBehaviourEnd();
+            MelonCoroutines.Start(MarcoChoicesAfterGreeting(_marcoDC, handler));
+        }
+
+        private static IEnumerator MarcoChoicesAfterGreeting(DialogueController dc, Il2CppScheduleOne.Dialogue.DialogueHandler handler)
+        {
+            int myGen = _gen;
+            // The conversation-start event runs before the talk opens, and a seated Marco stands up first.
+            float openBy = Time.realtimeSinceStartup + 3f;
+            while (myGen == _gen && !handler.IsDialogueInProgress && Time.realtimeSinceStartup < openBy) yield return null;
+            while (myGen == _gen && handler.IsDialogueInProgress) yield return null;
+            // The end of the talk gives the movement and look locks back within these frames, see MarcoOpensCoroutine.
+            yield return null;
+            yield return null;
+            if (myGen != _gen) { Core.Log.Msg("[Questline] the scene changed during Marco's greeting, no choices follow it."); yield break; }
+            try
+            {
+                dc.StartGenericDialogue();
+                Core.Log.Msg("[Questline] Marco's choices follow his greeting.");
+            }
+            catch (Exception e) { Core.Swallowed("Questline.MarcoChoicesAfterGreeting", e); }
+        }
+
+        private static void Say(string npcId, string container, Conversation conv, Transform t, string line, bool enableBehaviour)
+        {
+            try
+            {
+                var node = conv != null ? conv.GetDialogueNodeByLabel("ENTRY") : null;
+                var s1 = S1API.Entities.NPC.Get(npcId);
+                if (node != null && s1 != null)
+                {
+                    node.DialogueText = line;
+                    if (s1.Dialogue.JumpTo(container, "ENTRY", enableBehaviour))
+                    {
+                        Core.Log.Msg("[Reply] " + npcId + ": " + line);
+                        return;
+                    }
+                    Core.Log.Warning("[Reply] " + npcId + ": dialogue refused '" + container + "' - the line goes in a bubble.");
+                }
+            }
+            catch (Exception e) { Core.Log.Warning("[Reply] " + npcId + " failed, the line goes in a bubble: " + e.Message); }
+            WorldSay(t, line);
+        }
 
         private static void RefreshRepairChoice()
         {
@@ -1545,7 +1852,11 @@ namespace RVRepairVan.Quests
             catch (Exception e) { Core.Swallowed("Questline.RefreshRepairChoice.upgrades", e); }
         }
 
-        internal static void RefreshPrice() => RefreshRepairChoice();
+        internal static void RefreshPrice()
+        {
+            RefreshRepairChoice();
+            if (RVRepairVanPreferences.QuestlineEnabled && Stage >= Started && Stage < Paid) SyncEntry();   // the journal shows it too
+        }
 
         private static string RepairChoiceText() => L10n.T("Repair my RV ({0})", MoneyManager.FormatAmount(CurrentPrice()));
 
@@ -1573,5 +1884,6 @@ namespace RVRepairVan.Quests
         private static Vector3 DonnaPos() => _donnaT != null ? _donnaT.position : RvPos();
         private static Vector3 MingPos() => _mingT != null ? _mingT.position : RvPos();
         private static Vector3 MarcoPos() => _marcoT != null ? _marcoT.position : RvPos();
+        internal static Vector3 MarcoPosition() => MarcoPos();
     }
 }

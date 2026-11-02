@@ -100,7 +100,7 @@ namespace RVRepairVan.Base
             }
         }
 
-        private static string DoneLine(RvUpgrade up)
+        internal static string DoneLine(RvUpgrade up)
         {
             switch (up)
             {
@@ -111,7 +111,9 @@ namespace RVRepairVan.Base
                 case RvUpgrade.LoadingDock:
                     return L10n.T("Dock's done. Deliveries can come straight to the RV now.");
                 case RvUpgrade.Engine:
-                    return L10n.T("She runs. Just don't leave the keys in.");
+                    return Owned(RvUpgrade.WorkshopFloor)
+                        ? L10n.T("She runs. Just don't leave the keys in.")
+                        : L10n.T("She runs. Just don't leave the keys in. Drive her onto the lot out front and tell me to pimp your ride - the workshop floor goes in there.");
                 default: return "";
             }
         }
@@ -147,11 +149,15 @@ namespace RVRepairVan.Base
                     int ticket = ClientPayment.Charge(price, "upgrade " + up);
                     if (ticket == 0)
                     {
-                        Questline.SayMarco(L10n.T("That's {0}, buddy. Come back when you've got it.", MoneyManager.FormatAmount(price)));
+                        Questline.ReplyMarco(L10n.T("That's {0}, buddy. Come back when you've got it.", MoneyManager.FormatAmount(price)));
                         return;
                     }
                     NetworkBus.SendToHost(RvOp.BuyUpgrade, (int)up, ticket, price);
-                    Effects.RepairCinematic.PlayUpgrade(null, null);
+                    Effects.RepairCinematic.PlayUpgrade(null, () =>
+                    {
+                        if (Owned(up)) Questline.MarcoOpens(DoneLine(up));
+                        else Core.Log.Warning("[Upgrade] " + up + " is not in the mask after the cinematic - the host refused or has not answered yet.");
+                    });
                     return;
                 }
 
@@ -177,7 +183,7 @@ namespace RVRepairVan.Base
                     if (S1API.Money.Money.GetCashBalance() < price)
                     {
                         Core.Log.Msg("[Upgrade] " + up + " rejected - short of " + MoneyManager.FormatAmount(price) + ".");
-                        Questline.SayMarco(L10n.T("That's {0}, buddy. Come back when you've got it.", MoneyManager.FormatAmount(price)));
+                        Questline.ReplyMarco(L10n.T("That's {0}, buddy. Come back when you've got it.", MoneyManager.FormatAmount(price)));
                         return false;
                     }
                     // Charge and record ownership in the SAME step. Deferring the mask to the cinematic's midpoint
@@ -198,7 +204,7 @@ namespace RVRepairVan.Base
                 // Apply is a retryable projection of that ownership - if it does not take now, the re-apply pass
                 // after the next load runs it again.
                 if (withCinematic)
-                    Effects.RepairCinematic.PlayUpgrade(() => Apply(up), () => Questline.SayMarco(DoneLine(up)));
+                    Effects.RepairCinematic.PlayUpgrade(() => Apply(up), () => Questline.MarcoOpens(DoneLine(up)));
                 else
                     Apply(up);   // a client acted - their own cinematic is already running
                 return true;
