@@ -4,6 +4,25 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [4.3.0] - 2026-11-02
+
+### Added
+- New quest "Home on Wheels" after the repair: ask Marco, get the engine, drive onto his lot, buy the workshop floor.
+- "Back on the Road" lists its steps in the journal and ticks them off as you go.
+
+### Changed
+- Marco answers you in the conversation: his price, too little cash, the repair and the build-outs no longer end the talk
+  in a speech bubble.
+
+### Fixed
+- Steering parts from the bodyshop turn the RV's wheels further, at every speed. Before, they changed nothing.
+- Marco's RV choices show after his first greeting. Before, the first talk ended after it.
+- Marco's package run carries on after a save is loaded.
+- In co-op, "Back on the Road" ends at the RV for every player, not only the host.
+
+### For mod authors
+- Other mods can read the RV's repair state and send it home through the RV Repair Van API.
+
 ## [4.2.0] - 2026-10-28
 
 ### Added
