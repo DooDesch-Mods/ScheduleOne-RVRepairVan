@@ -4,7 +4,8 @@
 
 > Your RV got blown up in the intro? Now you can fix it. A tracked side quest sends you
 > from Donna at the motel to Mrs. Ming to Marco the mechanic, with dead-drop errands, a
-> haggled price and a repair cinematic. After that, Marco turns the RV into a workshop.
+> haggled price and a repair cinematic. A second quest then takes you through the engine and the
+> workshop floor.
 
 ![Version](https://img.shields.io/badge/version-3.6.4-blue)
 ![Game](https://img.shields.io/badge/game-Schedule%20I-purple)
@@ -21,6 +22,8 @@
 - **"Back on the Road" questline.** After the RV is wrecked in the intro, the quest starts
   on its own: Donna at the motel -> Mrs. Ming (a dead-drop crate) -> Marco at the docks.
   Native S1API dialogue, journal and quest tracker.
+- **"Home on Wheels" questline** after the repair: ask Marco, get the engine running, drive the RV
+  onto his lot, put in the workshop floor.
 - **Haggling.** Marco normally charges $50,000. Mrs. Ming's name gets it to $10,000. Ask
   him to go lower, fetch his package, then hold out packaged product for up to $500 off each.
 - **Carried quest items** in dead drops (a crate, a package). Lose one and the owner wants

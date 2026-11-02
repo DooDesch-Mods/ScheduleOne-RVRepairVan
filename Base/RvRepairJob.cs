@@ -97,7 +97,9 @@ namespace RVRepairVan.Base
                 RepairStateStore.SetRepaired(true);
                 RepairStateStore.SetRepairStartedAt(0);
                 if (NetworkBus.Online && NetworkBus.IsServer) NetworkBus.BroadcastToAll(RvOp.RepairApplied);
-                Quests.RepairQuest.CompleteIfActive();
+                // The story goes on in Questline mode: the journal moves from waiting to going to look at the RV.
+                if (RVRepairVanPreferences.QuestlineEnabled) Quests.Questline.RefreshEntries();
+                else Quests.RepairQuest.CompleteIfActive();
                 TextFromMarco(L10n.T("Your RV's all done, buddy. Good as new. Next time, better call Marco."));
                 Core.Log.Msg("[Job] Marco finished the RV.");
             }

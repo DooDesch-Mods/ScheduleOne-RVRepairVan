@@ -60,6 +60,11 @@ namespace RVRepairVan.Patches
             new[] { "rvclear", "clear the staged test state", "rvclear" },
             new[] { "rvgiveclient", "hand the client its half of a co-op errand", "rvgiveclient" },
             new[] { "rvdiag", "what the questline thinks is going on", "rvdiag" },
+            new[] { "rvquest", "both journal quests: every step with its state, title and marker", "rvquest" },
+            new[] { "rvpref", "set a mod setting for this session, it is not saved", "rvpref RepairTakesADay true" },
+            new[] { "rvjob", "finish Marco's day-long repair job now", "rvjob" },
+            new[] { "rvcash", "change this player's cash, also on a co-op client where changecash does nothing", "rvcash 50000" },
+            new[] { "rvgive", "put an item in this player's inventory, also on a co-op client where give does nothing", "rvgive rv_marco_package" },
             new[] { "rvpick", "fire one dialogue choice by its rvdiag index; 'open' starts the dialogue", "rvpick marco 3" },
             new[] { "rvghost", "aim at a floor point in the RV, then log why each build tile is red; 'pickup' lifts what stands on the second grid", "rvghost aim 0.5 -1" },
             new[] { "rvhold", "equip a hotbar slot, 'talk' locks equipping the way a conversation does", "rvhold 2 talk" },
@@ -129,7 +134,7 @@ namespace RVRepairVan.Patches
             if (parts.Length == 0) return false;
             string cmd = parts[0].ToLower();
             if (cmd != "rvtest" && cmd != "rvstage" && cmd != "rvdrops" && cmd != "rvclear"
-                && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvreinject" && cmd != "rvprobe"
+                && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvquest" && cmd != "rvpref" && cmd != "rvjob" && cmd != "rvcash" && cmd != "rvgive" && cmd != "rvreinject" && cmd != "rvprobe"
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach" && cmd != "rvhands" && cmd != "rvseat"
                 && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt" && cmd != "rvcargo"
@@ -160,6 +165,33 @@ namespace RVRepairVan.Patches
                     case "rvclear":   // wipe accumulated test crates/packages from ALL drops + re-reserve a fresh one
                         ClearErrandItems();
                         RVRepairVan.Quests.Questline.DebugResetErrandDrop();
+                        break;
+                    case "rvquest":   // dump both journal quests step by step
+                        RVRepairVan.Quests.Questline.DebugQuests();
+                        break;
+                    case "rvpref":    // 'rvpref RepairTakesADay true' - a mod setting for this session
+                        if (parts.Length > 2) RVRepairVan.Config.RVRepairVanPreferences.DebugSet(parts[1], parts[2]);
+                        else Core.Log.Warning("[Debug] rvpref <entry> <value>");
+                        break;
+                    case "rvjob":     // Marco's day-long job is due at the next look at the clock
+                        if (Base.RvRepairJob.JobRunning)
+                        {
+                            RVRepairVan.Persistence.RepairStateStore.SetRepairStartedAt(Math.Max(1, Base.RvRepairJob.NowMinutes() - Base.RvRepairJob.JobMinutes));
+                            Core.Log.Msg("[Debug] rvjob: the job is due.");
+                        }
+                        else Core.Log.Warning("[Debug] rvjob: no job is running.");
+                        break;
+                    case "rvcash":    // the vanilla cash and item commands only run on the host
+                        if (parts.Length > 1 && float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float cash))
+                        {
+                            S1API.Money.Money.ChangeCashBalance(cash, true, true);
+                            Core.Log.Msg("[Debug] rvcash: changed by " + cash + ", now " + S1API.Money.Money.GetCashBalance() + ".");
+                        }
+                        else Core.Log.Warning("[Debug] rvcash <amount>");
+                        break;
+                    case "rvgive":
+                        if (parts.Length > 1) GiveItem(parts[1]);
+                        else Core.Log.Warning("[Debug] rvgive <item id>");
                         break;
                     case "rvdiag":    // dump the quest gate + every injected dialogue choice
                         RVRepairVan.Quests.Questline.DebugDiag();
@@ -485,6 +517,16 @@ namespace RVRepairVan.Patches
                 }
             }
             catch (Exception e) { Core.Log.Warning("[Debug] rvdrops failed: " + e.Message); }
+        }
+
+        private static void GiveItem(string id)
+        {
+            PlayerInventory inv = PlayerSingleton<PlayerInventory>.Instance;
+            if (inv == null) { Core.Log.Warning("[Debug] rvgive: no PlayerInventory."); return; }
+            var def = Il2CppScheduleOne.Registry.GetItem(id.ToLower());
+            if (def == null) { Core.Log.Warning("[Debug] rvgive: unknown item '" + id + "'."); return; }
+            inv.AddItemToInventory(def.GetDefaultInstance(1));
+            Core.Log.Msg("[Debug] rvgive: gave one " + def.Name + ".");
         }
 
         internal static void GiveTestProducts(string packagingId, string productId)

@@ -116,6 +116,7 @@ namespace RVRepairVan
                 // happened to arrive, and the previous session's mirror leaked in. Both are quest-mode-independent.
                 RepairStateStore.ResetClient();
                 MelonCoroutines.Start(Questline.NetJoinCoroutineShared());
+                MelonCoroutines.Start(BuildOutQuest.CancelLeftoverCoroutine());
             }
 
             RVRepairVan.Base.RvUpgrades.Reset();   // drop last scene's cached transforms; the mask lives in the save
