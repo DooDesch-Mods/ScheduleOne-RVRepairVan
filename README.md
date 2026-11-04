@@ -70,9 +70,9 @@
 | Schedule I | `0.4.7f12` (IL2CPP, current Steam public build) |
 | MelonLoader | `0.7.3+` |
 | S1API | [ifBars/S1API_Forked](https://thunderstore.io/c/schedule-i/p/ifBars/S1API_Forked/) **3.2.1+** (dialogue, items, dead drops, money, save system) |
-| Chassis | [DooDesch/Chassis](https://www.nexusmods.com/schedule1/mods/2918) **1.8.0+** (driver in the seat, first person, horn, indicators) |
-| Marco's Bodyshop | [DooDesch/MarcosBodyshop](https://www.nexusmods.com/schedule1/mods/2987) **1.1.0+** (the garage menu for the interior and the workshop floor) |
-| Sideload | [DooDesch/Sideload](https://www.nexusmods.com/schedule1/mods/2360) **1.35.0+** (draws the garage menu) |
+| Chassis | [Nexus Mods](https://www.nexusmods.com/schedule1/mods/2918) **1.8.0+** (driver in the seat, first person, horn, indicators) |
+| Marco's Bodyshop | [Nexus Mods](https://www.nexusmods.com/schedule1/mods/2987) **1.1.0+** (the garage menu for the interior and the workshop floor) |
+| Sideload | [Nexus Mods](https://www.nexusmods.com/schedule1/mods/2360) **1.35.0+** (draws the garage menu) |
 
 ## Installation
 
