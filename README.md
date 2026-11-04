@@ -2,6 +2,8 @@
 
 > 🛟 **Need help or found a bug?** Get support at [support.doodesch.de/rvrepairvan](https://support.doodesch.de/rvrepairvan).
 
+**Download:** [Nexus Mods](https://www.nexusmods.com/schedule1/mods/280) · [Thunderstore](https://thunderstore.io/c/schedule-i/p/DooDesch/RVRepairVan/) · [GitHub Releases](https://github.com/DooDesch-Mods/ScheduleOne-RVRepairVan/releases)
+
 > Your RV got blown up in the intro? Now you can fix it. A tracked side quest sends you
 > from Donna at the motel to Mrs. Ming to Marco the mechanic, with dead-drop errands, a
 > haggled price and a repair cinematic. A second quest then takes you through the engine and the
@@ -68,16 +70,23 @@
 | Schedule I | `0.4.7f12` (IL2CPP, current Steam public build) |
 | MelonLoader | `0.7.3+` |
 | S1API | [ifBars/S1API_Forked](https://thunderstore.io/c/schedule-i/p/ifBars/S1API_Forked/) **3.2.1+** (dialogue, items, dead drops, money, save system) |
-| Chassis | [DooDesch/Chassis](https://thunderstore.io/c/schedule-i/p/DooDesch/Chassis/) **1.8.0+** (driver in the seat, first person, horn, indicators) |
-| Marco's Bodyshop | [DooDesch/MarcosBodyshop](https://thunderstore.io/c/schedule-i/p/DooDesch/MarcosBodyshop/) **1.1.0+** (the garage menu for the interior and the workshop floor) |
-| Sideload | [DooDesch/Sideload](https://thunderstore.io/c/schedule-i/p/DooDesch/Sideload/) **1.35.0+** (draws the garage menu) |
+| Chassis | [Nexus Mods](https://www.nexusmods.com/schedule1/mods/2918) **1.8.0+** (driver in the seat, first person, horn, indicators) |
+| Marco's Bodyshop | [Nexus Mods](https://www.nexusmods.com/schedule1/mods/2987) **1.1.0+** (the garage menu for the interior and the workshop floor) |
+| Sideload | [Nexus Mods](https://www.nexusmods.com/schedule1/mods/2360) **1.35.0+** (draws the garage menu) |
 
 ## Installation
 
-### Recommended: a Thunderstore mod manager
+### Recommended: Nexus Mods
+
+1. Install **MelonLoader 0.7.3** for Schedule I ([melonwiki.xyz](https://melonwiki.xyz/)).
+2. Download RVRepairVan from [Nexus Mods](https://www.nexusmods.com/schedule1/mods/280) and install it with Vortex,
+   or put **`RVRepairVan.dll`** into your Schedule I `Mods/` folder.
+3. Get **S1API**, [Chassis](https://www.nexusmods.com/schedule1/mods/2918), [Marco's Bodyshop](https://www.nexusmods.com/schedule1/mods/2987) and [Sideload](https://www.nexusmods.com/schedule1/mods/2360) the same way.
+
+### Thunderstore mod manager
 
 Install with a mod manager (r2modman / Gale) from the Schedule I community; the
-dependencies (MelonLoader, S1API, Chassis, Marco's Bodyshop, Sideload) are pulled in automatically.
+dependencies (MelonLoader, S1API, Chassis, Marco's Bodyshop, Sideload) are pulled in automatically. Find it on the [Thunderstore page](https://thunderstore.io/c/schedule-i/p/DooDesch/RVRepairVan/).
 
 ### Manual
 
