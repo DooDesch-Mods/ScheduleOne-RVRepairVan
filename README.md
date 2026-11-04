@@ -4,8 +4,6 @@
 
 **Download:** [Nexus Mods](https://www.nexusmods.com/schedule1/mods/280) · [Thunderstore](https://thunderstore.io/c/schedule-i/p/DooDesch/RVRepairVan/) · [GitHub Releases](https://github.com/DooDesch-Mods/ScheduleOne-RVRepairVan/releases)
 
-[![Discord](https://mods.doodesch.de/img/badge.svg)](https://mods.doodesch.de)
-
 > Your RV got blown up in the intro? Now you can fix it. A tracked side quest sends you
 > from Donna at the motel to Mrs. Ming to Marco the mechanic, with dead-drop errands, a
 > haggled price and a repair cinematic. A second quest then takes you through the engine and the
@@ -16,7 +14,7 @@
 ![MelonLoader](https://img.shields.io/badge/MelonLoader-0.7.3+-green)
 ![S1API](https://img.shields.io/badge/S1API-required-orange)
 ![Status](https://img.shields.io/badge/status-working-brightgreen)
-[![Polyfill](https://polyfill.doomods.com/badge/rvrepairvan.svg)](https://polyfill.doomods.com/mod/rvrepairvan)
+[![Discord](https://mods.doodesch.de/img/badge.svg)](https://mods.doodesch.de) [![Polyfill](https://polyfill.doomods.com/badge/rvrepairvan.svg)](https://polyfill.doomods.com/mod/rvrepairvan)
 
 [![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_76UV_WZ7jGxaZC7E4LaqwyNt/badge.svg)](https://mlvscan.com/attestations/att_76UV_WZ7jGxaZC7E4LaqwyNt)
 
