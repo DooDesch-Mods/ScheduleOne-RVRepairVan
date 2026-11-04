@@ -4,6 +4,8 @@
 
 **Download:** [Nexus Mods](https://www.nexusmods.com/schedule1/mods/280) · [Thunderstore](https://thunderstore.io/c/schedule-i/p/DooDesch/RVRepairVan/) · [GitHub Releases](https://github.com/DooDesch-Mods/ScheduleOne-RVRepairVan/releases)
 
+[![Discord](https://mods.doodesch.de/img/badge.svg)](https://mods.doodesch.de)
+
 > Your RV got blown up in the intro? Now you can fix it. A tracked side quest sends you
 > from Donna at the motel to Mrs. Ming to Marco the mechanic, with dead-drop errands, a
 > haggled price and a repair cinematic. A second quest then takes you through the engine and the
@@ -177,6 +179,12 @@ Prefer no story? Set `QuestMode = Simple` and just pay Marco directly.
 - Disable other RV-repair or Marco-dialogue mods to avoid duplicate or conflicting choices.
 - IL2CPP build only (current Steam public branch). A Mono build for the alternate branch is
   planned.
+
+## Community
+
+[![DooDesch Mods on Discord](https://mods.doodesch.de/img/card.svg)](https://mods.doodesch.de)
+
+Join the DooDesch Mods Discord: update pings, polls on what comes next, and playtests of new mods.
 
 ## Credits
 
