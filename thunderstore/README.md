@@ -2,6 +2,12 @@
 
 > 🛟 **Need help or found a bug?** Get support at [support.doodesch.de/rvrepairvan](https://support.doodesch.de/rvrepairvan).
 
+> ⚠️ **A required mod is missing on Thunderstore?** Thunderstore sometimes takes one of my library mods off its listing, and then r2modman and Gale can't install it. Get it from Nexus Mods or GitHub instead and put the DLL into the `Mods` folder of your profile. Stuck? Ask in the [Discord](https://mods.doodesch.de).
+>
+> - **Chassis:** [Nexus Mods](https://www.nexusmods.com/schedule1/mods/2918) · [GitHub](https://github.com/DooDesch-Mods/ScheduleOne-Chassis/releases/latest)
+> - **MarcosBodyshop:** [Nexus Mods](https://www.nexusmods.com/schedule1/mods/2987) · [GitHub](https://github.com/DooDesch-Mods/ScheduleOne-MarcosBodyshop/releases/latest)
+> - **Sideload:** [Nexus Mods](https://www.nexusmods.com/schedule1/mods/2360) · [GitHub](https://github.com/DooDesch-Mods/ScheduleOne-Sideload/releases/latest)
+
 > Your RV got blown up in the intro? Now you can fix it. A tracked side quest sends you
 > from Donna at the motel to Mrs. Ming to Marco the mechanic, with dead-drop errands, a
 > haggled price and a repair cinematic. A second quest then takes you through the engine and the
