@@ -40,7 +40,62 @@ namespace RVRepairVan.Base
 
         private static bool _applied;
 
-        internal static void Reset() { _applied = false; DockReady = false; }
+        internal static void Reset() { _applied = false; DockReady = false; Deferred.Clear(); }
+
+#if DEBUG
+        /// <summary>Debug (rvdeliver guard off): lets the vanilla activation run unguarded, to reproduce the original failure.</summary>
+        internal static bool DebugGuardOff;
+#endif
+
+        // Deliveries to the RV whose activation had to wait for the dock (a save that is loaded with one open).
+        private static readonly List<DeliveryInstance> Deferred = new List<DeliveryInstance>();
+
+        /// <summary>
+        /// True when the delivery targets the RV but the RV has no dock at its index yet. Tries to attach the
+        /// dock right now; if that is not possible the delivery is parked and activated by <see cref="Apply"/>.
+        /// </summary>
+        internal static bool MustDefer(DeliveryInstance inst)
+        {
+            try
+            {
+#if DEBUG
+                if (DebugGuardOff) { Core.Log.Msg("[Debug] dock guard is off - vanilla activation runs unguarded."); return false; }
+#endif
+                Transform root = RVManager.Root;
+                Property rv = root != null ? root.GetComponent<Property>() : null;
+                if (rv == null || inst.DestinationCode != rv.PropertyCode) return false;
+                if (HasDockAt(rv, inst.LoadingDockIndex)) { Core.Log.Msg("[Dock] delivery " + inst.DeliveryID + " activates at RV dock " + inst.LoadingDockIndex + "."); return false; }
+
+                if (RvUpgrades.Owned(RvUpgrade.LoadingDock)) Apply();
+                if (HasDockAt(rv, inst.LoadingDockIndex)) { Core.Log.Msg("[Dock] dock attached before delivery " + inst.DeliveryID + " activated."); return false; }
+
+                if (!Deferred.Contains(inst)) Deferred.Add(inst);
+                Core.Log.Warning("[Dock] delivery " + inst.DeliveryID + " to the RV has no loading dock yet - activation deferred until the dock is attached.");
+                return true;
+            }
+            catch (Exception e) { Core.Log.Error("[Dock] MustDefer failed: " + e.Message); return false; }
+        }
+
+        private static bool HasDockAt(Property rv, int index)
+        {
+            return rv.LoadingDocks != null && index >= 0 && index < rv.LoadingDocks.Length && rv.LoadingDocks[index] != null;
+        }
+
+        private static void ActivateDeferred()
+        {
+            if (Deferred.Count == 0) return;
+            DeliveryInstance[] pending = Deferred.ToArray();
+            Deferred.Clear();
+            foreach (DeliveryInstance inst in pending)
+            {
+                try
+                {
+                    inst.SetStatus(inst.Status);   // runs the vanilla activation now that the dock exists
+                    Core.Log.Msg("[Dock] activated deferred delivery " + inst.DeliveryID + " (" + inst.Status + ").");
+                }
+                catch (Exception e) { Core.Log.Error("[Dock] deferred activation of " + inst.DeliveryID + " failed: " + e.Message); }
+            }
+        }
 
         internal static void Apply()
         {
@@ -89,6 +144,7 @@ namespace RVRepairVan.Base
                 DockReady = true;
                 dock = null;   // handed over to the property - no longer ours to clean up
                 Core.Log.Msg("[Dock] loading dock attached (" + list.Count + " total on the RV).");
+                ActivateDeferred();
             }
             catch (Exception e) { Core.Log.Warning("[Dock] apply failed: " + e.Message); }
             finally
@@ -227,6 +283,44 @@ namespace RVRepairVan.Base
                 __result.Add(rv);
             }
             catch (Exception e) { Core.Swallowed("RvDeliveryDock.DestinationPatch", e); }
+        }
+    }
+
+    /// <summary>
+    /// A delivery restored from a save goes through <c>SetStatus(Arrived)</c> and vanilla indexes the destination's
+    /// <c>LoadingDocks</c> with it. The RV only gets its dock a few seconds later, so that throws
+    /// IndexOutOfRangeException and leaves the van half activated. Attach the dock first or hold the activation
+    /// back until it exists.
+    /// </summary>
+    [HarmonyPatch(typeof(DeliveryInstance), nameof(DeliveryInstance.SetStatus))]
+    internal static class Rv_DeliverySetStatus_Patch
+    {
+        private static bool Prefix(DeliveryInstance __instance, EDeliveryStatus status)
+        {
+            try
+            {
+                if (status != EDeliveryStatus.Arrived || !RvDeliveryDock.MustDefer(__instance)) return true;
+                __instance.Status = status;
+                return false;
+            }
+            catch (Exception e) { Core.Log.Error("[Dock] SetStatus guard failed: " + e.Message); return true; }
+        }
+    }
+
+    /// <summary>The bay check indexes LoadingDocks too; with no dock yet the bay counts as busy instead of throwing.</summary>
+    [HarmonyPatch(typeof(DeliveryManager), nameof(DeliveryManager.IsLoadingBayFree))]
+    internal static class Rv_IsLoadingBayFree_Patch
+    {
+        private static bool Prefix(Property destination, int loadingDockIndex, ref bool __result)
+        {
+            try
+            {
+                if (destination == null || (destination.LoadingDocks != null && loadingDockIndex >= 0 && loadingDockIndex < destination.LoadingDocks.Length)) return true;
+                Core.Log.Warning("[Dock] bay " + loadingDockIndex + " of " + destination.PropertyCode + " does not exist yet - treated as busy.");
+                __result = false;
+                return false;
+            }
+            catch (Exception e) { Core.Log.Error("[Dock] IsLoadingBayFree guard failed: " + e.Message); return true; }
         }
     }
 }
