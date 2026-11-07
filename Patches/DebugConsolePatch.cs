@@ -70,6 +70,7 @@ namespace RVRepairVan.Patches
             new[] { "rvhold", "equip a hotbar slot, 'talk' locks equipping the way a conversation does", "rvhold 2 talk" },
             new[] { "rvreinject", "rebuild the quest objects after a reload", "rvreinject" },
             new[] { "rvprobe", "poke one step of the questline", "rvprobe" },
+            new[] { "rvdeliver", "send a vanilla delivery to the RV dock (item, minutes until arrival)", "rvdeliver soil 5" },
             new[] { "rvupg", "the van's upgrades and what they cost", "rvupg" },
             new[] { "rvrepair", "repair the van right now", "rvrepair" },
             new[] { "rvbuy", "buy an upgrade without the money", "rvbuy" },
@@ -138,7 +139,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach" && cmd != "rvhands" && cmd != "rvseat"
                 && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt" && cmd != "rvcargo"
-                && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony" && cmd != "rvinterior" && cmd != "rvpaint" && cmd != "rvhatch" && cmd != "rvnav")
+                && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony" && cmd != "rvinterior" && cmd != "rvpaint" && cmd != "rvdeliver" && cmd != "rvhatch" && cmd != "rvnav")
                 return false;   // not ours - let the game handle it
 
             // Both overloads can fire for a single submission (the string body calls the List body), so run the
@@ -228,6 +229,10 @@ namespace RVRepairVan.Patches
                                 + ", mask=" + RVRepairVan.Base.RvUpgrades.Mask);
                         }
                         else Core.Log.Warning("[Debug] rvbuy <bit>  (2=WorkshopFloor 4=CrewQuarters 8=LoadingDock 16=Engine)");
+                        break;
+                    case "rvdeliver": // 'rvdeliver [item] [minutes]' - a vanilla delivery to the RV dock, as the phone app would send it
+                        if (parts.Length > 2 && parts[1] == "guard") { Base.RvDeliveryDock.DebugGuardOff = parts[2] == "off"; Core.Log.Msg("[Debug] rvdeliver guard " + parts[2]); break; }
+                        DeliverToRv(parts.Length > 1 ? parts[1] : "soil", parts.Length > 2 && int.TryParse(parts[2], out int dm) ? dm : 5);
                         break;
                     case "rvupg":     // 'rvupg' dumps the build-out state; 'rvupg <mask>' grants/revokes (host)
                         if (parts.Length > 1 && int.TryParse(parts[1], out int mask))
@@ -517,6 +522,22 @@ namespace RVRepairVan.Patches
                 }
             }
             catch (Exception e) { Core.Log.Warning("[Debug] rvdrops failed: " + e.Message); }
+        }
+
+        private static void DeliverToRv(string itemId, int minutes)
+        {
+            var rvRoot = RVRepairVan.Managers.RVManager.Root;
+            var rv = rvRoot != null ? rvRoot.GetComponent<Il2CppScheduleOne.Property.Property>() : null;
+            if (rv == null) { Core.Log.Warning("[Debug] rvdeliver: the RV property is not loaded."); return; }
+            if (Il2CppScheduleOne.Registry.GetItem(itemId.ToLower()) == null) { Core.Log.Warning("[Debug] rvdeliver: unknown item '" + itemId + "'."); return; }
+            var shops = Resources.FindObjectsOfTypeAll<Il2CppScheduleOne.UI.Phone.Delivery.DeliveryShop>();
+            if (shops == null || shops.Length == 0) { Core.Log.Warning("[Debug] rvdeliver: no delivery shop found."); return; }
+            string shop = shops[0].MatchingShopInterfaceName;
+            var items = new Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<Il2CppScheduleOne.DevUtilities.StringIntPair>(1);
+            items[0] = new Il2CppScheduleOne.DevUtilities.StringIntPair(itemId.ToLower(), 1);
+            var inst = new Il2CppScheduleOne.Delivery.DeliveryInstance(Il2Cpp.GUIDManager.GenerateUniqueGUID().ToString(), shop, rv.PropertyCode, 0, items, Il2CppScheduleOne.Delivery.EDeliveryStatus.InTransit, minutes);
+            Il2CppScheduleOne.DevUtilities.NetworkSingleton<Il2CppScheduleOne.Delivery.DeliveryManager>.Instance.SendDelivery(inst);
+            Core.Log.Msg("[Debug] rvdeliver: " + itemId + " from " + shop + " to the RV in " + minutes + " min (dock " + rv.LoadingDockCount + ").");
         }
 
         private static void GiveItem(string id)
