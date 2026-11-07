@@ -13,7 +13,7 @@
 > haggled price and a repair cinematic. A second quest then takes you through the engine and the
 > workshop floor.
 
-![Version](https://img.shields.io/badge/version-3.6.4-blue)
+![Version](https://img.shields.io/badge/version-4.3.1-blue)
 ![Game](https://img.shields.io/badge/game-Schedule%20I-purple)
 ![MelonLoader](https://img.shields.io/badge/MelonLoader-0.7.3+-green)
 ![S1API](https://img.shields.io/badge/S1API-required-orange)
@@ -72,3 +72,7 @@ Join the DooDesch Mods Discord: update pings, polls on what comes next, and play
 ## License
 
 MIT. See the included LICENSE.md.
+
+This mod is written with help from generative AI tools (Anthropic Claude, OpenAI Codex).
+
+If you have fun with it, a like on the [Thunderstore page](https://thunderstore.io/c/schedule-i/p/DooDesch/RVRepairVan/) really helps other people find it (thumbs up next to Download, you need to be logged in) - ty either way, and lemme know if anything breaks or you've got ideas

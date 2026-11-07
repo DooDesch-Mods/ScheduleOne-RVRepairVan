@@ -4,6 +4,13 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [4.3.1] - 2026-11-07
+
+### Fixed
+
+- A delivery to the RV loading bay that was still open when you saved arrives complete after loading, instead of a
+  van with only its seats left.
+
 ## [4.3.0] - 2026-11-02
 
 ### Added

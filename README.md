@@ -9,7 +9,7 @@
 > haggled price and a repair cinematic. A second quest then takes you through the engine and the
 > workshop floor. Built on [S1API](https://github.com/ifBars/S1API).
 
-![Version](https://img.shields.io/badge/version-3.6.4-blue)
+![Version](https://img.shields.io/badge/version-4.3.1-blue)
 ![Game](https://img.shields.io/badge/game-Schedule%20I-purple)
 ![MelonLoader](https://img.shields.io/badge/MelonLoader-0.7.3+-green)
 ![S1API](https://img.shields.io/badge/S1API-required-orange)
@@ -192,3 +192,5 @@ Join the DooDesch Mods Discord: update pings, polls on what comes next, and play
 ## License
 
 Provided as-is under the [MIT License](LICENSE.md).
+
+This mod is written with help from generative AI tools (Anthropic Claude, OpenAI Codex).
