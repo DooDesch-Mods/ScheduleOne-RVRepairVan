@@ -16,7 +16,7 @@
 ![Status](https://img.shields.io/badge/status-working-brightgreen)
 [![Discord](https://mods.doodesch.de/img/badge.svg)](https://mods.doodesch.de) [![Polyfill](https://polyfill.doomods.com/badge/rvrepairvan.svg)](https://polyfill.doomods.com/mod/rvrepairvan)
 
-[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_76UV_WZ7jGxaZC7E4LaqwyNt/badge.svg)](https://mlvscan.com/attestations/att_76UV_WZ7jGxaZC7E4LaqwyNt)
+[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_qkQFX--tVmkOGk3rSrclvBtW/badge.svg)](https://mlvscan.com/attestations/att_qkQFX--tVmkOGk3rSrclvBtW)
 
 ![The RV driving through town at dusk](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
 
