@@ -11,6 +11,9 @@ in this order and build on each other:
     package  the client carries the package to Marco
     pay      the client pays from its own cash, the quest closes at the RV
     home     the second quest: the client asks, buys the engine and the floor
+
+`map` runs on its own after `join` (python tests/coop.py <host> <client> join map): the host drives and parks the RV,
+the client's phone map follows.
 """
 import sys
 import time
@@ -222,7 +225,51 @@ def home(h, c):
     c.shot("coop-8-client-text")
 
 
-PARTS = {"join": join, "marco": marco, "package": package, "pay": pay, "home": home}
+def rvmap(r):
+    """The RV's markers on this machine's map, as rvmap reports them: (vehicle, property)."""
+    for line in reversed(r.cmd("rvmap", wait=0.6)):
+        if "[Map] rvmap:" in line:
+            r.note(line.split("[Map] ", 1)[-1])
+            parts = line.split(" | ")
+            if len(parts) == 3:
+                return parts[1].replace("vehicle marker ", ""), parts[2].replace("property marker ", "")
+    return None, None
+
+
+def map_marker(h, c):
+    """Standalone after `join`: the host repairs the RV, drives and parks it away; the client's map follows."""
+    c.begin("Map: the host drives the RV")
+    h.cmd("rvrepair", wait=1.5)
+    h.cmd("rvupg 16", wait=1.0)
+    m = c.mark()
+    h.cmd("rvdrive", wait=3)
+    line = c.wait_line(m, r"\[Map\] RV marker: vehicle \(driving\)", timeout=15)
+    c.check("the client's map switches to the vehicle marker", line is not None, c.lines(m, r"\[Map\]"))
+    vehicle, prop = rvmap(c)
+    c.check("on the client the vehicle marker is on", (vehicle or "").startswith("on '"), vehicle)
+    c.check("on the client the property marker is off", (prop or "").startswith("off"), prop)
+    c.cmd("rvmap open", wait=1.5)
+    c.shot("coop-map-client-driving")
+    c.cmd("rvmap close", wait=1.0)
+
+    c.begin("Map: the host parks the RV away from home")
+    m = c.mark()
+    # Right after the exit: an RV left on its own spot goes home after a short grace time.
+    h.cmd("rvdrive exit", wait=0.5)
+    h.cmd("rvdrive tp 10.05 -18.7 90", wait=3)
+    line = c.wait_line(m, r"\[Map\] RV marker: property \(parked\)", timeout=15)
+    c.check("the client's map switches to the property marker", line is not None, c.lines(m, r"\[Map\]"))
+    time.sleep(2)
+    vehicle, prop = rvmap(c)
+    c.check("on the client the vehicle marker is off", (vehicle or "").startswith("off") or vehicle == "none", vehicle)
+    c.check("on the client the property marker is on with the owned icon", (prop or "").startswith("on 'RV") and "icon=owned" in prop, prop)
+    c.cmd("rvmap open", wait=1.5)
+    c.shot("coop-map-client-parked")
+    c.cmd("rvmap close", wait=1.0)
+    h.cmd("rvdrive home", wait=3)
+
+
+PARTS = {"join": join, "marco": marco, "package": package, "pay": pay, "home": home, "map": map_marker}
 
 
 def main():
