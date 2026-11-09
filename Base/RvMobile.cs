@@ -529,6 +529,7 @@ namespace RVRepairVan.Base
             if (bounds != null) Carry(bounds); else Core.Log.Warning("[Mobile] no BoundingBox - the RV counts as a property only at home.");
             Transform poi = root.Find("PoI");
             if (poi != null) Carry(poi);
+            RvMapMarker.Bind(poi);
 
             // Place each part relative to the chassis exactly as it sits relative to the home chassis pose. On the
             // host at spawn that changes nothing; on a client or after a load the chassis is elsewhere already.
@@ -716,6 +717,7 @@ namespace RVRepairVan.Base
                 p.T.localRotation = p.LocalRot;
             }
             Carried.Clear();
+            RvMapMarker.Release(chassis);
             _ignored.Clear();
             DropBodies();
             if (_contents != null) { UnityEngine.Object.Destroy(_contents); _contents = null; }
@@ -945,6 +947,7 @@ namespace RVRepairVan.Base
             if (occupied) { _lastOccupiedAt = Time.time; RvBattery.HostStamp(); }
             bool driven = HasDriver(_chassis);
             if (driven != _driving) SetDriving(driven);
+            RvMapMarker.Update(_chassis, _driving);
             if (_driving) { IgnoreChassis(false); ReIgnoreOnWheelSwap(); }
             RvRide.KeepClear();
             if (Time.time - _lastBodyScan > BodyScanInterval) { _lastBodyScan = Time.time; StopInterpolation(); }

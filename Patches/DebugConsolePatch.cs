@@ -85,6 +85,7 @@ namespace RVRepairVan.Patches
             new[] { "rvstock", "fill the first RV storage rack with soil and seeds", "rvstock" },
             new[] { "rvreach", "for every RV pot and rack: is each access point in bounds and reachable by the crew", "rvreach" },
             new[] { "rvhands", "where the seated driver's hand bones sit against the steering wheel rim", "rvhands" },
+            new[] { "rvmap", "the RV's map markers: which one shows, its text and icon; 'open' takes the phone out on the map, 'close' puts it away", "rvmap open" },
             new[] { "rvseat", "the cab chairs' cushion height along the seat and where the seated body's hips, knees and feet sit against it", "rvseat" },
             new[] { "rvpay", "put cash in every RV locker, the way a player pays the crew", "rvpay 500" },
             new[] { "rvpayrepair", "pay Marco for the repair the way his dialogue choice does", "rvpayrepair" },
@@ -138,7 +139,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvquest" && cmd != "rvpref" && cmd != "rvjob" && cmd != "rvcash" && cmd != "rvgive" && cmd != "rvreinject" && cmd != "rvprobe"
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach" && cmd != "rvhands" && cmd != "rvseat"
-                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt" && cmd != "rvcargo"
+                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvmap" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt" && cmd != "rvcargo"
                 && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony" && cmd != "rvinterior" && cmd != "rvpaint" && cmd != "rvdeliver" && cmd != "rvhatch" && cmd != "rvnav")
                 return false;   // not ours - let the game handle it
 
@@ -368,6 +369,7 @@ namespace RVRepairVan.Patches
                     case "rvsow":   RvDevTools.Sow(parts.Length > 1 && parts[1] == "elsewhere"); break;
                     case "rvreach":  RvDevTools.Reach(); break;
                     case "rvhands":  Base.RvChassis.HandsReport(); break;   // hand bones against the steering wheel rim
+                    case "rvmap":    Base.RvMapMarker.Debug(parts.Length > 1 ? parts[1].ToLower() : ""); break;
                     case "rvseat":   Base.RvChassis.SeatReport(); break;    // cushion height against hips, knees and feet
                     case "rvpayrepair":
                         Core.Log.Msg("[Debug] rvpayrepair: HostPayRepair returned "
