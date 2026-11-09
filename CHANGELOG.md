@@ -4,6 +4,12 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [4.4.0] - 2026-11-09
+
+### Added
+
+- The RV shows on the phone map: as a vehicle while you drive it, and as your property wherever it is parked.
+
 ## [4.3.1] - 2026-11-07
 
 ### Fixed
