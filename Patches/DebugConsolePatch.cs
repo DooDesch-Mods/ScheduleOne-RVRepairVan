@@ -97,7 +97,8 @@ namespace RVRepairVan.Patches
             new[] { "rvbattery", "the RV's flat battery; 'dead' / 'fix' set it, 'age 4' makes the RV stand 4 days", "rvbattery age 4" },
             new[] { "rvthanks", "the line Marco says for the product in hand", "rvthanks" },
             new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'arrest' arrests you, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
-            new[] { "rvtilt", "how far each placed item in the RV leans against it; 'redo' sets every pose again, 'vanilla' toggles the fix, 'lean 8' rolls the parked RV", "rvtilt redo" },
+            new[] { "rvtilt", "how far each placed item in the RV leans against it; 'redo' sets every pose again, 'vanilla' toggles the fix, 'lean 8' rolls and 'pitch 8' pitches the parked RV", "rvtilt redo" },
+            new[] { "rvpour", "tip a beaker on the RV's chemistry station against its joint and log whether the game pours; 'vanilla' toggles the fix", "rvpour tip 0.9 3" },
             new[] { "rvcargo", "how the first loose body in the driving RV moves against it, per physics step and per frame; 'vanilla' toggles the fix, 'pin' holds it like a poured bag", "rvcargo probe 4" },
             new[] { "rvinterior", "the RV's furniture: unlocked, out, box and refit block per part; 'rvinterior bed' takes a part out or puts it back, 'all out|in' every part, 'renderers' lists whether each piece draws", "rvinterior bed" },
             new[] { "rvpaint", "the RV's outside paint: 'rvpaint' dumps every renderer and its materials, 'rvpaint FF0000,metallic' paints (host), 'rvpaint stock' takes it off, a trailing '2' means the trim", "rvpaint 2E6B3A,metallic" },
@@ -139,7 +140,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvquest" && cmd != "rvpref" && cmd != "rvjob" && cmd != "rvcash" && cmd != "rvgive" && cmd != "rvreinject" && cmd != "rvprobe"
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach" && cmd != "rvhands" && cmd != "rvseat"
-                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvmap" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt" && cmd != "rvcargo"
+                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvmap" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt" && cmd != "rvcargo" && cmd != "rvpour"
                 && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony" && cmd != "rvinterior" && cmd != "rvpaint" && cmd != "rvdeliver" && cmd != "rvhatch" && cmd != "rvnav")
                 return false;   // not ours - let the game handle it
 
@@ -353,9 +354,20 @@ namespace RVRepairVan.Patches
                             Base.RvItemTilt.DebugVanilla = !Base.RvItemTilt.DebugVanilla;
                             Core.Log.Msg("[Tilt] fix " + (Base.RvItemTilt.DebugVanilla ? "off - the game's own pose stays" : "on") + ".");
                         }
-                        else if (parts.Length > 2 && parts[1] == "lean" && float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float deg))
-                            Base.RvItemTilt.Lean(deg);
+                        else if (parts.Length > 2 && (parts[1] == "lean" || parts[1] == "pitch") && float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float deg))
+                            Base.RvItemTilt.Lean(deg, parts[1] == "pitch");
                         else Base.RvItemTilt.Report(parts.Length > 1 && parts[1] == "redo");
+                        break;
+                    case "rvpour":   // 'rvpour tip [level] [seconds]' tips the RV chemistry station's beaker, 'vanilla' toggles the fix
+                        if (parts.Length > 1 && parts[1] == "vanilla") { Base.RvPour.SetVanilla(!Base.RvPour.DebugVanilla); break; }
+                        {
+                            var inv = System.Globalization.CultureInfo.InvariantCulture;
+                            var num = System.Globalization.NumberStyles.Float;
+                            float lv = parts.Length > 2 && float.TryParse(parts[2], num, inv, out float l) ? l : 0.9f;
+                            float secs = parts.Length > 3 && float.TryParse(parts[3], num, inv, out float s) ? s : 3f;
+                            if (parts.Length > 1 && parts[1] == "tip") Base.RvPour.Tip(lv, secs);
+                            else Core.Log.Warning("[Debug] rvpour tip [level 0..1] [seconds] | rvpour vanilla");
+                        }
                         break;
                     case "rvcargo":  // how a loose body in the driving RV moves against it; 'rvcargo probe 4'
                         if (parts.Length > 1 && parts[1] == "vanilla") { Base.RvCargo.SetVanilla(!Base.RvCargo.DebugVanilla); break; }

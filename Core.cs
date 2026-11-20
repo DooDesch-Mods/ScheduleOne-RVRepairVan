@@ -66,6 +66,10 @@ namespace RVRepairVan
         {
             try { Base.RvCargo.FixedStep(); }
             catch (Exception e) { Swallowed("cargo physics step", e); }
+#if DEBUG
+            try { Base.RvPour.FixedStep(); }
+            catch (Exception e) { Log.Error("[Pour] tip step failed: " + e); }
+#endif
         }
 
         public override void OnLateUpdate()
