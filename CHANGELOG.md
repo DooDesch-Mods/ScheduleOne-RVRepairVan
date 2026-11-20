@@ -4,6 +4,13 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [4.4.1] - 2026-11-20
+
+### Fixed
+
+- The flask at a chemistry station in the RV pours again when the RV is parked on a slope. It stopped just short of
+  pouring, so no cook could start.
+
 ## [4.4.0] - 2026-11-09
 
 ### Added
