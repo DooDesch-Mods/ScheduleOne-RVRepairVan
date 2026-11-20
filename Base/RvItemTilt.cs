@@ -29,7 +29,7 @@ namespace RVRepairVan.Base
 
         // How the RV is turned and tilted against its pose at home, for an item on the chassis. False at home, off the
         // RV, or with the RV standing as it does at home.
-        private static bool AwayFrame(Transform t, out Quaternion away)
+        internal static bool AwayFrame(Transform t, out Quaternion away)
         {
             away = Quaternion.identity;
             LandVehicle chassis = RvMobile.Chassis;
@@ -96,14 +96,15 @@ namespace RVRepairVan.Base
         }
 
 #if DEBUG
-        /// <summary>rvtilt lean: rolls the parked RV by that many degrees, to put its floor on a slope.</summary>
-        internal static void Lean(float degrees)
+        /// <summary>rvtilt lean|pitch: rolls (about its length) or pitches (about its width) the parked RV by that many
+        /// degrees, to put its floor on a slope.</summary>
+        internal static void Lean(float degrees, bool pitch = false)
         {
             LandVehicle chassis = RvMobile.Chassis;
             if (chassis == null) { Core.Log.Warning("[Tilt] lean: no chassis out - 'rvdrive', then 'rvdrive exit'."); return; }
             Transform ct = chassis.transform;
-            ct.rotation = Quaternion.AngleAxis(degrees, ct.forward) * ct.rotation;
-            Core.Log.Msg("[Tilt] lean: RV rolled by " + degrees.ToString("F1") + " deg, floor tilt now "
+            ct.rotation = Quaternion.AngleAxis(degrees, pitch ? ct.right : ct.forward) * ct.rotation;
+            Core.Log.Msg("[Tilt] lean: RV " + (pitch ? "pitched" : "rolled") + " by " + degrees.ToString("F1") + " deg, floor tilt now "
                 + Vector3.Angle(ct.up, Vector3.up).ToString("F1") + " deg.");
         }
 

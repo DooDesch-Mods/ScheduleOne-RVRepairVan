@@ -77,9 +77,12 @@ namespace RVRepairVan.Patches
                 for (int t = 0; t < grid.Tiles.Count; t++)
                 {
                     Tile tile = grid.Tiles[t];
-                    if (tile == null || !BlockFree(grid, tile.x, tile.y, w, h)) continue;
+                    if (tile == null || !BlockFree(grid, tile.x, tile.y, prefab.FootprintX, prefab.FootprintY, rotation)) continue;
                     GridItem placed = build.CreateGridItem(def.GetDefaultInstance(1), grid, new Vector2(tile.x, tile.y), rotation);
                     if (placed == null) { Core.Log.Warning("[Debug] rvplace: CreateGridItem returned null at (" + tile.x + "," + tile.y + ")."); return; }
+                    // The position is set when the grid item processes its grid data; a footprint the grid does not hold
+                    // destroys it there, so report where it stands once that has run.
+                    MelonLoader.MelonCoroutines.Start(ReportPlaced(placed, itemId));
                     Core.Log.Msg("[Debug] rvplace: '" + itemId + "' (" + w + "x" + h + ") on grid '" + grid.name + "' at tile ("
                         + tile.x + "," + tile.y + "), world " + placed.transform.position);
                     return;
@@ -395,16 +398,30 @@ namespace RVRepairVan.Patches
             if (paid == 0) Core.Log.Warning("[Debug] rvpay: no locker in the RV took cash.");
         }
 
-        private static bool BlockFree(Grid grid, int x0, int y0, int w, int h)
+        private static System.Collections.IEnumerator ReportPlaced(GridItem placed, string itemId)
         {
-            for (int x = 0; x < w; x++)
-                for (int y = 0; y < h; y++)
-                {
-                    Tile tile = grid.GetTile(new Coordinate(x0 + x, y0 + y));
-                    if (tile == null) return false;
-                    if (tile.BuildableOccupants != null && tile.BuildableOccupants.Count > 0) return false;
-                    if (!tile.CanBeBuiltOn()) return false;
-                }
+            yield return null;
+            yield return null;
+            if (placed == null || placed.WasCollected) { Core.Log.Warning("[Debug] rvplace: '" + itemId + "' was destroyed right after spawning (see the game's log)."); yield break; }
+            Transform root = RVManager.Root;
+            Core.Log.Msg("[Debug] rvplace: '" + itemId + "' stands at world " + placed.transform.position
+                + (root != null ? ", RV-local " + root.InverseTransformPoint(placed.transform.position) : "")
+                + ", under '" + (placed.transform.parent != null ? placed.transform.parent.name : "<scene root>") + "'.");
+        }
+
+        // The tiles come from the game's own footprint math, which turns the footprint about the origin tile: at 90 or
+        // 180 degrees it reaches into negative coordinates, and a grid item missing one tile is destroyed on spawn.
+        private static bool BlockFree(Grid grid, int x0, int y0, int footprintX, int footprintY, int rotation)
+        {
+            var pairs = Coordinate.BuildCoordinateMatches(new Coordinate(x0, y0), footprintX, footprintY, rotation);
+            if (pairs == null || pairs.Count == 0) return false;
+            for (int i = 0; i < pairs.Count; i++)
+            {
+                Tile tile = grid.GetTile(pairs[i].coord2);
+                if (tile == null) return false;
+                if (tile.BuildableOccupants != null && tile.BuildableOccupants.Count > 0) return false;
+                if (!tile.CanBeBuiltOn()) return false;
+            }
             return true;
         }
 
