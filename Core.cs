@@ -64,11 +64,17 @@ namespace RVRepairVan
 
         public override void OnFixedUpdate()
         {
+#if DEBUG
+            try { Base.RvCookProbe.BeforeSteps(); }
+            catch (Exception e) { Log.Error("[Cook] watch failed: " + e); }
+#endif
             try { Base.RvCargo.FixedStep(); }
             catch (Exception e) { Swallowed("cargo physics step", e); }
 #if DEBUG
             try { Base.RvPour.FixedStep(); }
             catch (Exception e) { Log.Error("[Pour] tip step failed: " + e); }
+            try { Base.RvCookProbe.FixedStep(); }
+            catch (Exception e) { Base.RvCookProbe.Holding = false; Log.Error("[Cook] tilt step failed - tilt ended: " + e); }
 #endif
         }
 
@@ -80,6 +86,10 @@ namespace RVRepairVan
             catch (Exception e) { Swallowed("ride frame", e); }
             try { Base.RvRiders.Draw(); }
             catch (Exception e) { Swallowed("riders frame", e); }
+#if DEBUG
+            try { Base.RvCookProbe.Frame(); }
+            catch (Exception e) { Base.RvCookProbe.Holding = false; Log.Error("[Cook] tilt frame failed - tilt ended: " + e); }
+#endif
         }
 
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)

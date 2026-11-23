@@ -4,6 +4,7 @@ using HarmonyLib;
 using Il2CppScheduleOne.PlayerTasks;
 using Il2CppScheduleOne.Vehicles;
 using UnityEngine;
+using Task = Il2CppScheduleOne.PlayerTasks.Task;
 
 namespace RVRepairVan.Base
 {
@@ -106,7 +107,8 @@ namespace RVRepairVan.Base
             ProbeFrame();
 #endif
             LandVehicle ch = RvMobile.Chassis;
-            if (ch == null) { _frameHave = false; _vel = _acc = Vector3.zero; return; }
+            if (ch == null) { _frameHave = false; _vel = _acc = Vector3.zero; NoteTask(null, "the RV is home"); return; }
+            KeepSpawnPoses();
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
             Vector3 pos = ch.transform.position;
@@ -124,6 +126,39 @@ namespace RVRepairVan.Base
             _vel += (v - _vel) * (1f - Mathf.Exp(-dt / VelocityTau));
             Vector3 a = Vector3.ClampMagnitude((_vel - lastVel) / dt, MaxAccel);
             _acc += (a - _acc) * (1f - Mathf.Exp(-dt / AccelTau));
+        }
+
+        // A station task places its items by their transforms right after it creates them (the chemistry station in
+        // UseChemistryStationTask's constructor). Away from home the station hangs under the RV's own kinematic body, and
+        // there the first physics step of the next frame resets each new interpolated body to the pose it was created
+        // with, at the item container's origin, unless something synced the transforms first: all ingredients land in one
+        // heap and the bottle wedges in it and cannot tip (issue #114). A sync at the end of each frame of a task hands
+        // the placed poses to the physics engine before that step.
+        private static IntPtr _task;
+
+        private static void KeepSpawnPoses()
+        {
+            TaskManager tm = TaskManager.Instance;
+            Task t = tm != null ? tm.CurrentTask : null;
+            NoteTask(t, null);
+            if (t == null) return;
+#if DEBUG
+            if (DebugVanilla) return;
+#endif
+            Physics.SyncTransforms();
+        }
+
+        private static void NoteTask(Task t, string why)
+        {
+            IntPtr p = t != null ? t.Pointer : IntPtr.Zero;
+            if (p == _task) return;
+            if (_task != IntPtr.Zero) Core.Log.Msg("[Cargo] task ended" + (why != null ? " (" + why + ")" : "") + " - item poses no longer synced each frame.");
+            _task = p;
+            if (t == null) return;
+#if DEBUG
+            if (DebugVanilla) { Core.Log.Msg("[Cargo] task '" + t.GetIl2CppType().Name + "' started away from home - poses left to the game, the fix is off."); return; }
+#endif
+            Core.Log.Msg("[Cargo] task '" + t.GetIl2CppType().Name + "' started away from home - item poses synced to physics each frame so new items stay where the task put them.");
         }
 
         private static void Scan(LandVehicle ch)
