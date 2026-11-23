@@ -99,6 +99,7 @@ namespace RVRepairVan.Patches
             new[] { "rvdrive", "use the RV's wheel (needs the engine upgrade); 'seat' the passenger chair, 'creator' skips the character creator, 'board' stands you in the RV, 'station pack|mix|fill|task|close|drift' uses, fills or measures a station, 'ride 10' logs the ride, 'arrest' arrests you, 'home' snaps it back, 'info' dumps state, 'gas 1 0' drives", "rvdrive" },
             new[] { "rvtilt", "how far each placed item in the RV leans against it; 'redo' sets every pose again, 'vanilla' toggles the fix, 'lean 8' rolls and 'pitch 8' pitches the parked RV", "rvtilt redo" },
             new[] { "rvpour", "tip a beaker on the RV's chemistry station against its joint and log whether the game pours; 'vanilla' toggles the fix", "rvpour tip 0.9 3" },
+            new[] { "rvcook", "begin a cook on the RV's chemistry station and tip its pourable with played-in keys; logs tilt, contacts and pose writes", "rvcook tilt 1 4" },
             new[] { "rvcargo", "how the first loose body in the driving RV moves against it, per physics step and per frame; 'vanilla' toggles the fix, 'pin' holds it like a poured bag", "rvcargo probe 4" },
             new[] { "rvinterior", "the RV's furniture: unlocked, out, box and refit block per part; 'rvinterior bed' takes a part out or puts it back, 'all out|in' every part, 'renderers' lists whether each piece draws", "rvinterior bed" },
             new[] { "rvpaint", "the RV's outside paint: 'rvpaint' dumps every renderer and its materials, 'rvpaint FF0000,metallic' paints (host), 'rvpaint stock' takes it off, a trailing '2' means the trim", "rvpaint 2E6B3A,metallic" },
@@ -140,7 +141,7 @@ namespace RVRepairVan.Patches
                 && cmd != "rvgiveclient" && cmd != "rvdiag" && cmd != "rvquest" && cmd != "rvpref" && cmd != "rvjob" && cmd != "rvcash" && cmd != "rvgive" && cmd != "rvreinject" && cmd != "rvprobe"
                 && cmd != "rvupg" && cmd != "rvrepair" && cmd != "rvbuy" && cmd != "rvcam" && cmd != "rvwreck"
                 && cmd != "rvparts" && cmd != "rvtoggle" && cmd != "rvplace" && cmd != "rvcrew" && cmd != "rvassign" && cmd != "rvgrid" && cmd != "rvpay" && cmd != "rvstock" && cmd != "rvreach" && cmd != "rvhands" && cmd != "rvseat"
-                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvmap" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt" && cmd != "rvcargo" && cmd != "rvpour"
+                && cmd != "rvpayrepair" && cmd != "rvpick" && cmd != "rvhold" && cmd != "rvdrive" && cmd != "rvmap" && cmd != "rvsave" && cmd != "rvsow" && cmd != "rvbed" && cmd != "rvdoor" && cmd != "rvghost" && cmd != "rvtilt" && cmd != "rvcargo" && cmd != "rvpour" && cmd != "rvcook"
                 && cmd != "rvegg" && cmd != "rvbattery" && cmd != "rvthanks" && cmd != "rvharmony" && cmd != "rvinterior" && cmd != "rvpaint" && cmd != "rvdeliver" && cmd != "rvhatch" && cmd != "rvnav")
                 return false;   // not ours - let the game handle it
 
@@ -367,6 +368,20 @@ namespace RVRepairVan.Patches
                             float secs = parts.Length > 3 && float.TryParse(parts[3], num, inv, out float s) ? s : 3f;
                             if (parts.Length > 1 && parts[1] == "tip") Base.RvPour.Tip(lv, secs);
                             else Core.Log.Warning("[Debug] rvpour tip [level 0..1] [seconds] | rvpour vanilla");
+                        }
+                        break;
+                    case "rvcook":   // 'rvcook start' begins a cook on the RV station, 'rvcook tilt [1|-1] [seconds]' tips its pourable, 'rvcook stop'
+                        {
+                            var inv = System.Globalization.CultureInfo.InvariantCulture;
+                            var num = System.Globalization.NumberStyles.Float;
+                            string sub = parts.Length > 1 ? parts[1] : "";
+                            if (sub == "start") Base.RvCookProbe.Start();
+                            else if (sub == "tilt")
+                                Base.RvCookProbe.Tilt(parts.Length > 2 && float.TryParse(parts[2], num, inv, out float dir) ? dir : 1f,
+                                    parts.Length > 3 && float.TryParse(parts[3], num, inv, out float s) ? s : 4f,
+                                    parts.Length > 4 && parts[4] == "nointerp");
+                            else if (sub == "stop") Base.RvCookProbe.Stop();
+                            else Core.Log.Warning("[Debug] rvcook start | rvcook tilt [1|-1] [seconds] [nointerp] | rvcook stop");
                         }
                         break;
                     case "rvcargo":  // how a loose body in the driving RV moves against it; 'rvcargo probe 4'
