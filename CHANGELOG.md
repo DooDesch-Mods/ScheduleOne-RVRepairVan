@@ -4,6 +4,13 @@ All notable changes to RVRepairVan are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 project adheres to Semantic Versioning.
 
+## [4.4.2] - 2026-11-23
+
+### Fixed
+
+- The flask at a chemistry station in the RV tips and pours again with the RV parked away from home. The ingredients
+  spawned in one heap and blocked it.
+
 ## [4.4.1] - 2026-11-20
 
 ### Fixed
