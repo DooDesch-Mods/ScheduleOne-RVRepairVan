@@ -21,7 +21,7 @@
 ![S1API](https://img.shields.io/badge/S1API-required-orange)
 [![Discord](https://mods.doodesch.de/img/badge.svg)](https://mods.doodesch.de) [![Polyfill](https://polyfill.doomods.com/badge/rvrepairvan.svg)](https://polyfill.doomods.com/mod/rvrepairvan)
 
-[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_u90lXXj-7Xk81Eb1Lt-L3huI/badge.svg)](https://mlvscan.com/attestations/att_u90lXXj-7Xk81Eb1Lt-L3huI)
+[![MLVScan RVRepairVan.dll](https://mlvscan.com/attestations/att_M9nCrHjyg_1ofB5ZrFe420M9/badge.svg)](https://mlvscan.com/attestations/att_M9nCrHjyg_1ofB5ZrFe420M9)
 
 ![The RV driving through town at dusk](https://raw.githubusercontent.com/DooDesch-Mods/ScheduleOne-RVRepairVan/main/docs/img/header.jpg)
 
